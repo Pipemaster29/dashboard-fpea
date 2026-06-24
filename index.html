@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard FP&A — Orçado vs Real + Análise de Custos</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#0f172a;--panel:#1e293b;--panel2:#273449;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;
+    --accent:#38bdf8;--accent2:#818cf8;--good:#34d399;--bad:#f87171;--warn:#fbbf24;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.4}
+  header{background:linear-gradient(90deg,#0f172a,#1e293b);border-bottom:1px solid var(--line);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
+  header h1{font-size:20px;font-weight:600;display:flex;align-items:center;gap:10px}
+  header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+  .actions{display:flex;gap:10px;flex-wrap:wrap}
+  button{cursor:pointer;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;transition:.15s}
+  .btn-primary{background:var(--accent);color:#06202c}.btn-primary:hover{background:#7dd3fc}
+  .btn-ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}.btn-ghost:hover{border-color:var(--accent)}
+  main{padding:24px 28px;max-width:1480px;margin:0 auto}
+  #drop{border:2px dashed var(--line);border-radius:14px;padding:44px 24px;text-align:center;background:var(--panel);transition:.2s;cursor:pointer;margin-bottom:24px}
+  #drop:hover,#drop.drag{border-color:var(--accent);background:var(--panel2)}
+  #drop h2{font-size:17px;margin-bottom:6px}#drop p{color:var(--muted);font-size:14px;margin-top:4px}#drop .big{font-size:42px;margin-bottom:10px}
+  .hidden{display:none!important}
+  .sectitle{font-size:16px;font-weight:700;margin:6px 0 16px;display:flex;align-items:center;gap:10px}
+  .sectitle .tag{font-size:11px;font-weight:600;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 11px;color:var(--muted)}
+  .ovrbox{background:linear-gradient(180deg,#16233b,#1e293b);border:1px solid var(--accent2);border-radius:14px;padding:20px;margin-bottom:30px}
+  .resumo{background:rgba(56,189,248,.08);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
+  .resumo b{color:#fff}
+  .scope{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  .scope label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .note{font-size:12px;color:var(--muted);margin-top:10px;font-style:italic}
+  .filters{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px;align-items:flex-end}
+  .filters .grp{display:flex;flex-direction:column;gap:5px}
+  .filters label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;min-width:150px;max-width:240px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:22px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .kpi.glass{background:rgba(255,255,255,.04)}
+  .kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .kpi .val{font-size:22px;font-weight:700}
+  .kpi .sub{font-size:12px;margin-top:5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:24px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .card.full{grid-column:1/-1}
+  .card h3{font-size:14px;font-weight:600;margin-bottom:14px}
+  .card .wrap{position:relative;height:320px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .tablecard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:24px}
+  .tablecard h3{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+  .tablewrap{overflow:auto;max-height:460px;border-radius:8px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px;cursor:pointer}
+  th:hover{color:var(--accent)}
+  td:first-child,th:first-child,td.txt,th.txt{text-align:left}
+  tbody tr:hover{background:var(--panel2)}
+  .pos{color:var(--bad)}.neg{color:var(--good)}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:24px}
+  .badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--muted);margin-left:8px}
+  .small{font-size:11px;color:var(--muted);font-weight:400}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge">nenhum arquivo carregado</span></h1>
+  <div class="actions">
+    <button class="btn-ghost" onclick="limpar()">🗑 Limpar dados</button>
+    <button class="btn-primary" onclick="document.getElementById('file').click()">📂 Carregar Excel (realizado e/ou orçamento)</button>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple class="hidden">
+  </div>
+</header>
+
+<main>
+  <div id="drop">
+    <div class="big">📊</div>
+    <h2>Arraste suas planilhas aqui ou clique para selecionar</h2>
+    <p><b>Realizado:</b> extrações SAP/KSB1 (serviços + materiais). &nbsp; <b>Orçado:</b> a planilha de orçamento de custos.</p>
+    <p>Pode soltar todas de uma vez. Os dados ficam só no seu navegador — não são enviados para a internet.</p>
+  </div>
+
+  <!-- ORÇADO vs REAL -->
+  <div id="ovr" class="ovrbox hidden">
+    <div class="sectitle">🎯 Orçado vs Real <span class="tag" id="ovrTag">Custos Variáveis</span></div>
+    <div class="scope">
+      <label>Escopo (Tipo do orçamento)</label>
+      <select id="ovrTipo" onchange="renderOVR()"></select>
+    </div>
+    <div class="resumo" id="ovrResumo"></div>
+    <div class="kpis" id="ovrKpis"></div>
+    <div class="grid">
+      <div class="card full"><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
+    </div>
+    <div class="tablewrap"><table id="tabOVR"><thead></thead><tbody></tbody></table></div>
+    <div class="note" id="ovrNote"></div>
+  </div>
+
+  <!-- ANÁLISE DE CUSTOS REALIZADOS -->
+  <div id="dash" class="hidden">
+    <div class="sectitle">📈 Análise de Custos Realizados <span class="tag">detalhe por conta / centro</span></div>
+    <div class="filters">
+      <div class="grp"><label>Mês</label><select id="fMes"></select></div>
+      <div class="grp"><label>Centro de custo</label><select id="fCentro"></select></div>
+      <div class="grp"><label>Classe de custo</label><select id="fClasse"></select></div>
+      <div class="grp"><label>Objeto</label><select id="fObjeto"></select></div>
+      <div class="grp"><label>Origem</label><select id="fOrigem"></select></div>
+      <button class="btn-ghost" onclick="resetFiltros()">Limpar filtros</button>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="grid">
+      <div class="card"><h3>Custo por Classe de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chClasse"></canvas></div></div>
+      <div class="card"><h3>Custo por Centro de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chCentro"></canvas></div></div>
+      <div class="card"><h3>Evolução Mensal do Custo</h3><div class="wrap"><canvas id="chMes"></canvas></div></div>
+      <div class="card"><h3>Composição por Objeto</h3><div class="wrap"><canvas id="chObjeto"></canvas></div></div>
+    </div>
+    <div class="tablecard">
+      <h3>Detalhamento <span class="small" id="tabInfo"></span></h3>
+      <div class="tablewrap"><table id="tabela"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+</main>
+
+<footer>Dashboard FP&amp;A · Orçado vs Real (agregado) + análise de custos realizados (SAP KSB1) · Chart.js + SheetJS · GitHub Pages</footer>
+
+<script>
+const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const INT=new Intl.NumberFormat('pt-BR');
+const PCT=n=>(n>=0?'+':'')+n.toFixed(1).replace('.',',')+'%';
+const kBRL=v=>Math.abs(v)>=1000?'R$ '+(v/1000).toLocaleString('pt-BR',{maximumFractionDigits:0})+'k':'R$ '+v.toFixed(0);
+
+let DADOS=[];        // realizado
+let ORCAMENTO=[];    // {tipo, mes, classeCod, classeNome, valor}
+let charts={};
+let sortState={col:'valor',dir:1};
+
+function norm(s){return (s??'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
+function num(v){
+  if(typeof v==='number') return v;
+  if(v==null||v==='') return 0;
+  let s=v.toString().trim().replace(/r\$/gi,'').replace(/\s/g,'');
+  if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s); return isNaN(n)?0:n;
+}
+function mesDe(v){
+  if(v instanceof Date&&!isNaN(v)) return String(v.getMonth()+1).padStart(2,'0')+'/'+v.getFullYear();
+  const s=(v??'').toString();
+  let m=s.match(/(\d{4})[-\/](\d{1,2})/); if(m) return m[2].padStart(2,'0')+'/'+m[1];
+  m=s.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/); if(m) return m[2].padStart(2,'0')+'/'+m[3];
+  return s||'—';
+}
+const mesOrd=m=>{const p=m.split('/');return p.length===2?+p[1]*100+ +p[0]:999999;};
+function origemDe(nome){const n=norm(nome);if(n.includes('servic'))return'Serviços';if(n.includes('material')||n.includes('materiais'))return'Materiais';return nome.replace(/\.(xlsx|xls|csv)$/i,'');}
+
+document.getElementById('file').addEventListener('change',e=>{[...e.target.files].forEach(lerArquivo);e.target.value='';});
+const drop=document.getElementById('drop');
+drop.addEventListener('click',()=>document.getElementById('file').click());
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
+drop.addEventListener('drop',e=>{e.preventDefault();[...e.dataTransfer.files].forEach(lerArquivo);});
+
+function lerArquivo(file){
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[ escolherAba(wb) ];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,cellDates:true,defval:''});
+      if(ehOrcamento(aoa)){
+        const novos=parseOrcamento(aoa);
+        if(!novos.length){ alert('Reconheci "'+file.name+'" como orçamento, mas não achei valores mensais.'); return; }
+        ORCAMENTO=ORCAMENTO.concat(novos);
+      }else{
+        const json=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
+        const novos=mapear(json,file.name);
+        if(!novos.length){ alert('Não consegui identificar as colunas de "'+file.name+'".'); return; }
+        DADOS=DADOS.concat(novos);
+      }
+      atualizarUI();
+    }catch(err){ alert('Erro ao ler "'+file.name+'": '+err.message); }
+  };
+  r.readAsArrayBuffer(file);
+}
+function escolherAba(wb){
+  // prefere a aba com mais conteúdo (orçamento tem "Consolidado..." e "Planilha1" vazia)
+  let best=wb.SheetNames[0],max=-1;
+  wb.SheetNames.forEach(n=>{const ref=wb.Sheets[n]['!ref'];const c=ref?XLSX.utils.decode_range(ref).e.r:0;if(c>max){max=c;best=n;}});
+  return best;
+}
+
+function ehOrcamento(aoa){
+  for(let i=0;i<Math.min(aoa.length,15);i++){
+    const row=aoa[i]||[];
+    const temConta4=row.some(c=>norm(c).includes('conta 4'));
+    const temData=row.some(c=>c instanceof Date);
+    if(temConta4&&temData) return true;
+  }
+  return false;
+}
+function parseOrcamento(aoa){
+  let hi=-1;
+  for(let i=0;i<Math.min(aoa.length,15);i++){ if((aoa[i]||[]).some(c=>norm(c).includes('conta 4'))){hi=i;break;} }
+  if(hi<0) return [];
+  const hdr=aoa[hi];
+  const idx=cands=>{ for(const c of cands){ const i=hdr.findIndex(h=>norm(h).includes(c)); if(i>=0) return i; } return -1; };
+  const iTipo=hdr.findIndex(h=>norm(h)==='tipo');
+  const iC4=idx(['conta 4']);
+  const iD4=idx(['descricao conta 4','denominacao conta 4']);
+  const meses=[]; hdr.forEach((h,i)=>{ if(h instanceof Date) meses.push({i,mes:mesDe(h)}); });
+  const out=[];
+  for(let r=hi+1;r<aoa.length;r++){
+    const row=aoa[r]; if(!row) continue;
+    const tipo=iTipo>=0?String(row[iTipo]||''):'';
+    const cod=iC4>=0?String(row[iC4]||'').trim():'';
+    const nome=iD4>=0?String(row[iD4]||''):'';
+    if(!tipo&&!cod) continue;
+    meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,mes,classeCod:cod,classeNome:nome,valor:v}); });
+  }
+  return out;
+}
+
+function mapear(json,nome){
+  const keys=Object.keys(json[0]);
+  const find=cands=>{ for(const c of cands){ const k=keys.find(k=>norm(k).includes(c)); if(k) return k; } return undefined; };
+  const kVal=find(['valor variavel','valor/mobj','valor mobj','valor','montante','vlr']);
+  const kClasse=find(['denom.classe','denominacao classe','denom classe','classe de custo','classe custo']);
+  const kCentro=find(['centro custo','centro de custo','centro']);
+  const kObjeto=find(['denominacao objeto','denom objeto','objeto']);
+  const kData=find(['data do documento','data documento','data de lancamento','data','competencia','periodo','mes']);
+  const kMat=find(['texto breve material','descricao','material','texto']);
+  const origem=origemDe(nome);
+  return json.map(row=>({
+    valor:num(row[kVal]),
+    classe:(kClasse?String(row[kClasse]):'')||'Sem classe',
+    centro:kCentro?String(row[kCentro]):'—',
+    objeto:(kObjeto?String(row[kObjeto]):'')||'—',
+    mes:mesDe(kData?row[kData]:''),
+    material:kMat?String(row[kMat]):'',
+    origem
+  })).filter(d=>d.valor!==0);
+}
+
+function atualizarUI(){
+  document.getElementById('drop').classList.add('hidden');
+  const origens=[...new Set(DADOS.map(d=>d.origem))];
+  let badge=[];
+  if(DADOS.length) badge.push('Realizado: '+origens.join(' + ')+' ('+INT.format(DADOS.length)+')');
+  if(ORCAMENTO.length) badge.push('Orçamento ✓');
+  if(!DADOS.length&&ORCAMENTO.length) badge.push('— carregue o realizado (KSB1) para ver o Orçado vs Real');
+  document.getElementById('fileBadge').textContent=badge.join(' · ')||'nenhum arquivo carregado';
+  if(DADOS.length){ document.getElementById('dash').classList.remove('hidden'); montarFiltros(); render(); }
+  montarEscopoOVR(); renderOVR();
+}
+
+// ---------- filtros realizado ----------
+function uniq(a){return[...new Set(a)];}
+function montarFiltros(){
+  const set=(id,vals,sortFn)=>{const sel=document.getElementById(id);const cur=sel.value;
+    const v=sortFn?[...vals].sort(sortFn):[...vals].sort();
+    sel.innerHTML='<option value="">Todos</option>'+v.map(x=>`<option ${x===cur?'selected':''}>${x}</option>`).join('');sel.onchange=render;};
+  set('fMes',uniq(DADOS.map(d=>d.mes)),(a,b)=>mesOrd(a)-mesOrd(b));
+  set('fCentro',uniq(DADOS.map(d=>d.centro)));
+  set('fClasse',uniq(DADOS.map(d=>d.classe)));
+  set('fObjeto',uniq(DADOS.map(d=>d.objeto)));
+  set('fOrigem',uniq(DADOS.map(d=>d.origem)));
+}
+function resetFiltros(){['fMes','fCentro','fClasse','fObjeto','fOrigem'].forEach(id=>document.getElementById(id).value='');render();}
+function filtrar(){const g=id=>document.getElementById(id).value;
+  const m=g('fMes'),c=g('fCentro'),cl=g('fClasse'),o=g('fObjeto'),or=g('fOrigem');
+  return DADOS.filter(d=>(!m||d.mes===m)&&(!c||d.centro===c)&&(!cl||d.classe===cl)&&(!o||d.objeto===o)&&(!or||d.origem===or));}
+function aggSoma(rows,key){const m={};rows.forEach(d=>{m[d[key]]=(m[d[key]]||0)+d.valor;});return m;}
+
+function render(){const rows=filtrar();renderKPIs(rows);renderCharts(rows);renderTabela(rows);}
+
+function renderKPIs(rows){
+  const total=rows.reduce((s,d)=>s+d.valor,0);
+  const porClasse=aggSoma(rows,'classe');
+  const maior=Object.entries(porClasse).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))[0]||['—',0];
+  const porMes=aggSoma(rows,'mes');const nMes=Object.keys(porMes).length;
+  const cards=[
+    {lbl:'Custo Total',val:BRL.format(total),sub:'soma líquida (já com estornos)'},
+    {lbl:'Nº de Lançamentos',val:INT.format(rows.length)},
+    {lbl:'Média Mensal',val:BRL.format(nMes?total/nMes:0),sub:nMes+(nMes===1?' mês':' meses')},
+    {lbl:'Centros de Custo',val:INT.format(uniq(rows.map(d=>d.centro)).length)},
+    {lbl:'Maior Classe de Custo',val:BRL.format(maior[1]),sub:maior[0]}
+  ];
+  document.getElementById('kpis').innerHTML=cards.map(c=>`<div class="kpi"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub" title="${c.sub}">${c.sub}</div>`:''}</div>`).join('');
+}
+
+const COLORS=['#38bdf8','#818cf8','#34d399','#fbbf24','#f87171','#f472b6','#a78bfa','#2dd4bf','#fb923c','#60a5fa','#c084fc','#4ade80'];
+function destroy(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function topN(obj,n){return Object.entries(obj).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,n);}
+
+function renderCharts(rows){
+  const opts=horiz=>({responsive:true,maintainAspectRatio:false,indexAxis:horiz?'y':'x',
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>BRL.format(horiz?c.parsed.x:c.parsed.y)}}},
+    scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:horiz?(v=>kBRL(v)):undefined}},
+            y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:horiz?undefined:(v=>kBRL(v))}}}});
+  const cl=topN(aggSoma(rows,'classe'),12);destroy('chClasse');
+  const totCl=rows.reduce((s,d)=>s+d.valor,0);
+  const optCl=opts(true);
+  optCl.plugins.tooltip.callbacks.label=c=>BRL.format(c.parsed.x)+'  ('+(totCl?(c.parsed.x/totCl*100):0).toFixed(1).replace('.',',')+'% do total)';
+  charts.chClasse=new Chart('chClasse',{type:'bar',data:{labels:cl.map(x=>x[0]),datasets:[{data:cl.map(x=>x[1]),backgroundColor:'#38bdf8'}]},options:optCl});
+  const ce=topN(aggSoma(rows,'centro'),12);destroy('chCentro');
+  charts.chCentro=new Chart('chCentro',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:'#818cf8'}]},options:opts(true)});
+  const pm=aggSoma(rows,'mes');const meses=Object.keys(pm).sort((a,b)=>mesOrd(a)-mesOrd(b));destroy('chMes');
+  charts.chMes=new Chart('chMes',{type:'bar',data:{labels:meses,datasets:[{data:meses.map(m=>pm[m]),backgroundColor:'#34d399'}]},options:opts(false)});
+  const ob=topN(aggSoma(rows,'objeto'),10);destroy('chObjeto');
+  charts.chObjeto=new Chart('chObjeto',{type:'doughnut',data:{labels:ob.map(x=>x[0]),datasets:[{data:ob.map(x=>Math.abs(x[1])),backgroundColor:COLORS,borderColor:'#1e293b',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>c.label+': '+BRL.format(c.parsed)}}}}});
+}
+
+function renderTabela(rows){
+  const cols=[{k:'mes',t:'Mês',txt:true},{k:'centro',t:'Centro',txt:true},{k:'classe',t:'Classe de Custo',txt:true},
+    {k:'objeto',t:'Objeto',txt:true},{k:'material',t:'Material / Texto',txt:true},{k:'valor',t:'Valor',money:true,color:true}];
+  const data=[...rows].sort((a,b)=>{const x=a[sortState.col],y=b[sortState.col];return(typeof x==='number'?x-y:String(x).localeCompare(String(y)))*sortState.dir;});
+  document.getElementById('tabInfo').textContent=INT.format(rows.length)+' linhas · total '+BRL.format(rows.reduce((s,d)=>s+d.valor,0));
+  document.querySelector('#tabela thead').innerHTML='<tr>'+cols.map(c=>`<th class="${c.txt?'txt':''}" onclick="ordenar('${c.k}')">${c.t}</th>`).join('')+'</tr>';
+  const lim=data.slice(0,2000);
+  document.querySelector('#tabela tbody').innerHTML=lim.map(d=>'<tr>'+cols.map(c=>{let v=d[c.k],cls=c.txt?'txt':'';
+    if(c.color)cls+=v>0?' pos':(v<0?' neg':'');if(c.money)v=BRL.format(v);
+    return `<td class="${cls}" title="${String(d[c.k]).replace(/"/g,'')}">${String(v).length>40?String(v).slice(0,40)+'…':v}</td>`;}).join('')+'</tr>').join('')
+    +(data.length>2000?`<tr><td colspan="6" class="txt small">… exibindo 2.000 de ${INT.format(data.length)} linhas (use os filtros)</td></tr>`:'');
+}
+function ordenar(col){sortState.dir=sortState.col===col?-sortState.dir:1;sortState.col=col;render();}
+
+// ---------- ORÇADO vs REAL ----------
+function montarEscopoOVR(){
+  if(!ORCAMENTO.length) return;
+  const tipos=uniq(ORCAMENTO.map(o=>o.tipo)).filter(Boolean).sort();
+  const sel=document.getElementById('ovrTipo');const cur=sel.value;
+  const padrao=tipos.find(t=>norm(t).includes('custos variaveis'))||tipos[0]||'';
+  sel.innerHTML=tipos.map(t=>`<option ${ (cur||padrao)===t?'selected':'' }>${t}</option>`).join('');
+}
+function renderOVR(){
+  const ovr=document.getElementById('ovr');
+  if(!ORCAMENTO.length||!DADOS.length){ ovr.classList.add('hidden'); return; }
+  const tipo=document.getElementById('ovrTipo').value;
+  document.getElementById('ovrTag').textContent=tipo||'Orçamento';
+  const bm={}; ORCAMENTO.forEach(o=>{ if(!tipo||o.tipo===tipo) bm[o.mes]=(bm[o.mes]||0)+o.valor; });
+  const rm={}; DADOS.forEach(d=>{ rm[d.mes]=(rm[d.mes]||0)+d.valor; });
+  const meses=Object.keys(bm).filter(m=>m in rm).sort((a,b)=>mesOrd(a)-mesOrd(b)); // só meses com orçado E realizado
+  if(!meses.length){ ovr.classList.add('hidden'); return; }
+  ovr.classList.remove('hidden');
+  const orc=meses.reduce((s,m)=>s+bm[m],0), real=meses.reduce((s,m)=>s+rm[m],0);
+  const varAbs=real-orc, varPct=orc?varAbs/orc*100:0, exec=orc?real/orc*100:0;
+  const cls=varAbs>0?'pos':(varAbs<0?'neg':'');
+  const kpis=[
+    {lbl:'Orçado',val:BRL.format(orc),sub:meses[0]+' a '+meses[meses.length-1]},
+    {lbl:'Realizado',val:BRL.format(real)},
+    {lbl:'Variação (R$)',val:BRL.format(varAbs),cls,sub:varAbs>0?'acima do orçado':'abaixo do orçado'},
+    {lbl:'Variação (%)',val:PCT(varPct),cls},
+    {lbl:'Execução Orçamentária',val:exec.toFixed(1).replace('.',',')+'%',sub:'Realizado / Orçado'}
+  ];
+  document.getElementById('ovrKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
+
+  // resumo executivo automático
+  const desvios=meses.map(m=>({m,p:bm[m]?(rm[m]-bm[m])/bm[m]*100:0}));
+  const melhor=[...desvios].sort((a,b)=>Math.abs(a.p)-Math.abs(b.p))[0];
+  const pior=[...desvios].sort((a,b)=>Math.abs(b.p)-Math.abs(a.p))[0];
+  const sentido=varAbs<0?'<b>abaixo</b>':'<b>acima</b>';
+  document.getElementById('ovrResumo').innerHTML=
+    `📌 No acumulado <b>${meses[0]}–${meses[meses.length-1]}</b>, o realizado de "<b>${tipo}</b>" foi <b>${BRL.format(real)}</b>, `+
+    `${PCT(varPct)} ${sentido} do orçado (<b>${BRL.format(orc)}</b>) — diferença de <b>${BRL.format(Math.abs(varAbs))}</b>. `+
+    `Execução de <b>${exec.toFixed(0)}%</b> do orçamento. `+
+    `Mês de maior aderência: <b>${melhor.m}</b> (${PCT(melhor.p)}); maior desvio: <b>${pior.m}</b> (${PCT(pior.p)}).`;
+
+  destroy('chOVR');
+  charts.chOVR=new Chart('chOVR',{type:'bar',data:{labels:meses,datasets:[
+    {label:'Orçado',data:meses.map(m=>bm[m]),backgroundColor:'#818cf8'},
+    {label:'Realizado',data:meses.map(m=>rm[m]),backgroundColor:'#38bdf8'}
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
+    scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+
+  // tabela mensal
+  const cols=['Mês','Orçado','Realizado','Variação','%'];
+  document.querySelector('#tabOVR thead').innerHTML='<tr>'+cols.map((c,i)=>`<th class="${i===0?'txt':''}">${c}</th>`).join('')+'</tr>';
+  let body=meses.map(m=>{const o=bm[m],r=rm[m],v=r-o,p=o?v/o*100:0,cc=v>0?'pos':'neg';
+    return `<tr><td class="txt">${m}</td><td>${BRL.format(o)}</td><td>${BRL.format(r)}</td><td class="${cc}">${BRL.format(v)}</td><td class="${cc}">${PCT(p)}</td></tr>`;}).join('');
+  body+=`<tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt">TOTAL</td><td>${BRL.format(orc)}</td><td>${BRL.format(real)}</td><td class="${cls}">${BRL.format(varAbs)}</td><td class="${cls}">${PCT(varPct)}</td></tr>`;
+  document.querySelector('#tabOVR tbody').innerHTML=body;
+
+  document.getElementById('ovrNote').textContent=
+    `Comparação no escopo "${tipo}", apenas meses com orçado e realizado (${meses.join(', ')}). `+
+    `Meses sem realizado (orçamento futuro) e meses sem orçamento ficam de fora. `+
+    `A abertura por conta não é comparada aqui porque os códigos do orçamento diferem dos códigos de lançamento do SAP.`;
+}
+
+function limpar(){
+  DADOS=[];ORCAMENTO=[];Object.keys(charts).forEach(destroy);
+  document.getElementById('dash').classList.add('hidden');
+  document.getElementById('ovr').classList.add('hidden');
+  document.getElementById('drop').classList.remove('hidden');
+  document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
+}
+</script>
+</body>
+</html>
