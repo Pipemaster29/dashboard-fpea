@@ -35,6 +35,9 @@
   .filters .grp{display:flex;flex-direction:column;gap:5px}
   .filters label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
   select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;min-width:150px;max-width:240px}
+  #tabOps input,#tabOps select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12.5px;width:100%;min-width:64px;max-width:none}
+  #tabOps td{padding:6px 8px}
+  .delbtn{background:transparent;color:var(--bad);border:1px solid var(--line);padding:3px 9px;border-radius:6px;font-size:14px;font-weight:700}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:22px}
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
   .kpi.glass{background:rgba(255,255,255,.04)}
@@ -94,6 +97,29 @@
     </div>
     <div class="tablewrap"><table id="tabOVR"><thead></thead><tbody></tbody></table></div>
     <div class="note" id="ovrNote"></div>
+  </div>
+
+  <!-- OPERAÇÕES & R$/KM -->
+  <div id="ops" class="ovrbox hidden">
+    <div class="sectitle">🚚 Operações & Custo por KM <span class="tag" id="opsTag">R$/KM · R$/viagem</span></div>
+    <div class="scope">
+      <label>Categoria de custo</label>
+      <select id="opsCat" onchange="renderOpsCalc()">
+        <option value="combustivel">Combustível / Diesel</option>
+        <option value="manutencao">Manutenção</option>
+        <option value="pneus">Pneus</option>
+        <option value="total">Custo Total</option>
+      </select>
+      <button class="btn-ghost" onclick="addOpsRow()">+ Adicionar operação</button>
+      <span class="small">Digite KM e nº de viagens por operação/mês — os custos vêm das bases SAP carregadas. Fica salvo no seu navegador.</span>
+    </div>
+    <div class="kpis" id="opsKpis"></div>
+    <div class="grid">
+      <div class="card"><h3>R$/KM por Localidade</h3><div class="wrap"><canvas id="chRkmLoc"></canvas></div></div>
+      <div class="card"><h3>R$/KM por Mês</h3><div class="wrap"><canvas id="chRkmMes"></canvas></div></div>
+    </div>
+    <div class="tablewrap"><table id="tabOps"><thead></thead><tbody></tbody></table></div>
+    <div class="note">R$/KM = custo da categoria (das bases SAP, por localidade e mês) ÷ KM informado. O custo é restrito aos meses/localidades em que você informou KM, para a conta bater.</div>
   </div>
 
   <!-- ANÁLISE DE CUSTOS REALIZADOS -->
@@ -265,7 +291,7 @@ function atualizarUI(){
   if(!DADOS.length&&ORCAMENTO.length) badge.push('— carregue o realizado (KSB1) para ver o Orçado vs Real');
   document.getElementById('fileBadge').textContent=badge.join(' · ')||'nenhum arquivo carregado';
   if(DADOS.length){ document.getElementById('dash').classList.remove('hidden'); montarFiltros(); render(); }
-  montarEscopoOVR(); renderOVR();
+  montarEscopoOVR(); renderOVR(); renderOps();
 }
 
 // ---------- filtros realizado ----------
@@ -368,6 +394,60 @@ function renderTabela(rows){
 }
 function ordenar(col){sortState.dir=sortState.col===col?-sortState.dir:1;sortState.col=col;render();}
 
+// ---------- OPERAÇÕES & R$/KM ----------
+let opsRows=[];try{opsRows=JSON.parse(localStorage.getItem('opsRows')||'[]');}catch(e){opsRows=[];}
+function saveOps(){try{localStorage.setItem('opsRows',JSON.stringify(opsRows));}catch(e){}}
+function addOpsRow(){const meses=uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
+  opsRows.push({mes:meses[meses.length-1]||'',regiao:'Amazonas',operacao:'',km:0,viagens:0});saveOps();renderOpsTable();renderOpsCalc();}
+function delOpsRow(i){opsRows.splice(i,1);saveOps();renderOpsTable();renderOpsCalc();}
+function setOps(i,k,v){if(!opsRows[i])return;opsRows[i][k]=(k==='km'||k==='viagens')?num(v):v;saveOps();renderOpsCalc();}
+function catMatch(cat,classe){const n=norm(classe);
+  if(cat==='combustivel')return n.includes('diesel')||n.includes('combust')||n.includes('lubrific');
+  if(cat==='manutencao')return n.includes('manuten')||n.includes('sobressalente');
+  if(cat==='pneus')return n.includes('pneu')||n.includes('camara');
+  return true;}
+function renderOps(){const sec=document.getElementById('ops');
+  if(!DADOS.length){sec.classList.add('hidden');return;}
+  sec.classList.remove('hidden');
+  if(!opsRows.length){addOpsRow();}else{renderOpsTable();renderOpsCalc();}}
+function renderOpsTable(){
+  const meses=uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
+  const regs=['Amazonas','Maranhão'];
+  document.querySelector('#tabOps thead').innerHTML='<tr><th class="txt">Operação / Rota</th><th class="txt">Localidade</th><th class="txt">Mês</th><th>KM</th><th>Nº viagens</th><th></th></tr>';
+  document.querySelector('#tabOps tbody').innerHTML=opsRows.map((r,i)=>`<tr>
+    <td class="txt"><input value="${(r.operacao||'').replace(/"/g,'&quot;')}" placeholder="ex: Azulão" oninput="setOps(${i},'operacao',this.value)"></td>
+    <td class="txt"><select onchange="setOps(${i},'regiao',this.value)">${regs.map(x=>`<option ${x===r.regiao?'selected':''}>${x}</option>`).join('')}</select></td>
+    <td class="txt"><select onchange="setOps(${i},'mes',this.value)">${meses.map(x=>`<option ${x===r.mes?'selected':''}>${x}</option>`).join('')}</select></td>
+    <td><input type="number" min="0" value="${r.km||''}" oninput="setOps(${i},'km',this.value)"></td>
+    <td><input type="number" min="0" value="${r.viagens||''}" oninput="setOps(${i},'viagens',this.value)"></td>
+    <td><button class="delbtn" onclick="delOpsRow(${i})" title="remover">✕</button></td></tr>`).join('');
+}
+function renderOpsCalc(){
+  const cat=document.getElementById('opsCat').value;
+  const cost={};DADOS.forEach(d=>{if(catMatch(cat,d.classe)){const k=d.loc+'|'+d.mes;cost[k]=(cost[k]||0)+d.valor;}});
+  const kmReg={},kmMes={},kmOp={};const pares=new Set();let viaTot=0,kmTot=0;
+  opsRows.forEach(r=>{viaTot+=(+r.viagens||0);if(!r.mes||!r.km)return;const k=r.regiao+'|'+r.mes;pares.add(k);
+    kmReg[r.regiao]=(kmReg[r.regiao]||0)+r.km;kmMes[r.mes]=(kmMes[r.mes]||0)+r.km;kmTot+=r.km;
+    if(r.operacao)kmOp[r.operacao]=(kmOp[r.operacao]||0)+r.km;});
+  const custoReg={},custoMes={};let custoTot=0;
+  pares.forEach(k=>{const p=k.split('|');const c=cost[k]||0;custoReg[p[0]]=(custoReg[p[0]]||0)+c;custoMes[p[1]]=(custoMes[p[1]]||0)+c;custoTot+=c;});
+  const rkm=kmTot?custoTot/kmTot:0;
+  const kpis=[
+    {lbl:'Custo da categoria',val:BRL.format(custoTot),sub:'meses/locais informados'},
+    {lbl:'KM total',val:INT.format(Math.round(kmTot))},
+    {lbl:'R$/KM',val:kmTot?BRL.format(rkm):'—',sub:'custo ÷ km'},
+    {lbl:'Nº de viagens',val:INT.format(viaTot)},
+    {lbl:'R$/viagem',val:viaTot?BRL.format(custoTot/viaTot):'—'}
+  ];
+  document.getElementById('opsKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
+  const regs=Object.keys(kmReg);destroy('chRkmLoc');
+  charts.chRkmLoc=new Chart('chRkmLoc',{type:'bar',data:{labels:regs,datasets:[{data:regs.map(r=>kmReg[r]?custoReg[r]/kmReg[r]:0),backgroundColor:'#34d399'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$/KM: '+BRL.format(c.parsed.y)}}},scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
+  const meses=Object.keys(kmMes).sort((a,b)=>mesOrd(a)-mesOrd(b));destroy('chRkmMes');
+  charts.chRkmMes=new Chart('chRkmMes',{type:'line',data:{labels:meses,datasets:[{data:meses.map(m=>kmMes[m]?custoMes[m]/kmMes[m]:0),borderColor:'#38bdf8',backgroundColor:'#38bdf8',tension:.2,pointRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$/KM: '+BRL.format(c.parsed.y)}}},scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
+}
+
 // ---------- ORÇADO vs REAL ----------
 function montarEscopoOVR(){
   if(!ORCAMENTO.length) return;
@@ -435,6 +515,7 @@ function limpar(){
   DADOS=[];ORCAMENTO=[];Object.keys(charts).forEach(destroy);
   document.getElementById('dash').classList.add('hidden');
   document.getElementById('ovr').classList.add('hidden');
+  document.getElementById('ops').classList.add('hidden');
   document.getElementById('drop').classList.remove('hidden');
   document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
 }
