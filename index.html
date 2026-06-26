@@ -170,6 +170,7 @@ const kBRL=v=>Math.abs(v)>=1000?'R$ '+(v/1000).toLocaleString('pt-BR',{maximumFr
 
 let DADOS=[];        // realizado
 let ORCAMENTO=[];    // {tipo, mes, classeCod, classeNome, valor}
+let ORCKPI=null;     // {localidade:{mes:{km, custo:{manut,pneu,lubrif,comb,total}}}}  (OBZ R$/km)
 let charts={};
 let sortState={col:'valor',dir:1};
 
@@ -207,7 +208,11 @@ function lerArquivo(file){
       const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
       const ws=wb.Sheets[ escolherAba(wb) ];
       const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,cellDates:true,defval:''});
-      if(ehOrcamento(aoa)){
+      if(ehOBZ(aoa)){
+        const obz=parseOBZ(aoa);
+        if(!Object.keys(obz).length){ alert('Reconheci "'+file.name+'" como Orçamento KPIs (OBZ), mas não consegui extrair o R$/km.'); return; }
+        ORCKPI=obz;
+      }else if(ehOrcamento(aoa)){
         const novos=parseOrcamento(aoa);
         if(!novos.length){ alert('Reconheci "'+file.name+'" como orçamento, mas não achei valores mensais.'); return; }
         ORCAMENTO=ORCAMENTO.concat(novos);
@@ -223,10 +228,56 @@ function lerArquivo(file){
   r.readAsArrayBuffer(file);
 }
 function escolherAba(wb){
-  // prefere a aba com mais conteúdo (orçamento tem "Consolidado..." e "Planilha1" vazia)
+  // prefere aba OBZ (orçamento KPIs); senão a aba com mais conteúdo
+  const obz=wb.SheetNames.find(n=>norm(n).includes('obz'));
+  if(obz) return obz;
   let best=wb.SheetNames[0],max=-1;
   wb.SheetNames.forEach(n=>{const ref=wb.Sheets[n]['!ref'];const c=ref?XLSX.utils.decode_range(ref).e.r:0;if(c>max){max=c;best=n;}});
   return best;
+}
+
+// ----- Orçamento KPIs (OBZ): R$/km por tipo, por operação/localidade -----
+function ehOBZ(aoa){
+  for(let i=0;i<Math.min(aoa.length,40);i++){
+    const row=aoa[i]||[];
+    for(const c of row){ const n=norm(c);
+      if(n.includes('operacao maranh')||n.includes('operacao amazon')||n.includes('principais kpis')) return true; }
+  }
+  return false;
+}
+function parseOBZ(aoa){
+  const isDate=v=>v instanceof Date&&!isNaN(v);
+  const ops=[]; let reg=null;
+  for(let i=0;i<aoa.length;i++){
+    const row=aoa[i]||[]; const c1=norm(row[1]);
+    if(c1.startsWith('opera')&&(c1.includes('maranh')||c1.includes('amazon'))){reg=c1.includes('amazon')?'Amazonas':'Maranhão';continue;}
+    if(row[1]&&isDate(row[5])&&c1!=='gnl brasil r$'){
+      const mesCols=[]; row.forEach((v,c)=>{ if(isDate(v)){const mes=mesDe(v); if(mes.endsWith('/2026')) mesCols.push({c,mes});} });
+      ops.push({start:i,reg:reg||'Indefinido',mesCols});
+    }
+  }
+  const out={};
+  for(let k=0;k<ops.length;k++){
+    const op=ops[k]; const end=k+1<ops.length?ops[k+1].start:aoa.length;
+    const rate={}; let kmRow=null, totalRow=null;
+    for(let r=op.start;r<end;r++){
+      const row=aoa[r]||[]; const lbl=norm(row[1]);
+      const t = lbl==='manutencao'?'manut': lbl.includes('pneus e camaras')?'pneu': lbl==='lubrificantes'?'lubrif': lbl==='combustivel'?'comb': null;
+      if(t&&!rate[t]) rate[t]=row;                                  // R$/km por tipo (mensal)
+      if(lbl.includes('km necess')&&!kmRow) kmRow=row;              // KM necessária (mensal)
+      if(lbl.includes('total custos variaveis')&&!totalRow) totalRow=row; // custo total absoluto (mensal)
+    }
+    if(!kmRow) continue;
+    op.mesCols.forEach(({c,mes})=>{
+      const km=typeof kmRow[c]==='number'?kmRow[c]:0; if(!km) return;
+      if(!out[op.reg]) out[op.reg]={};
+      if(!out[op.reg][mes]) out[op.reg][mes]={km:0,custo:{manut:0,pneu:0,lubrif:0,comb:0,total:0}};
+      out[op.reg][mes].km+=km;
+      ['manut','pneu','lubrif','comb'].forEach(t=>{const rr=rate[t]; const v=(rr&&typeof rr[c]==='number')?rr[c]:0; out[op.reg][mes].custo[t]+=v*km;});
+      const tv=totalRow&&typeof totalRow[c]==='number'?totalRow[c]:0; out[op.reg][mes].custo.total+=tv;
+    });
+  }
+  return out;
 }
 
 function ehOrcamento(aoa){
@@ -288,6 +339,7 @@ function atualizarUI(){
   let badge=[];
   if(DADOS.length) badge.push('Realizado: '+origens.join(' + ')+' ('+INT.format(DADOS.length)+')');
   if(ORCAMENTO.length) badge.push('Orçamento ✓');
+  if(ORCKPI) badge.push('Orçado R$/km ✓');
   if(!DADOS.length&&ORCAMENTO.length) badge.push('— carregue o realizado (KSB1) para ver o Orçado vs Real');
   document.getElementById('fileBadge').textContent=badge.join(' · ')||'nenhum arquivo carregado';
   if(DADOS.length){ document.getElementById('dash').classList.remove('hidden'); montarFiltros(); render(); }
@@ -424,6 +476,7 @@ function renderOpsTable(){
 }
 function renderOpsCalc(){
   const cat=document.getElementById('opsCat').value;
+  const orcType = cat==='manutencao'?'manut': cat==='combustivel'?'comb': cat==='pneus'?'pneu': 'total';
   const cost={};DADOS.forEach(d=>{if(catMatch(cat,d.classe)){const k=d.loc+'|'+d.mes;cost[k]=(cost[k]||0)+d.valor;}});
   const kmReg={},kmMes={},kmOp={};const pares=new Set();let viaTot=0,kmTot=0;
   opsRows.forEach(r=>{viaTot+=(+r.viagens||0);if(!r.mes||!r.km)return;const k=r.regiao+'|'+r.mes;pares.add(k);
@@ -432,20 +485,38 @@ function renderOpsCalc(){
   const custoReg={},custoMes={};let custoTot=0;
   pares.forEach(k=>{const p=k.split('|');const c=cost[k]||0;custoReg[p[0]]=(custoReg[p[0]]||0)+c;custoMes[p[1]]=(custoMes[p[1]]||0)+c;custoTot+=c;});
   const rkm=kmTot?custoTot/kmTot:0;
+  // orçado R$/km (OBZ) restrito aos mesmos meses/localidades informados
+  const orcRegC={},orcRegK={},orcMesC={},orcMesK={};let orcCustoTot=0,orcKmTot=0;
+  const temOrc=!!ORCKPI;
+  if(temOrc){pares.forEach(k=>{const p=k.split('|');const o=ORCKPI[p[0]]&&ORCKPI[p[0]][p[1]];if(!o)return;
+    const c=o.custo[orcType]||0;orcRegC[p[0]]=(orcRegC[p[0]]||0)+c;orcRegK[p[0]]=(orcRegK[p[0]]||0)+o.km;
+    orcMesC[p[1]]=(orcMesC[p[1]]||0)+c;orcMesK[p[1]]=(orcMesK[p[1]]||0)+o.km;orcCustoTot+=c;orcKmTot+=o.km;});}
+  const orcRkm=orcKmTot?orcCustoTot/orcKmTot:0;
   const kpis=[
     {lbl:'Custo da categoria',val:BRL.format(custoTot),sub:'meses/locais informados'},
-    {lbl:'KM total',val:INT.format(Math.round(kmTot))},
-    {lbl:'R$/KM',val:kmTot?BRL.format(rkm):'—',sub:'custo ÷ km'},
-    {lbl:'Nº de viagens',val:INT.format(viaTot)},
-    {lbl:'R$/viagem',val:viaTot?BRL.format(custoTot/viaTot):'—'}
+    {lbl:'KM total (real)',val:INT.format(Math.round(kmTot))},
+    {lbl:'R$/KM realizado',val:kmTot?BRL.format(rkm):'—',sub:'custo ÷ km'}
   ];
-  document.getElementById('opsKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
+  if(temOrc&&orcKmTot){const dv=rkm-orcRkm,dpct=orcRkm?dv/orcRkm*100:0,cls=dv>0?'pos':'neg';
+    kpis.push({lbl:'R$/KM orçado',val:BRL.format(orcRkm),sub:'meta OBZ'});
+    kpis.push({lbl:'Variação R$/KM',val:(dv>=0?'+':'')+BRL.format(dv),cls,sub:PCT(dpct)+(dv>0?' acima':' abaixo')});
+  }else{
+    kpis.push({lbl:'Nº de viagens',val:INT.format(viaTot)});
+    kpis.push({lbl:'R$/viagem',val:viaTot?BRL.format(custoTot/viaTot):'—'});
+  }
+  document.getElementById('opsKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
+  document.getElementById('opsTag').textContent=temOrc?'R$/KM realizado vs orçado (OBZ)':'R$/KM · R$/viagem';
+  const showOrc=temOrc&&orcKmTot>0;
   const regs=Object.keys(kmReg);destroy('chRkmLoc');
-  charts.chRkmLoc=new Chart('chRkmLoc',{type:'bar',data:{labels:regs,datasets:[{data:regs.map(r=>kmReg[r]?custoReg[r]/kmReg[r]:0),backgroundColor:'#34d399'}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$/KM: '+BRL.format(c.parsed.y)}}},scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
+  const dsLoc=[{label:'Realizado',data:regs.map(r=>kmReg[r]?custoReg[r]/kmReg[r]:0),backgroundColor:'#34d399'}];
+  if(showOrc)dsLoc.push({label:'Orçado',data:regs.map(r=>orcRegK[r]?orcRegC[r]/orcRegK[r]:0),backgroundColor:'#818cf8'});
+  charts.chRkmLoc=new Chart('chRkmLoc',{type:'bar',data:{labels:regs,datasets:dsLoc},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:showOrc,labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+'/km'}}},scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
   const meses=Object.keys(kmMes).sort((a,b)=>mesOrd(a)-mesOrd(b));destroy('chRkmMes');
-  charts.chRkmMes=new Chart('chRkmMes',{type:'line',data:{labels:meses,datasets:[{data:meses.map(m=>kmMes[m]?custoMes[m]/kmMes[m]:0),borderColor:'#38bdf8',backgroundColor:'#38bdf8',tension:.2,pointRadius:3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$/KM: '+BRL.format(c.parsed.y)}}},scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
+  const dsMes=[{label:'Realizado',data:meses.map(m=>kmMes[m]?custoMes[m]/kmMes[m]:0),borderColor:'#38bdf8',backgroundColor:'#38bdf8',tension:.2,pointRadius:3}];
+  if(showOrc)dsMes.push({label:'Orçado',data:meses.map(m=>orcMesK[m]?orcMesC[m]/orcMesK[m]:0),borderColor:'#818cf8',backgroundColor:'#818cf8',borderDash:[5,4],tension:.2,pointRadius:3});
+  charts.chRkmMes=new Chart('chRkmMes',{type:'line',data:{labels:meses,datasets:dsMes},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:showOrc,labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+'/km'}}},scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
 }
 
 // ---------- ORÇADO vs REAL ----------
@@ -512,7 +583,7 @@ function renderOVR(){
 }
 
 function limpar(){
-  DADOS=[];ORCAMENTO=[];Object.keys(charts).forEach(destroy);
+  DADOS=[];ORCAMENTO=[];ORCKPI=null;Object.keys(charts).forEach(destroy);
   document.getElementById('dash').classList.add('hidden');
   document.getElementById('ovr').classList.add('hidden');
   document.getElementById('ops').classList.add('hidden');
