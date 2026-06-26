@@ -590,6 +590,54 @@ function limpar(){
   document.getElementById('drop').classList.remove('hidden');
   document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
 }
+// 🔥 --------- SUPABASE INTEGRAÇÃO ---------
+
+const SUPABASE_URL = "https://mzbwxyqfmruxaytfrimp.supabase.co";
+const SUPABASE_KEY = "COLE_SUA_PUBLISHABLE_KEY_AQUI";
+
+async function carregarDoSupabase() {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/Custos%20Variaveis`,
+      {
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": "Bearer " + SUPABASE_KEY
+        }
+      }
+    );
+
+    const data = await res.json();
+
+    console.log("Dados do Supabase:", data);
+
+    // 👉 converte os dados do banco para formato do seu sistema
+    const novos = data.map(d => ({
+      valor: Number(d["Valor"] || 0),
+      classe: String(d["Classe de custo"] || "Sem classe"),
+      centro: String(d["Centro custo"] || "—"),
+      objeto: "",
+      mes: mesDe(d["Data do documento"]),
+      material: "",
+      loc: localidadeDe(d["Centro custo"]),
+      origem: "Supabase"
+    }));
+
+    // ✅ joga no sistema
+    DADOS = novos;
+
+    // ✅ dispara toda sua lógica atual
+    atualizarUI();
+
+  } catch (err) {
+    console.error("Erro ao carregar Supabase:", err);
+  }
+}
+
+// 🚀 chama automaticamente ao abrir o site
+carregarDoSupabase();
+
+
 </script>
 </body>
 </html>
