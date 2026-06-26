@@ -101,6 +101,7 @@
     <div class="sectitle">📈 Análise de Custos Realizados <span class="tag">detalhe por conta / centro</span></div>
     <div class="filters">
       <div class="grp"><label>Mês</label><select id="fMes"></select></div>
+      <div class="grp"><label>Localidade</label><select id="fLoc"></select></div>
       <div class="grp"><label>Centro de custo</label><select id="fCentro"></select></div>
       <div class="grp"><label>Classe de custo</label><select id="fClasse"></select></div>
       <div class="grp"><label>Objeto</label><select id="fObjeto"></select></div>
@@ -112,6 +113,18 @@
       <div class="card"><h3>Custo por Classe de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chClasse"></canvas></div></div>
       <div class="card"><h3>Custo por Centro de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chCentro"></canvas></div></div>
       <div class="card"><h3>Evolução Mensal do Custo</h3><div class="wrap"><canvas id="chMes"></canvas></div></div>
+      <div class="card"><h3>Custo por Localidade <span class="small">(Amazonas × Maranhão)</span></h3><div class="wrap"><canvas id="chLoc"></canvas></div></div>
+      <div class="card full">
+        <h3>Análise de Pareto <span class="small">— onde está concentrado o custo (80/20)</span>
+          &nbsp; <select id="paretoDim" onchange="render()" style="min-width:150px">
+            <option value="classe">por Classe de Custo</option>
+            <option value="centro">por Centro de Custo</option>
+            <option value="objeto">por Objeto</option>
+            <option value="loc">por Localidade</option>
+          </select>
+        </h3>
+        <div class="wrap" style="height:360px"><canvas id="chPareto"></canvas></div>
+      </div>
       <div class="card"><h3>Composição por Objeto</h3><div class="wrap"><canvas id="chObjeto"></canvas></div></div>
     </div>
     <div class="tablecard">
@@ -151,6 +164,8 @@ function mesDe(v){
 }
 const mesOrd=m=>{const p=m.split('/');return p.length===2?+p[1]*100+ +p[0]:999999;};
 function origemDe(nome){const n=norm(nome);if(n.includes('servic'))return'Serviços';if(n.includes('material')||n.includes('materiais'))return'Materiais';return nome.replace(/\.(xlsx|xls|csv)$/i,'');}
+// localidade pela última letra do centro de custo: A -> Amazonas, demais -> Maranhão
+function localidadeDe(cc){const m=String(cc||'').match(/([A-Za-z])(?=[^A-Za-z]*$)/);if(!m)return'Indefinido';return m[1].toUpperCase()==='A'?'Amazonas':'Maranhão';}
 
 document.getElementById('file').addEventListener('change',e=>{[...e.target.files].forEach(lerArquivo);e.target.value='';});
 const drop=document.getElementById('drop');
@@ -236,6 +251,7 @@ function mapear(json,nome){
     objeto:(kObjeto?String(row[kObjeto]):'')||'—',
     mes:mesDe(kData?row[kData]:''),
     material:kMat?String(row[kMat]):'',
+    loc:localidadeDe(kCentro?row[kCentro]:''),
     origem
   })).filter(d=>d.valor!==0);
 }
@@ -259,15 +275,16 @@ function montarFiltros(){
     const v=sortFn?[...vals].sort(sortFn):[...vals].sort();
     sel.innerHTML='<option value="">Todos</option>'+v.map(x=>`<option ${x===cur?'selected':''}>${x}</option>`).join('');sel.onchange=render;};
   set('fMes',uniq(DADOS.map(d=>d.mes)),(a,b)=>mesOrd(a)-mesOrd(b));
+  set('fLoc',uniq(DADOS.map(d=>d.loc)));
   set('fCentro',uniq(DADOS.map(d=>d.centro)));
   set('fClasse',uniq(DADOS.map(d=>d.classe)));
   set('fObjeto',uniq(DADOS.map(d=>d.objeto)));
   set('fOrigem',uniq(DADOS.map(d=>d.origem)));
 }
-function resetFiltros(){['fMes','fCentro','fClasse','fObjeto','fOrigem'].forEach(id=>document.getElementById(id).value='');render();}
+function resetFiltros(){['fMes','fLoc','fCentro','fClasse','fObjeto','fOrigem'].forEach(id=>document.getElementById(id).value='');render();}
 function filtrar(){const g=id=>document.getElementById(id).value;
-  const m=g('fMes'),c=g('fCentro'),cl=g('fClasse'),o=g('fObjeto'),or=g('fOrigem');
-  return DADOS.filter(d=>(!m||d.mes===m)&&(!c||d.centro===c)&&(!cl||d.classe===cl)&&(!o||d.objeto===o)&&(!or||d.origem===or));}
+  const m=g('fMes'),lo=g('fLoc'),c=g('fCentro'),cl=g('fClasse'),o=g('fObjeto'),or=g('fOrigem');
+  return DADOS.filter(d=>(!m||d.mes===m)&&(!lo||d.loc===lo)&&(!c||d.centro===c)&&(!cl||d.classe===cl)&&(!o||d.objeto===o)&&(!or||d.origem===or));}
 function aggSoma(rows,key){const m={};rows.forEach(d=>{m[d[key]]=(m[d[key]]||0)+d.valor;});return m;}
 
 function render(){const rows=filtrar();renderKPIs(rows);renderCharts(rows);renderTabela(rows);}
@@ -308,10 +325,37 @@ function renderCharts(rows){
   const ob=topN(aggSoma(rows,'objeto'),10);destroy('chObjeto');
   charts.chObjeto=new Chart('chObjeto',{type:'doughnut',data:{labels:ob.map(x=>x[0]),datasets:[{data:ob.map(x=>Math.abs(x[1])),backgroundColor:COLORS,borderColor:'#1e293b',borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>c.label+': '+BRL.format(c.parsed)}}}}});
+
+  // Custo por Localidade
+  const lo=aggSoma(rows,'loc');const loKeys=Object.keys(lo).sort((a,b)=>lo[b]-lo[a]);const totLo=loKeys.reduce((s,k)=>s+Math.abs(lo[k]),0);destroy('chLoc');
+  charts.chLoc=new Chart('chLoc',{type:'doughnut',data:{labels:loKeys,datasets:[{data:loKeys.map(k=>Math.abs(lo[k])),backgroundColor:['#34d399','#38bdf8','#fbbf24','#f87171'],borderColor:'#1e293b',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:12},boxWidth:12}},
+      tooltip:{callbacks:{label:c=>c.label+': '+BRL.format(c.parsed)+' ('+(totLo?(c.parsed/totLo*100):0).toFixed(1).replace('.',',')+'%)'}}}}});
+
+  renderPareto(rows);
+}
+
+function renderPareto(rows){
+  const dim=document.getElementById('paretoDim').value;
+  const agg=aggSoma(rows,dim);
+  // só contribuintes positivos (drivers de custo), ordenados desc
+  let items=Object.entries(agg).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  if(items.length>15){const resto=items.slice(15).reduce((s,x)=>s+x[1],0);items=items.slice(0,15);if(resto>0)items.push(['Outros',resto]);}
+  const tot=items.reduce((s,x)=>s+x[1],0);
+  let acc=0;const cum=items.map(([,v])=>{acc+=v;return tot?acc/tot*100:0;});
+  destroy('chPareto');
+  charts.chPareto=new Chart('chPareto',{data:{labels:items.map(x=>String(x[0]).slice(0,28)),datasets:[
+    {type:'bar',label:'Custo',data:items.map(x=>x[1]),backgroundColor:'#38bdf8',yAxisID:'y',order:2},
+    {type:'line',label:'% acumulado',data:cum,borderColor:'#fbbf24',backgroundColor:'#fbbf24',yAxisID:'y2',tension:.2,pointRadius:3,order:1}
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.type==='line'?'Acumulado: '+c.parsed.y.toFixed(1).replace('.',',')+'%':BRL.format(c.parsed.y)+' ('+(tot?c.parsed.y/tot*100:0).toFixed(1).replace('.',',')+'%)'}}},
+    scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:55,minRotation:30,font:{size:10}}},
+      y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},
+      y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#fbbf24',callback:v=>v+'%'}}}}});
 }
 
 function renderTabela(rows){
-  const cols=[{k:'mes',t:'Mês',txt:true},{k:'centro',t:'Centro',txt:true},{k:'classe',t:'Classe de Custo',txt:true},
+  const cols=[{k:'mes',t:'Mês',txt:true},{k:'loc',t:'Localidade',txt:true},{k:'centro',t:'Centro',txt:true},{k:'classe',t:'Classe de Custo',txt:true},
     {k:'objeto',t:'Objeto',txt:true},{k:'material',t:'Material / Texto',txt:true},{k:'valor',t:'Valor',money:true,color:true}];
   const data=[...rows].sort((a,b)=>{const x=a[sortState.col],y=b[sortState.col];return(typeof x==='number'?x-y:String(x).localeCompare(String(y)))*sortState.dir;});
   document.getElementById('tabInfo').textContent=INT.format(rows.length)+' linhas · total '+BRL.format(rows.reduce((s,d)=>s+d.valor,0));
@@ -320,7 +364,7 @@ function renderTabela(rows){
   document.querySelector('#tabela tbody').innerHTML=lim.map(d=>'<tr>'+cols.map(c=>{let v=d[c.k],cls=c.txt?'txt':'';
     if(c.color)cls+=v>0?' pos':(v<0?' neg':'');if(c.money)v=BRL.format(v);
     return `<td class="${cls}" title="${String(d[c.k]).replace(/"/g,'')}">${String(v).length>40?String(v).slice(0,40)+'…':v}</td>`;}).join('')+'</tr>').join('')
-    +(data.length>2000?`<tr><td colspan="6" class="txt small">… exibindo 2.000 de ${INT.format(data.length)} linhas (use os filtros)</td></tr>`:'');
+    +(data.length>2000?`<tr><td colspan="7" class="txt small">… exibindo 2.000 de ${INT.format(data.length)} linhas (use os filtros)</td></tr>`:'');
 }
 function ordenar(col){sortState.dir=sortState.col===col?-sortState.dir:1;sortState.col=col;render();}
 
