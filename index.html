@@ -79,26 +79,12 @@
 </style>
 </head>
 <body>
-<div id="login">
-  <div class="loginbox">
-    <h2>🔐 Dashboard FP&amp;A</h2>
-    <p>Acesso restrito. Entre com seu e-mail e senha.</p>
-    <label>E-mail</label>
-    <input type="email" id="loginEmail" autocomplete="username" placeholder="voce@empresa.com">
-    <label>Senha</label>
-    <input type="password" id="loginPass" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="btn-primary" id="loginBtn" onclick="doLogin()">Entrar</button>
-    <div id="loginErr"></div>
-  </div>
-</div>
-
 <header>
   <h1><span class="dot"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge">carregando…</span></h1>
   <div class="actions">
     <span id="cloudInfo" class="small"></span>
     <button class="btn-primary" onclick="document.getElementById('file').click()">📂 Carregar/atualizar base</button>
     <button class="btn-ghost" id="btnSalvar" onclick="salvarNaNuvem()">☁️ Salvar na nuvem</button>
-    <button class="btn-ghost" onclick="doLogout()" title="Sair">Sair</button>
     <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple class="hidden">
   </div>
 </header>
@@ -626,29 +612,6 @@ const SB_KEY='sb_publishable_g_2RyjcUMHnvrjH2DpXEZg_o6-ybqj-';
 let sb=null;
 try{ sb=window.supabase.createClient(SB_URL,SB_KEY); }catch(e){ console.error('Supabase init falhou',e); }
 
-function showLogin(){document.getElementById('login').style.display='flex';}
-function hideLogin(){document.getElementById('login').style.display='none';}
-
-async function doLogin(){
-  const email=document.getElementById('loginEmail').value.trim();
-  const password=document.getElementById('loginPass').value;
-  const err=document.getElementById('loginErr'); err.textContent='';
-  const btn=document.getElementById('loginBtn'); btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
-  try{
-    const {error}=await sb.auth.signInWithPassword({email,password});
-    if(error){ err.textContent='Não foi possível entrar: '+error.message; return; }
-    await aoLogar();
-  }catch(e){ err.textContent='Erro: '+e.message; }
-  finally{ btn.disabled=false; btn.textContent='Entrar'; }
-}
-async function doLogout(){ try{await sb.auth.signOut();}catch(e){} location.reload(); }
-
-async function aoLogar(){
-  hideLogin();
-  document.getElementById('fileBadge').textContent='carregando da nuvem…';
-  await carregarDaNuvem();
-}
-
 async function carregarDaNuvem(){
   try{
     const {data,error}=await sb.from('dataset').select('payload,updated_at').eq('id','atual').maybeSingle();
@@ -693,12 +656,11 @@ function descomprimir(p){
 function marcarAtualizado(ts){ const d=ts?new Date(ts):new Date();
   document.getElementById('cloudInfo').innerHTML='<span class="cloudbadge">☁️ na nuvem · '+d.toLocaleString('pt-BR')+'</span>'; }
 
-// inicialização: checa sessão existente
+// inicialização: carrega direto da nuvem (sem login)
 (async function(){
-  if(!sb){ showLogin(); document.getElementById('loginErr').textContent='Erro ao conectar no Supabase (recarregue a página).'; return; }
-  try{ const {data:{session}}=await sb.auth.getSession();
-    if(session) await aoLogar(); else showLogin();
-  }catch(e){ showLogin(); }
+  if(!sb){ document.getElementById('cloudInfo').textContent='Erro ao conectar no Supabase'; atualizarUI(); return; }
+  document.getElementById('fileBadge').textContent='carregando da nuvem…';
+  await carregarDaNuvem();
 })();
 </script>
 </body>
