@@ -336,7 +336,7 @@ function mapear(json,nome){
   const kClasse=find(['denom.classe','denominacao classe','denom classe','classe de custo','classe custo']);
   const kCentro=find(['centro custo','centro de custo','centro']);
   const kObjeto=find(['denominacao objeto','denom objeto','objeto']);
-  const kData=find(['data do documento','data documento','data de lancamento','data','competencia','periodo','mes']);
+  const kData=find(['data de lancamento','data lancamento','data do documento','data documento','competencia','periodo','mes','data']);
   const kMat=find(['texto breve material','descricao','material','texto']);
   const origem=origemDe(nome);
   return json.map(row=>({
@@ -556,54 +556,63 @@ function renderOVR(){
   document.getElementById('ovrTag').textContent=tipo||'Orçamento';
   const fPC=fatorPisCofins();
   const bm={}; ORCAMENTO.forEach(o=>{ if(!tipo||o.tipo===tipo) bm[o.mes]=(bm[o.mes]||0)+o.valor*fPC; });
-  const rm={}; DADOS.forEach(d=>{ rm[d.mes]=(rm[d.mes]||0)+d.valor; });
-  const meses=Object.keys(bm).filter(m=>m in rm).sort((a,b)=>mesOrd(a)-mesOrd(b)); // só meses com orçado E realizado
+  // A base de realizado carregada é "Custos Variáveis" — só há realizado para esse escopo
+  const temReal = norm(tipo).includes('variavei');
+  const rm={}; if(temReal) DADOS.forEach(d=>{ rm[d.mes]=(rm[d.mes]||0)+d.valor; });
+  const meses=(temReal?Object.keys(bm).filter(m=>m in rm):Object.keys(bm)).sort((a,b)=>mesOrd(a)-mesOrd(b));
   if(!meses.length){ ovr.classList.add('hidden'); return; }
   ovr.classList.remove('hidden');
-  const orc=meses.reduce((s,m)=>s+bm[m],0), real=meses.reduce((s,m)=>s+rm[m],0);
+  const orc=meses.reduce((s,m)=>s+bm[m],0), real=meses.reduce((s,m)=>s+(rm[m]||0),0);
   const varAbs=real-orc, varPct=orc?varAbs/orc*100:0, exec=orc?real/orc*100:0;
-  const cls=varAbs>0?'pos':(varAbs<0?'neg':'');
+  const cls=varAbs>0?'pos':(varAbs<0?'neg':''); const D='—';
   const kpis=[
     {lbl:'Orçado',val:BRL.format(orc),sub:meses[0]+' a '+meses[meses.length-1]},
-    {lbl:'Realizado',val:BRL.format(real)},
-    {lbl:'Variação (R$)',val:BRL.format(varAbs),cls,sub:varAbs>0?'acima do orçado':'abaixo do orçado'},
-    {lbl:'Variação (%)',val:PCT(varPct),cls},
-    {lbl:'Execução Orçamentária',val:exec.toFixed(1).replace('.',',')+'%',sub:'Realizado / Orçado'}
+    {lbl:'Realizado',val:temReal?BRL.format(real):D,sub:temReal?'':'sem realizado nesta base'},
+    {lbl:'Variação (R$)',val:temReal?BRL.format(varAbs):D,cls:temReal?cls:'',sub:temReal?(varAbs>0?'acima do orçado':'abaixo do orçado'):''},
+    {lbl:'Variação (%)',val:temReal?PCT(varPct):D,cls:temReal?cls:''},
+    {lbl:'Execução Orçamentária',val:temReal?exec.toFixed(1).replace('.',',')+'%':D,sub:'Realizado / Orçado'}
   ];
   document.getElementById('ovrKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
 
   // resumo executivo automático
-  const desvios=meses.map(m=>({m,p:bm[m]?(rm[m]-bm[m])/bm[m]*100:0}));
-  const melhor=[...desvios].sort((a,b)=>Math.abs(a.p)-Math.abs(b.p))[0];
-  const pior=[...desvios].sort((a,b)=>Math.abs(b.p)-Math.abs(a.p))[0];
-  const sentido=varAbs<0?'<b>abaixo</b>':'<b>acima</b>';
-  document.getElementById('ovrResumo').innerHTML=
-    `📌 No acumulado <b>${meses[0]}–${meses[meses.length-1]}</b>, o realizado de "<b>${tipo}</b>" foi <b>${BRL.format(real)}</b>, `+
-    `${PCT(varPct)} ${sentido} do orçado (<b>${BRL.format(orc)}</b>) — diferença de <b>${BRL.format(Math.abs(varAbs))}</b>. `+
-    `Execução de <b>${exec.toFixed(0)}%</b> do orçamento. `+
-    `Mês de maior aderência: <b>${melhor.m}</b> (${PCT(melhor.p)}); maior desvio: <b>${pior.m}</b> (${PCT(pior.p)}).`;
+  if(temReal){
+    const desvios=meses.map(m=>({m,p:bm[m]?((rm[m]||0)-bm[m])/bm[m]*100:0}));
+    const melhor=[...desvios].sort((a,b)=>Math.abs(a.p)-Math.abs(b.p))[0];
+    const pior=[...desvios].sort((a,b)=>Math.abs(b.p)-Math.abs(a.p))[0];
+    const sentido=varAbs<0?'<b>abaixo</b>':'<b>acima</b>';
+    document.getElementById('ovrResumo').innerHTML=
+      `📌 No acumulado <b>${meses[0]}–${meses[meses.length-1]}</b>, o realizado de "<b>${tipo}</b>" foi <b>${BRL.format(real)}</b>, `+
+      `${PCT(varPct)} ${sentido} do orçado (<b>${BRL.format(orc)}</b>) — diferença de <b>${BRL.format(Math.abs(varAbs))}</b>. `+
+      `Execução de <b>${exec.toFixed(0)}%</b> do orçamento. `+
+      `Mês de maior aderência: <b>${melhor.m}</b> (${PCT(melhor.p)}); maior desvio: <b>${pior.m}</b> (${PCT(pior.p)}).`;
+  }else{
+    document.getElementById('ovrResumo').innerHTML=
+      `⚠️ A base de realizado carregada tem apenas <b>Custos Variáveis</b>. Não há realizado para o escopo "<b>${tipo}</b>" — mostrando só o <b>orçado</b> (${BRL.format(orc)} em ${meses[0]}–${meses[meses.length-1]}).`;
+  }
 
   destroy('chOVR');
-  charts.chOVR=new Chart('chOVR',{type:'bar',data:{labels:meses,datasets:[
-    {label:'Orçado',data:meses.map(m=>bm[m]),backgroundColor:'#818cf8'},
-    {label:'Realizado',data:meses.map(m=>rm[m]),backgroundColor:'#38bdf8'}
-  ]},options:{responsive:true,maintainAspectRatio:false,
+  const dsOVR=[{label:'Orçado',data:meses.map(m=>bm[m]),backgroundColor:'#818cf8'}];
+  if(temReal) dsOVR.push({label:'Realizado',data:meses.map(m=>rm[m]||0),backgroundColor:'#38bdf8'});
+  charts.chOVR=new Chart('chOVR',{type:'bar',data:{labels:meses,datasets:dsOVR},options:{responsive:true,maintainAspectRatio:false,
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
 
   // tabela mensal
-  const cols=['Mês','Orçado','Realizado','Variação','%'];
+  const cols=temReal?['Mês','Orçado','Realizado','Variação','%']:['Mês','Orçado'];
   document.querySelector('#tabOVR thead').innerHTML='<tr>'+cols.map((c,i)=>`<th class="${i===0?'txt':''}">${c}</th>`).join('')+'</tr>';
-  let body=meses.map(m=>{const o=bm[m],r=rm[m],v=r-o,p=o?v/o*100:0,cc=v>0?'pos':'neg';
+  let body=meses.map(m=>{const o=bm[m];
+    if(!temReal) return `<tr><td class="txt">${m}</td><td>${BRL.format(o)}</td></tr>`;
+    const r=rm[m]||0,v=r-o,p=o?v/o*100:0,cc=v>0?'pos':'neg';
     return `<tr><td class="txt">${m}</td><td>${BRL.format(o)}</td><td>${BRL.format(r)}</td><td class="${cc}">${BRL.format(v)}</td><td class="${cc}">${PCT(p)}</td></tr>`;}).join('');
-  body+=`<tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt">TOTAL</td><td>${BRL.format(orc)}</td><td>${BRL.format(real)}</td><td class="${cls}">${BRL.format(varAbs)}</td><td class="${cls}">${PCT(varPct)}</td></tr>`;
+  body+= temReal
+    ? `<tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt">TOTAL</td><td>${BRL.format(orc)}</td><td>${BRL.format(real)}</td><td class="${cls}">${BRL.format(varAbs)}</td><td class="${cls}">${PCT(varPct)}</td></tr>`
+    : `<tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt">TOTAL</td><td>${BRL.format(orc)}</td></tr>`;
   document.querySelector('#tabOVR tbody').innerHTML=body;
 
   document.getElementById('ovrNote').textContent=
     `Orçado ${fPC<1?'líquido de crédito PIS/Cofins (−9,25%)':'bruto (sem crédito PIS/Cofins)'}. `+
-    `Comparação no escopo "${tipo}", apenas meses com orçado e realizado (${meses.join(', ')}). `+
-    `Meses sem realizado (orçamento futuro) e meses sem orçamento ficam de fora. `+
-    `A abertura por conta não é comparada aqui porque os códigos do orçamento diferem dos códigos de lançamento do SAP.`;
+    (temReal? `Comparação no escopo "${tipo}", apenas meses com orçado e realizado. A abertura por conta não é comparada (códigos do orçamento ≠ SAP).`
+            : `O escopo "${tipo}" não tem realizado na base atual (só Custos Variáveis foi carregado).`);
 }
 
 function limpar(){
