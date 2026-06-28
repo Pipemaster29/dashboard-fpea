@@ -103,6 +103,10 @@
     <div class="scope">
       <label>Escopo (Tipo do orçamento)</label>
       <select id="ovrTipo" onchange="renderOVR()"></select>
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt);margin-left:8px">
+        <input type="checkbox" id="pisCofins" checked onchange="recalcOrc()" style="width:16px;height:16px;cursor:pointer">
+        Aplicar crédito PIS/Cofins (−9,25%) no orçado
+      </label>
     </div>
     <div class="resumo" id="ovrResumo"></div>
     <div class="kpis" id="ovrKpis"></div>
@@ -503,8 +507,9 @@ function renderOpsCalc(){
   // orçado R$/km (OBZ) restrito aos mesmos meses/localidades informados
   const orcRegC={},orcRegK={},orcMesC={},orcMesK={};let orcCustoTot=0,orcKmTot=0;
   const temOrc=!!ORCKPI;
+  const fPC=fatorPisCofins();
   if(temOrc){pares.forEach(k=>{const p=k.split('|');const o=ORCKPI[p[0]]&&ORCKPI[p[0]][p[1]];if(!o)return;
-    const c=o.custo[orcType]||0;orcRegC[p[0]]=(orcRegC[p[0]]||0)+c;orcRegK[p[0]]=(orcRegK[p[0]]||0)+o.km;
+    const c=(o.custo[orcType]||0)*fPC;orcRegC[p[0]]=(orcRegC[p[0]]||0)+c;orcRegK[p[0]]=(orcRegK[p[0]]||0)+o.km;
     orcMesC[p[1]]=(orcMesC[p[1]]||0)+c;orcMesK[p[1]]=(orcMesK[p[1]]||0)+o.km;orcCustoTot+=c;orcKmTot+=o.km;});}
   const orcRkm=orcKmTot?orcCustoTot/orcKmTot:0;
   const kpis=[
@@ -535,6 +540,8 @@ function renderOpsCalc(){
 }
 
 // ---------- ORÇADO vs REAL ----------
+function fatorPisCofins(){ const el=document.getElementById('pisCofins'); return (el&&el.checked)?(1-0.0925):1; }
+function recalcOrc(){ if(ORCAMENTO.length) renderOVR(); if(DADOS.length) renderOpsCalc(); }
 function montarEscopoOVR(){
   if(!ORCAMENTO.length) return;
   const tipos=uniq(ORCAMENTO.map(o=>o.tipo)).filter(Boolean).sort();
@@ -547,7 +554,8 @@ function renderOVR(){
   if(!ORCAMENTO.length||!DADOS.length){ ovr.classList.add('hidden'); return; }
   const tipo=document.getElementById('ovrTipo').value;
   document.getElementById('ovrTag').textContent=tipo||'Orçamento';
-  const bm={}; ORCAMENTO.forEach(o=>{ if(!tipo||o.tipo===tipo) bm[o.mes]=(bm[o.mes]||0)+o.valor; });
+  const fPC=fatorPisCofins();
+  const bm={}; ORCAMENTO.forEach(o=>{ if(!tipo||o.tipo===tipo) bm[o.mes]=(bm[o.mes]||0)+o.valor*fPC; });
   const rm={}; DADOS.forEach(d=>{ rm[d.mes]=(rm[d.mes]||0)+d.valor; });
   const meses=Object.keys(bm).filter(m=>m in rm).sort((a,b)=>mesOrd(a)-mesOrd(b)); // só meses com orçado E realizado
   if(!meses.length){ ovr.classList.add('hidden'); return; }
@@ -592,6 +600,7 @@ function renderOVR(){
   document.querySelector('#tabOVR tbody').innerHTML=body;
 
   document.getElementById('ovrNote').textContent=
+    `Orçado ${fPC<1?'líquido de crédito PIS/Cofins (−9,25%)':'bruto (sem crédito PIS/Cofins)'}. `+
     `Comparação no escopo "${tipo}", apenas meses com orçado e realizado (${meses.join(', ')}). `+
     `Meses sem realizado (orçamento futuro) e meses sem orçamento ficam de fora. `+
     `A abertura por conta não é comparada aqui porque os códigos do orçamento diferem dos códigos de lançamento do SAP.`;
