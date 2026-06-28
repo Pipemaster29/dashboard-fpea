@@ -6,6 +6,8 @@
 <title>Dashboard FP&A — Orçado vs Real + Análise de Custos</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 <style>
   :root{--bg:#0f172a;--panel:#1e293b;--panel2:#273449;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;
     --accent:#38bdf8;--accent2:#818cf8;--good:#34d399;--bad:#f87171;--warn:#fbbf24;}
@@ -63,14 +65,40 @@
   footer{text-align:center;color:var(--muted);font-size:12px;padding:24px}
   .badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--muted);margin-left:8px}
   .small{font-size:11px;color:var(--muted);font-weight:400}
+  #login{position:fixed;inset:0;background:radial-gradient(circle at 30% 20%,#16233b,#0f172a);display:flex;align-items:center;justify-content:center;z-index:1000}
+  .loginbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:34px 32px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .loginbox h2{font-size:19px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .loginbox p{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .loginbox label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:5px}
+  .loginbox input{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:11px 12px;font-size:14px;margin-bottom:14px}
+  .loginbox button{width:100%;margin-top:4px}
+  #loginErr{color:var(--bad);font-size:13px;margin-top:12px;min-height:18px}
+  .cloudbadge{display:inline-flex;align-items:center;gap:5px;background:rgba(52,211,153,.12);border:1px solid var(--good);color:var(--good);border-radius:20px;padding:3px 11px;font-size:11px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle}
+  @keyframes sp{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
+<div id="login">
+  <div class="loginbox">
+    <h2>🔐 Dashboard FP&amp;A</h2>
+    <p>Acesso restrito. Entre com seu e-mail e senha.</p>
+    <label>E-mail</label>
+    <input type="email" id="loginEmail" autocomplete="username" placeholder="voce@empresa.com">
+    <label>Senha</label>
+    <input type="password" id="loginPass" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-primary" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div id="loginErr"></div>
+  </div>
+</div>
+
 <header>
-  <h1><span class="dot"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge">nenhum arquivo carregado</span></h1>
+  <h1><span class="dot"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge">carregando…</span></h1>
   <div class="actions">
-    <button class="btn-ghost" onclick="limpar()">🗑 Limpar dados</button>
-    <button class="btn-primary" onclick="document.getElementById('file').click()">📂 Carregar Excel (realizado e/ou orçamento)</button>
+    <span id="cloudInfo" class="small"></span>
+    <button class="btn-primary" onclick="document.getElementById('file').click()">📂 Carregar/atualizar base</button>
+    <button class="btn-ghost" id="btnSalvar" onclick="salvarNaNuvem()">☁️ Salvar na nuvem</button>
+    <button class="btn-ghost" onclick="doLogout()" title="Sair">Sair</button>
     <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple class="hidden">
   </div>
 </header>
@@ -334,7 +362,8 @@ function mapear(json,nome){
 }
 
 function atualizarUI(){
-  document.getElementById('drop').classList.add('hidden');
+  const temDados=DADOS.length||ORCAMENTO.length||ORCKPI;
+  document.getElementById('drop').classList.toggle('hidden', !!temDados);
   const origens=[...new Set(DADOS.map(d=>d.origem))];
   let badge=[];
   if(DADOS.length) badge.push('Realizado: '+origens.join(' + ')+' ('+INT.format(DADOS.length)+')');
@@ -590,6 +619,87 @@ function limpar(){
   document.getElementById('drop').classList.remove('hidden');
   document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
 }
+
+// ================= SUPABASE (login + nuvem) =================
+const SB_URL='https://mzbwxyqfmruxaytfrimp.supabase.co';
+const SB_KEY='sb_publishable_g_2RyjcUMHnvrjH2DpXEZg_o6-ybqj-';
+let sb=null;
+try{ sb=window.supabase.createClient(SB_URL,SB_KEY); }catch(e){ console.error('Supabase init falhou',e); }
+
+function showLogin(){document.getElementById('login').style.display='flex';}
+function hideLogin(){document.getElementById('login').style.display='none';}
+
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const password=document.getElementById('loginPass').value;
+  const err=document.getElementById('loginErr'); err.textContent='';
+  const btn=document.getElementById('loginBtn'); btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
+  try{
+    const {error}=await sb.auth.signInWithPassword({email,password});
+    if(error){ err.textContent='Não foi possível entrar: '+error.message; return; }
+    await aoLogar();
+  }catch(e){ err.textContent='Erro: '+e.message; }
+  finally{ btn.disabled=false; btn.textContent='Entrar'; }
+}
+async function doLogout(){ try{await sb.auth.signOut();}catch(e){} location.reload(); }
+
+async function aoLogar(){
+  hideLogin();
+  document.getElementById('fileBadge').textContent='carregando da nuvem…';
+  await carregarDaNuvem();
+}
+
+async function carregarDaNuvem(){
+  try{
+    const {data,error}=await sb.from('dataset').select('payload,updated_at').eq('id','atual').maybeSingle();
+    if(error){
+      if(/relation|does not exist|schema cache|not find the table/i.test(error.message))
+        document.getElementById('cloudInfo').textContent='⚠ tabela "dataset" ainda não criada no Supabase';
+      else console.error('Leitura nuvem:',error);
+    }
+    if(data&&data.payload){
+      const obj=descomprimir(data.payload);
+      DADOS=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null;
+      atualizarUI(); marcarAtualizado(data.updated_at);
+    }else{
+      atualizarUI();
+      if(!document.getElementById('cloudInfo').textContent)
+        document.getElementById('cloudInfo').textContent='nenhuma base na nuvem ainda — carregue os Excel e clique em Salvar na nuvem';
+    }
+  }catch(e){ console.error(e); atualizarUI(); }
+}
+
+async function salvarNaNuvem(){
+  if(!DADOS.length&&!ORCAMENTO.length&&!ORCKPI){ alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
+  const info=document.getElementById('cloudInfo'); info.innerHTML='<span class="spin"></span> salvando…';
+  try{
+    const payload=comprimir({DADOS,ORCAMENTO,ORCKPI});
+    const {error}=await sb.from('dataset').upsert({id:'atual',payload,updated_at:new Date().toISOString()});
+    if(error){ info.textContent=''; alert('Erro ao salvar na nuvem: '+error.message); return; }
+    marcarAtualizado(new Date().toISOString());
+  }catch(e){ info.textContent=''; alert('Erro ao salvar: '+e.message); }
+}
+
+function comprimir(obj){
+  const gz=pako.gzip(JSON.stringify(obj)); let bin=''; const CH=8192;
+  for(let i=0;i<gz.length;i+=CH) bin+=String.fromCharCode.apply(null,gz.subarray(i,i+CH));
+  return 'gz:'+btoa(bin);
+}
+function descomprimir(p){
+  if(p&&p.indexOf('gz:')===0){ const bin=atob(p.slice(3)); const arr=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return JSON.parse(pako.ungzip(arr,{to:'string'})); }
+  return JSON.parse(p);
+}
+function marcarAtualizado(ts){ const d=ts?new Date(ts):new Date();
+  document.getElementById('cloudInfo').innerHTML='<span class="cloudbadge">☁️ na nuvem · '+d.toLocaleString('pt-BR')+'</span>'; }
+
+// inicialização: checa sessão existente
+(async function(){
+  if(!sb){ showLogin(); document.getElementById('loginErr').textContent='Erro ao conectar no Supabase (recarregue a página).'; return; }
+  try{ const {data:{session}}=await sb.auth.getSession();
+    if(session) await aoLogar(); else showLogin();
+  }catch(e){ showLogin(); }
+})();
 </script>
 </body>
 </html>
