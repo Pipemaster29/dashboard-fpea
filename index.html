@@ -37,6 +37,9 @@
   .tabbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
   .scope{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
   .scope label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .catsel{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .catsel>label{display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;color:var(--txt);cursor:pointer}
+  .catsel input{width:15px;height:15px;cursor:pointer}
   .note{font-size:12px;color:var(--muted);margin-top:10px;font-style:italic}
   .filters{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px;align-items:flex-end}
   .filters .grp{display:flex;flex-direction:column;gap:5px}
@@ -134,16 +137,18 @@
   <!-- OPERAÇÕES & R$/KM -->
   <div id="ops" class="ovrbox hidden">
     <div class="sectitle">🚚 Operações & Custo por KM <span class="tag" id="opsTag">R$/KM · R$/viagem</span></div>
-    <div class="scope">
-      <label>Categoria de custo</label>
-      <select id="opsCat" onchange="renderOpsCalc()">
-        <option value="combustivel">Combustível / Diesel</option>
-        <option value="manutencao">Manutenção</option>
-        <option value="pneus">Pneus</option>
-        <option value="total">Custo Total</option>
-      </select>
+    <div class="scope" style="align-items:flex-start">
+      <label style="padding-top:6px">Categorias de custo</label>
+      <div id="opsCats" class="catsel">
+        <label><input type="checkbox" value="combustivel" checked onchange="renderOpsCalc()"> Combustível / Diesel</label>
+        <label><input type="checkbox" value="manutencao" onchange="renderOpsCalc()"> Manutenção</label>
+        <label><input type="checkbox" value="pneus" onchange="renderOpsCalc()"> Pneus</label>
+        <label><input type="checkbox" value="outros" onchange="renderOpsCalc()"> Outros</label>
+        <button class="btn-ghost" style="padding:4px 10px" onclick="marcarCats(true)">Todas</button>
+        <button class="btn-ghost" style="padding:4px 10px" onclick="marcarCats(false)">Limpar</button>
+      </div>
       <button class="btn-ghost" onclick="addOpsRow()">+ Adicionar operação</button>
-      <span class="small">Digite o <b>KM realizado</b> e o <b>KM orçado</b> por operação/mês. Realizado usa o custo das bases SAP; orçado usa o custo da planilha OBZ. Fica salvo no seu navegador.</span>
+      <span class="small">Marque uma ou mais categorias (somam juntas). Digite o <b>KM realizado</b> e o <b>KM orçado</b> por operação/mês. Realizado usa o custo SAP; orçado usa o custo da OBZ.</span>
     </div>
     <div class="resumo" id="opsResumo" style="display:none"></div>
     <div class="kpis" id="opsKpis"></div>
@@ -550,13 +555,13 @@ function addOpsRow(){const meses=uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)
   opsRows.push({mes:meses[meses.length-1]||'',regiao:'Amazonas',operacao:'',km:0,kmOrc:0,viagens:0});saveOps();renderOpsTable();renderOpsCalc();}
 function delOpsRow(i){opsRows.splice(i,1);saveOps();renderOpsTable();renderOpsCalc();}
 function setOps(i,k,v){if(!opsRows[i])return;opsRows[i][k]=(k==='km'||k==='kmOrc'||k==='viagens')?num(v):v;saveOps();renderOpsCalc();}
-function catMatch(cat,d){
-  if(cat==='total') return true;
-  // usa a categoria já calculada no carregamento; se faltar (base antiga), recalcula
-  const c = d.cat || classificarCusto((d.material||'')+' '+(d.objeto||''), d.classe);
-  return c===cat;}
+function restaurarCats(){
+  let sel=null;try{sel=JSON.parse(localStorage.getItem('opsCats')||'null');}catch(e){}
+  if(sel&&sel.length)document.querySelectorAll('#opsCats input').forEach(c=>c.checked=sel.includes(c.value));
+}
 function renderOps(){
   if(!DADOS.length){return;}
+  restaurarCats();
   if(!opsRows.length){addOpsRow();}else{renderOpsTable();renderOpsCalc();}}
 function renderOpsTable(){
   const meses=uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
@@ -571,14 +576,22 @@ function renderOpsTable(){
     <td><input type="number" min="0" value="${r.viagens||''}" oninput="setOps(${i},'viagens',this.value)"></td>
     <td><button class="delbtn" onclick="delOpsRow(${i})" title="remover">✕</button></td></tr>`).join('');
 }
+function marcarCats(on){document.querySelectorAll('#opsCats input').forEach(c=>c.checked=on);renderOpsCalc();}
+function opsCatsSel(){return [...document.querySelectorAll('#opsCats input:checked')].map(c=>c.value);}
 function renderOpsCalc(){
-  const cat=document.getElementById('opsCat').value;
-  const orcType = cat==='manutencao'?'manut': cat==='combustivel'?'comb': cat==='pneus'?'pneu': 'total';
+  const cats=opsCatsSel();
+  try{localStorage.setItem('opsCats',JSON.stringify(cats));}catch(e){}
+  const catSet=new Set(cats);
+  // categorias OBZ correspondentes (combustível inclui lubrificantes; outros não tem orçado)
+  const orcMap={manutencao:['manut'],combustivel:['comb','lubrif'],pneus:['pneu']};
+  const orcTypes=[...new Set(cats.flatMap(c=>orcMap[c]||[]))];
+  const nomeCat={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus',outros:'Outros'};
+  const catLabel=cats.length?cats.map(c=>nomeCat[c]||c).join(' + '):'—';
   const fPC=fatorPisCofins();
   const temOrc=!!ORCKPI;
   const rkm2=v=>v.toFixed(2).replace('.',',');
   // custo realizado (SAP) por localidade|mês
-  const costReal={};DADOS.forEach(d=>{if(catMatch(cat,d)){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
+  const costReal={};DADOS.forEach(d=>{if(catSet.has(d.cat||classificarCusto((d.material||'')+' '+(d.objeto||''),d.classe))){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
   // KM informado por par localidade|mês — realizado e orçado, separados
   const kmRealP={},kmOrcP={};let viaTot=0;
   opsRows.forEach(r=>{viaTot+=(+r.viagens||0);if(!r.mes)return;const k=r.regiao+'|'+r.mes;
@@ -586,7 +599,7 @@ function renderOpsCalc(){
     if(r.kmOrc)kmOrcP[k]=(kmOrcP[k]||0)+(+r.kmOrc||0);});
   // custo orçado (OBZ) por par, restrito aos pares com KM orçado informado
   const costOrc={};
-  if(temOrc)Object.keys(kmOrcP).forEach(k=>{const p=k.split('|');const o=ORCKPI[p[0]]&&ORCKPI[p[0]][p[1]];if(o)costOrc[k]=(o.custo[orcType]||0)*fPC;});
+  if(temOrc&&orcTypes.length)Object.keys(kmOrcP).forEach(k=>{const p=k.split('|');const o=ORCKPI[p[0]]&&ORCKPI[p[0]][p[1]];if(o)costOrc[k]=orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC;});
   // agregadores por mês / por localidade
   const aggBy=(idx,costP,kmP)=>{const c={},k={};Object.keys(kmP).forEach(pr=>{const key=pr.split('|')[idx];c[key]=(c[key]||0)+(costP[pr]||0);k[key]=(k[key]||0)+kmP[pr];});return{c,k};};
   const rMes=aggBy(1,costReal,kmRealP), oMes=aggBy(1,costOrc,kmOrcP);
@@ -600,7 +613,7 @@ function renderOpsCalc(){
 
   // KPIs
   const kpis=[
-    {lbl:'Custo realizado',val:BRL.format(realCustoTot),sub:'categoria · meses/locais informados'},
+    {lbl:'Custo realizado',val:BRL.format(realCustoTot),sub:catLabel+' · meses/locais informados'},
     {lbl:'KM realizado total',val:INT.format(Math.round(realKmTot))},
     {lbl:'R$/KM realizado',val:realKmTot?BRL.format(rkm):'—',sub:'custo SAP ÷ km realizado'}
   ];
@@ -612,7 +625,7 @@ function renderOpsCalc(){
     kpis.push({lbl:'R$/viagem',val:viaTot?BRL.format(realCustoTot/viaTot):'—'});
   }
   document.getElementById('opsKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
-  document.getElementById('opsTag').textContent=showOrc?'R$/KM realizado vs orçado (OBZ)':'R$/KM · R$/viagem';
+  document.getElementById('opsTag').textContent=catLabel+(showOrc?' · real vs orçado':' · R$/KM');
 
   // meses ordenados (união do que tem realizado ou orçado)
   const meses=uniq([...Object.keys(rMes.k),...Object.keys(oMes.k)]).sort((a,b)=>mesOrd(a)-mesOrd(b));
