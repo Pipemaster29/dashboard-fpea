@@ -143,6 +143,7 @@
         <label><input type="checkbox" value="combustivel" checked onchange="renderOpsCalc()"> Combustível / Diesel</label>
         <label><input type="checkbox" value="manutencao" onchange="renderOpsCalc()"> Manutenção</label>
         <label><input type="checkbox" value="pneus" onchange="renderOpsCalc()"> Pneus</label>
+        <label><input type="checkbox" value="transporte" onchange="renderOpsCalc()"> Transporte / Frete</label>
         <label><input type="checkbox" value="outros" onchange="renderOpsCalc()"> Outros</label>
         <button class="btn-ghost" style="padding:4px 10px" onclick="marcarCats(true)">Todas</button>
         <button class="btn-ghost" style="padding:4px 10px" onclick="marcarCats(false)">Limpar</button>
@@ -428,7 +429,9 @@ function mapear(json,nome){
 function classificarCusto(texto, classe){
   const t=norm(texto), c=norm(classe);
   if(/pneu(?!m)|recap|recauchut|vulcaniz|borracharia|camara de ar|\bcamara ar\b/.test(t)) return 'pneus';
+  if(/\barla\b|agente redutor|adblue/.test(t)) return 'combustivel'; // ARLA analisado junto com diesel
   if(/diesel|combust|lubrific|gasolin|etanol/.test(c)) return 'combustivel';
+  if(/transporte|servicos de t|armazenag|pedagio|frete/.test(c)) return 'transporte';
   if(/manuten|sobressalent/.test(c)) return 'manutencao';
   return 'outros';
 }
@@ -585,7 +588,7 @@ function renderOpsCalc(){
   // categorias OBZ correspondentes (combustível inclui lubrificantes; outros não tem orçado)
   const orcMap={manutencao:['manut'],combustivel:['comb','lubrif'],pneus:['pneu']};
   const orcTypes=[...new Set(cats.flatMap(c=>orcMap[c]||[]))];
-  const nomeCat={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus',outros:'Outros'};
+  const nomeCat={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus',transporte:'Transporte',outros:'Outros'};
   const catLabel=cats.length?cats.map(c=>nomeCat[c]||c).join(' + '):'—';
   const fPC=fatorPisCofins();
   const temOrc=!!ORCKPI;
