@@ -395,18 +395,37 @@ function mapear(json,nome){
   const kCentro=find(['centro custo','centro de custo','centro']);
   const kObjeto=find(['denominacao objeto','denom objeto','objeto']);
   const kData=find(['data de lancamento','data lancamento','data do documento','data documento','competencia','periodo','mes','data']);
-  const kMat=find(['texto breve material','descricao','material','texto']);
+  const kMat=find(['texto breve material','material']);
+  const kDescr=find(['descricao']);
+  const kPedido=find(['texto do pedido','texto pedido']);
   const origem=origemDe(nome);
-  return json.map(row=>({
-    valor:num(row[kVal]),
-    classe:(kClasse?String(row[kClasse]):'')||'Sem classe',
-    centro:kCentro?String(row[kCentro]):'—',
-    objeto:(kObjeto?String(row[kObjeto]):'')||'—',
-    mes:mesDe(kData?row[kData]:''),
-    material:kMat?String(row[kMat]):'',
-    loc:localidadeDe(kCentro?row[kCentro]:''),
-    origem
-  })).filter(d=>d.valor!==0);
+  return json.map(row=>{
+    const classe=(kClasse?String(row[kClasse]):'')||'Sem classe';
+    const material=kMat?String(row[kMat]):'';
+    const objeto=(kObjeto?String(row[kObjeto]):'')||'—';
+    // categoria definida pelo texto (pneu, combustível, manutenção) — ver classificarCusto
+    const blob=[material, kDescr?row[kDescr]:'', kPedido?row[kPedido]:'', objeto].join(' ');
+    return {
+      valor:num(row[kVal]),
+      classe, centro:kCentro?String(row[kCentro]):'—', objeto,
+      mes:mesDe(kData?row[kData]:''),
+      material: material || (kDescr?String(row[kDescr]):''),
+      cat: classificarCusto(blob, classe),
+      loc:localidadeDe(kCentro?row[kCentro]:''),
+      origem
+    };
+  }).filter(d=>d.valor!==0);
+}
+
+// Classifica um lançamento em: pneus / combustivel / manutencao / outros.
+// PNEUS são reconhecidos pelo TEXTO (estão dentro de "Materiais de manutenção"),
+// excluindo itens "pneumáticos" (válvula/mola/pistola pneumática) que não são pneu.
+function classificarCusto(texto, classe){
+  const t=norm(texto), c=norm(classe);
+  if(/pneu(?!m)|recap|borracharia|camara de ar|\bcamara ar\b/.test(t)) return 'pneus';
+  if(/diesel|combust|lubrific|gasolin|etanol/.test(c)) return 'combustivel';
+  if(/manuten|sobressalent/.test(c)) return 'manutencao';
+  return 'outros';
 }
 
 function atualizarUI(){
@@ -531,11 +550,11 @@ function addOpsRow(){const meses=uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)
   opsRows.push({mes:meses[meses.length-1]||'',regiao:'Amazonas',operacao:'',km:0,kmOrc:0,viagens:0});saveOps();renderOpsTable();renderOpsCalc();}
 function delOpsRow(i){opsRows.splice(i,1);saveOps();renderOpsTable();renderOpsCalc();}
 function setOps(i,k,v){if(!opsRows[i])return;opsRows[i][k]=(k==='km'||k==='kmOrc'||k==='viagens')?num(v):v;saveOps();renderOpsCalc();}
-function catMatch(cat,classe){const n=norm(classe);
-  if(cat==='combustivel')return n.includes('diesel')||n.includes('combust')||n.includes('lubrific');
-  if(cat==='manutencao')return n.includes('manuten')||n.includes('sobressalente');
-  if(cat==='pneus')return n.includes('pneu')||n.includes('camara');
-  return true;}
+function catMatch(cat,d){
+  if(cat==='total') return true;
+  // usa a categoria já calculada no carregamento; se faltar (base antiga), recalcula
+  const c = d.cat || classificarCusto((d.material||'')+' '+(d.objeto||''), d.classe);
+  return c===cat;}
 function renderOps(){
   if(!DADOS.length){return;}
   if(!opsRows.length){addOpsRow();}else{renderOpsTable();renderOpsCalc();}}
@@ -559,7 +578,7 @@ function renderOpsCalc(){
   const temOrc=!!ORCKPI;
   const rkm2=v=>v.toFixed(2).replace('.',',');
   // custo realizado (SAP) por localidade|mês
-  const costReal={};DADOS.forEach(d=>{if(catMatch(cat,d.classe)){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
+  const costReal={};DADOS.forEach(d=>{if(catMatch(cat,d)){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
   // KM informado por par localidade|mês — realizado e orçado, separados
   const kmRealP={},kmOrcP={};let viaTot=0;
   opsRows.forEach(r=>{viaTot+=(+r.viagens||0);if(!r.mes)return;const k=r.regiao+'|'+r.mes;
