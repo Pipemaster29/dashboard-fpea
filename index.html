@@ -422,7 +422,7 @@ function mapear(json,nome){
 // excluindo itens "pneumáticos" (válvula/mola/pistola pneumática) que não são pneu.
 function classificarCusto(texto, classe){
   const t=norm(texto), c=norm(classe);
-  if(/pneu(?!m)|recap|borracharia|camara de ar|\bcamara ar\b/.test(t)) return 'pneus';
+  if(/pneu(?!m)|recap|recauchut|vulcaniz|borracharia|camara de ar|\bcamara ar\b/.test(t)) return 'pneus';
   if(/diesel|combust|lubrific|gasolin|etanol/.test(c)) return 'combustivel';
   if(/manuten|sobressalent/.test(c)) return 'manutencao';
   return 'outros';
