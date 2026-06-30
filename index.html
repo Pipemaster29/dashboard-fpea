@@ -81,6 +81,8 @@
   .cloudbadge{display:inline-flex;align-items:center;gap:5px;background:rgba(52,211,153,.12);border:1px solid var(--good);color:var(--good);border-radius:20px;padding:3px 11px;font-size:11px}
   .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle}
   @keyframes sp{to{transform:rotate(360deg)}}
+  #flash{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-24px);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;box-shadow:0 12px 34px rgba(0,0,0,.45);z-index:2000;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
+  #flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -88,8 +90,8 @@
   <h1><span class="dot"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge">carregando…</span></h1>
   <div class="actions">
     <span id="cloudInfo" class="small"></span>
-    <button class="btn-primary" onclick="document.getElementById('file').click()">📂 Carregar/atualizar base</button>
-    <button class="btn-ghost" id="btnSalvar" onclick="salvarNaNuvem()">☁️ Salvar na nuvem</button>
+    <button class="btn-primary" onclick="document.getElementById('file').click()" title="Recarregar um arquivo SUBSTITUI a versão anterior daquela base (serviços, materiais ou orçamento) — não duplica. Salva na nuvem automaticamente.">📂 Carregar/atualizar base</button>
+    <button class="btn-ghost" id="btnSalvar" onclick="salvarNaNuvem()" title="Forçar o salvamento na nuvem agora (já salva sozinho ao atualizar uma base)">☁️ Salvar na nuvem</button>
     <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple class="hidden">
   </div>
 </header>
@@ -99,7 +101,7 @@
     <div class="big">📊</div>
     <h2>Arraste suas planilhas aqui ou clique para selecionar</h2>
     <p><b>Realizado:</b> extrações SAP/KSB1 (serviços + materiais). &nbsp; <b>Orçado:</b> a planilha de orçamento de custos.</p>
-    <p>Pode soltar todas de uma vez. Os dados ficam só no seu navegador — não são enviados para a internet.</p>
+    <p>Pode soltar todas de uma vez. Ao recarregar um arquivo, ele <b>substitui</b> a versão anterior daquela base (não soma) e <b>salva na nuvem automaticamente</b>.</p>
   </div>
 
   <!-- ABAS DE NAVEGAÇÃO -->
@@ -229,6 +231,17 @@ function applyTabs(){
   });
 }
 
+// aviso visual rápido (não-bloqueante)
+let _flashEl=null,_flashT=null;
+function flash(msg){
+  if(!_flashEl){_flashEl=document.createElement('div');_flashEl.id='flash';document.body.appendChild(_flashEl);}
+  _flashEl.textContent=msg;_flashEl.classList.add('show');
+  clearTimeout(_flashT);_flashT=setTimeout(()=>_flashEl.classList.remove('show'),5000);
+}
+// salvamento automático na nuvem (com debounce)
+let autoSaveTimer=null;
+function agendarSalvamento(){ if(!sb)return; clearTimeout(autoSaveTimer); autoSaveTimer=setTimeout(()=>salvarNaNuvem(true),1500); }
+
 function norm(s){return (s??'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
 function num(v){
   if(typeof v==='number') return v;
@@ -266,18 +279,26 @@ function lerArquivo(file){
       if(ehOBZ(aoa)){
         const obz=parseOBZ(aoa);
         if(!Object.keys(obz).length){ alert('Reconheci "'+file.name+'" como Orçamento KPIs (OBZ), mas não consegui extrair o R$/km.'); return; }
-        ORCKPI=obz;
+        const tinha=!!ORCKPI; ORCKPI=obz;
+        flash(`🔄 Orçado R$/km (OBZ) ${tinha?'atualizado (substituiu o anterior)':'carregado'}.`);
       }else if(ehOrcamento(aoa)){
         const novos=parseOrcamento(aoa);
         if(!novos.length){ alert('Reconheci "'+file.name+'" como orçamento, mas não achei valores mensais.'); return; }
-        ORCAMENTO=ORCAMENTO.concat(novos);
+        const antes=ORCAMENTO.length; ORCAMENTO=novos; // substitui a base de orçamento (não soma)
+        flash(antes?`🔄 Orçamento atualizado: ${INT.format(antes)} → ${INT.format(novos.length)} linhas (substituí a versão anterior).`
+                   :`➕ Orçamento carregado: ${INT.format(novos.length)} linhas.`);
       }else{
         const json=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
         const novos=mapear(json,file.name);
         if(!novos.length){ alert('Não consegui identificar as colunas de "'+file.name+'".'); return; }
-        DADOS=DADOS.concat(novos);
+        const org=novos[0].origem;
+        const antes=DADOS.filter(d=>d.origem===org).length;
+        DADOS=DADOS.filter(d=>d.origem!==org).concat(novos); // substitui a base "org" (não soma)
+        flash(antes?`🔄 "${org}" atualizado: ${INT.format(antes)} → ${INT.format(novos.length)} lançamentos (substituí a versão anterior).`
+                   :`➕ "${org}" carregado: ${INT.format(novos.length)} lançamentos.`);
       }
       atualizarUI();
+      agendarSalvamento();   // salva na nuvem automaticamente após atualizar
     }catch(err){ alert('Erro ao ler "'+file.name+'": '+err.message); }
   };
   r.readAsArrayBuffer(file);
@@ -741,15 +762,16 @@ async function carregarDaNuvem(){
   }catch(e){ console.error(e); atualizarUI(); }
 }
 
-async function salvarNaNuvem(){
-  if(!DADOS.length&&!ORCAMENTO.length&&!ORCKPI){ alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
+async function salvarNaNuvem(auto){
+  if(!DADOS.length&&!ORCAMENTO.length&&!ORCKPI){ if(!auto)alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
   const info=document.getElementById('cloudInfo'); info.innerHTML='<span class="spin"></span> salvando…';
   try{
     const payload=comprimir({DADOS,ORCAMENTO,ORCKPI});
     const {error}=await sb.from('dataset').upsert({id:'atual',payload,updated_at:new Date().toISOString()});
-    if(error){ info.textContent=''; alert('Erro ao salvar na nuvem: '+error.message); return; }
+    if(error){ info.textContent=''; (auto?flash('⚠️ Erro ao salvar na nuvem: '+error.message):alert('Erro ao salvar na nuvem: '+error.message)); return; }
     marcarAtualizado(new Date().toISOString());
-  }catch(e){ info.textContent=''; alert('Erro ao salvar: '+e.message); }
+    if(auto) flash('☁️ Base salva na nuvem automaticamente.');
+  }catch(e){ info.textContent=''; (auto?flash('⚠️ Erro ao salvar: '+e.message):alert('Erro ao salvar: '+e.message)); }
 }
 
 function comprimir(obj){
