@@ -140,8 +140,7 @@
     <div class="scope" style="align-items:flex-start">
       <label style="padding-top:6px">Categorias de custo</label>
       <div id="opsCats" class="catsel">
-        <label><input type="checkbox" value="combustivel" checked onchange="renderOpsCalc()"> Combustível / Diesel</label>
-        <label><input type="checkbox" value="arla" onchange="renderOpsCalc()"> ARLA</label>
+        <label><input type="checkbox" value="combustivel" checked onchange="renderOpsCalc()"> Combustível / Diesel <span class="small">(inclui ARLA)</span></label>
         <label><input type="checkbox" value="lubrificantes" onchange="renderOpsCalc()"> Lubrificantes</label>
         <label><input type="checkbox" value="manutencao" onchange="renderOpsCalc()"> Manutenção</label>
         <label><input type="checkbox" value="pneus" onchange="renderOpsCalc()"> Pneus</label>
@@ -432,9 +431,9 @@ function mapear(json,nome){
 function classificarCusto(texto, classe){
   const t=norm(texto), c=norm(classe);
   if(/pneu(?!m)|recap|recauchut|vulcaniz|borracharia|camara de ar|\bcamara ar\b/.test(t)) return 'pneus';
-  if(/\barla\b|agente redutor|adblue/.test(t)) return 'arla';                 // ARLA separado (combustível da DRE não inclui ARLA)
-  if(/lubrific|\bgraxa\b/.test(c)) return 'lubrificantes';                    // Lubrificantes separado
-  if(/diesel|combust|gasolin|etanol/.test(c)) return 'combustivel';          // só Insumo Diesel + Combustíveis
+  if(/\barla\b|agente redutor|adblue/.test(t)) return 'combustivel';          // ARLA junto do combustível (o orçamento OBZ inclui ARLA)
+  if(/lubrific|\bgraxa\b/.test(c)) return 'lubrificantes';                    // Lubrificantes separado (OBZ tem linha própria)
+  if(/diesel|combust|gasolin|etanol/.test(c)) return 'combustivel';          // Insumo Diesel + Combustíveis + ARLA
   if(/transporte|servicos de t|armazenag|pedagio|frete/.test(c)) return 'transporte';
   if(/manuten|sobressalent/.test(c)) return 'manutencao';
   return 'outros';
