@@ -179,7 +179,7 @@
       <div class="card"><h3>Custo por Classe de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chClasse"></canvas></div></div>
       <div class="card"><h3>Custo por Centro de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chCentro"></canvas></div></div>
       <div class="card"><h3>Evolução Mensal do Custo</h3><div class="wrap"><canvas id="chMes"></canvas></div></div>
-      <div class="card"><h3>Custo por Localidade <span class="small">(Amazonas × Maranhão)</span></h3><div class="wrap"><canvas id="chLoc"></canvas></div></div>
+      <div class="card"><h3>Custo por Localidade <span class="small">(por centro de custo)</span></h3><div class="wrap"><canvas id="chLoc"></canvas></div></div>
       <div class="card full">
         <h3>Análise de Pareto <span class="small">— onde está concentrado o custo (80/20)</span>
           &nbsp; <select id="paretoDim" onchange="render()" style="min-width:150px">
@@ -265,8 +265,12 @@ function mesDe(v){
 }
 const mesOrd=m=>{const p=m.split('/');return p.length===2?+p[1]*100+ +p[0]:999999;};
 function origemDe(nome){const n=norm(nome);if(n.includes('servic'))return'Serviços';if(n.includes('material')||n.includes('materiais'))return'Materiais';return nome.replace(/\.(xlsx|xls|csv)$/i,'');}
-// localidade pela última letra do centro de custo: A -> Amazonas, demais -> Maranhão
-function localidadeDe(cc){const m=String(cc||'').match(/([A-Za-z])(?=[^A-Za-z]*$)/);if(!m)return'Indefinido';return m[1].toUpperCase()==='A'?'Amazonas':'Maranhão';}
+// localidade pela letra do centro de custo (antes dos dígitos finais):
+// A=Amazonas, P=Parnaíba, G=Garanhuns, I=Imperatriz, R=Roraima (mapa da base do cliente)
+const LOC_MAP={A:'Amazonas',P:'Parnaíba',G:'Garanhuns',I:'Imperatriz',R:'Roraima'};
+function localidadeDe(cc){const m=String(cc||'').match(/([A-Za-z])(?=[^A-Za-z]*$)/);if(!m)return'Corporativo';return LOC_MAP[m[1].toUpperCase()]||'Outros';}
+// o OBZ (orçado) é estruturado só em Amazonas x Maranhão; agrupa as demais localidades em Maranhão
+function regiaoOBZ(loc){return loc==='Amazonas'?'Amazonas':'Maranhão';}
 
 document.getElementById('file').addEventListener('change',e=>{[...e.target.files].forEach(lerArquivo);e.target.value='';});
 const drop=document.getElementById('drop');
@@ -568,7 +572,7 @@ function renderOps(){
   if(!opsRows.length){addOpsRow();}else{renderOpsTable();renderOpsCalc();}}
 function renderOpsTable(){
   const meses=uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
-  const regs=['Amazonas','Maranhão'];
+  const regs=uniq([...uniq(DADOS.map(d=>d.loc)), ...opsRows.map(r=>r.regiao)].filter(Boolean));
   document.querySelector('#tabOps thead').innerHTML='<tr><th class="txt">Operação / Rota</th><th class="txt">Localidade</th><th class="txt">Mês</th><th>KM realizado</th><th>KM orçado</th><th>Nº viagens</th><th></th></tr>';
   document.querySelector('#tabOps tbody').innerHTML=opsRows.map((r,i)=>`<tr>
     <td class="txt"><input value="${(r.operacao||'').replace(/"/g,'&quot;')}" placeholder="ex: Azulão" oninput="setOps(${i},'operacao',this.value)"></td>
@@ -608,7 +612,7 @@ function renderOpsCalc(){
     if(r.kmOrc)kmOrcP[k]=(kmOrcP[k]||0)+(+r.kmOrc||0);});
   // custo orçado (OBZ) por par, restrito aos pares com KM orçado informado
   const costOrc={};
-  if(temOrc&&orcTypes.length)Object.keys(kmOrcP).forEach(k=>{const p=k.split('|');const o=ORCKPI[p[0]]&&ORCKPI[p[0]][p[1]];if(o)costOrc[k]=orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC;});
+  if(temOrc&&orcTypes.length)Object.keys(kmOrcP).forEach(k=>{const p=k.split('|');const reg=regiaoOBZ(p[0]);const o=ORCKPI[reg]&&ORCKPI[reg][p[1]];if(o)costOrc[k]=orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC;});
   // agregadores por mês / por localidade
   const aggBy=(idx,costP,kmP)=>{const c={},k={};Object.keys(kmP).forEach(pr=>{const key=pr.split('|')[idx];c[key]=(c[key]||0)+(costP[pr]||0);k[key]=(k[key]||0)+kmP[pr];});return{c,k};};
   const rMes=aggBy(1,costReal,kmRealP), oMes=aggBy(1,costOrc,kmOrcP);
