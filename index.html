@@ -265,11 +265,8 @@ function mesDe(v){
 }
 const mesOrd=m=>{const p=m.split('/');return p.length===2?+p[1]*100+ +p[0]:999999;};
 function origemDe(nome){const n=norm(nome);if(n.includes('servic'))return'Serviços';if(n.includes('material')||n.includes('materiais'))return'Materiais';return nome.replace(/\.(xlsx|xls|csv)$/i,'');}
-// localidade pela letra do centro de custo (antes dos dígitos finais):
-// A=Amazonas, P=Parnaíba, G=Garanhuns, I=Imperatriz, R=Roraima (mapa da base do cliente)
-const LOC_MAP={A:'Amazonas',P:'Parnaíba',G:'Garanhuns',I:'Imperatriz',R:'Roraima'};
-function localidadeDe(cc){const m=String(cc||'').match(/([A-Za-z])(?=[^A-Za-z]*$)/);if(!m)return'Corporativo';return LOC_MAP[m[1].toUpperCase()]||'Outros';}
-// o OBZ (orçado) é estruturado só em Amazonas x Maranhão; agrupa as demais localidades em Maranhão
+// operação dividida em 2 regiões: Amazonas (centro de custo terminando em A) e Maranhão (demais)
+function localidadeDe(cc){const m=String(cc||'').match(/([A-Za-z])(?=[^A-Za-z]*$)/);if(!m)return'Maranhão';return m[1].toUpperCase()==='A'?'Amazonas':'Maranhão';}
 function regiaoOBZ(loc){return loc==='Amazonas'?'Amazonas':'Maranhão';}
 
 document.getElementById('file').addEventListener('change',e=>{[...e.target.files].forEach(lerArquivo);e.target.value='';});
