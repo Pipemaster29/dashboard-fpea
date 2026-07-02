@@ -111,6 +111,7 @@
   <nav id="tabs" class="tabs hidden">
     <button class="tabbtn" data-t="ovr" onclick="showTab('ovr')">🎯 Orçado vs Real</button>
     <button class="tabbtn" data-t="ops" onclick="showTab('ops')">🚚 Operações & R$/KM</button>
+    <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')">🔎 Pareto & Gargalos</button>
     <button class="tabbtn" data-t="dash" onclick="showTab('dash')">📈 Análise de Custos</button>
   </nav>
 
@@ -161,6 +162,29 @@
     </div>
     <div class="tablewrap"><table id="tabOps"><thead></thead><tbody></tbody></table></div>
     <div class="note">R$/KM realizado = custo da categoria (bases SAP, por localidade e mês) ÷ KM realizado. R$/KM orçado = custo da categoria na OBZ ÷ KM orçado. Cada ponta usa o seu próprio KM e o seu próprio custo; só entram nos cálculos os meses/localidades em que você informou o respectivo KM.</div>
+  </div>
+
+  <!-- PARETO & GARGALOS -->
+  <div id="pareto" class="ovrbox hidden">
+    <div class="sectitle">🔎 Pareto & Gargalos <span class="tag" id="pareTag">onde o custo se concentra</span></div>
+    <div class="resumo" id="pareResumo"></div>
+    <div class="tablewrap" style="margin-bottom:22px"><table id="tabResumo"><thead></thead><tbody></tbody></table></div>
+    <div class="scope">
+      <label>Grupo (gargalo)</label>
+      <select id="pareGrupo" onchange="renderPareto2()"></select>
+      <label>Localidade</label>
+      <select id="pareLoc" onchange="renderPareto2()"><option value="">Todas</option><option>Amazonas</option><option>Maranhão</option></select>
+      <label>Detalhar por</label>
+      <select id="pareDim" onchange="renderPareto2()">
+        <option value="material">Material / Serviço</option>
+        <option value="centro">Centro de custo</option>
+        <option value="mes">Mês</option>
+      </select>
+    </div>
+    <div class="kpis" id="pareKpis"></div>
+    <div class="grid"><div class="card full"><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
+    <div class="tablewrap"><table id="tabPareto2"><thead></thead><tbody></tbody></table></div>
+    <div class="note">Cada valor é a soma dos lançamentos SAP (KSB1) daquele grupo/localidade. Ordenado do maior para o menor, com % do grupo e % acumulado — os poucos itens que somam ~80% são o gargalo a atacar.</div>
   </div>
 
   <!-- ANÁLISE DE CUSTOS REALIZADOS -->
@@ -226,14 +250,14 @@ function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch
 function applyTabs(){
   const nav=document.getElementById('tabs');
   const temDados=DADOS.length||ORCAMENTO.length||ORCKPI;
-  const avail=['ovr','ops','dash'].filter(tabHasContent);
+  const avail=['ovr','ops','pareto','dash'].filter(tabHasContent);
   nav.classList.toggle('hidden', !temDados || !avail.length);
   if(!avail.includes(activeTab)) activeTab=avail[0]||'ovr';
   document.querySelectorAll('#tabs .tabbtn').forEach(b=>{
     b.style.display=avail.includes(b.dataset.t)?'':'none';
     b.classList.toggle('active', b.dataset.t===activeTab);
   });
-  ['ovr','ops','dash'].forEach(id=>{
+  ['ovr','ops','pareto','dash'].forEach(id=>{
     document.getElementById(id).classList.toggle('hidden', !(id===activeTab && avail.includes(id)));
   });
 }
@@ -450,7 +474,7 @@ function atualizarUI(){
   if(!DADOS.length&&ORCAMENTO.length) badge.push('— carregue o realizado (KSB1) para ver o Orçado vs Real');
   document.getElementById('fileBadge').textContent=badge.join(' · ')||'nenhum arquivo carregado';
   if(DADOS.length){ montarFiltros(); render(); }
-  montarEscopoOVR(); renderOVR(); renderOps();
+  montarEscopoOVR(); renderOVR(); renderOps(); renderParetoTab();
   applyTabs();
 }
 
@@ -695,9 +719,79 @@ function renderOpsCalc(){
       scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
 }
 
+// ---------- PARETO & GARGALOS ----------
+const GRUPO_NOME={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus',lubrificantes:'Lubrificantes',transporte:'Frete/Transporte',outros:'Outros'};
+function catDeLinha(d){return d.cat||classificarCusto((d.material||'')+' '+(d.objeto||''),d.classe);}
+function orcadoGrupoLoc(){ // orçado total por grupo x localidade, a partir da OBZ (R$/km→custo somado por mês)
+  const map={combustivel:'comb',manutencao:'manut',pneus:'pneu',lubrificantes:'lubrif'};const out={};
+  if(!ORCKPI) return out; const fPC=fatorPisCofins();
+  Object.keys(ORCKPI).forEach(loc=>Object.keys(ORCKPI[loc]).forEach(mes=>{const c=(ORCKPI[loc][mes]||{}).custo||{};
+    Object.entries(map).forEach(([g,t])=>{out[g]=out[g]||{};out[g][loc]=(out[g][loc]||0)+(c[t]||0)*fPC;});}));
+  return out;
+}
+function renderParetoTab(){
+  if(!DADOS.length) return;
+  const real={};DADOS.forEach(d=>{const g=catDeLinha(d);real[g]=real[g]||{Amazonas:0,'Maranhão':0};real[g][d.loc]=(real[g][d.loc]||0)+d.valor;});
+  const orc=orcadoGrupoLoc();const temOrc=!!ORCKPI;
+  const ordem=['combustivel','manutencao','pneus','lubrificantes','transporte','outros'].filter(g=>real[g]);
+  const sel=document.getElementById('pareGrupo');const cur=sel.value;
+  sel.innerHTML=ordem.map(g=>`<option value="${g}" ${g===cur?'selected':''}>${GRUPO_NOME[g]}</option>`).join('');
+  const head=temOrc?['Grupo','Real AM','Real MA','Real Total','Orç AM','Orç MA','Orç Total','Δ R$','Δ %']:['Grupo','Real AM','Real MA','Real Total','% do total'];
+  document.querySelector('#tabResumo thead').innerHTML='<tr>'+head.map((h,i)=>`<th class="${i===0?'txt':''}">${h}</th>`).join('')+'</tr>';
+  const totGeral=ordem.reduce((s,g)=>s+(real[g].Amazonas||0)+(real[g]['Maranhão']||0),0);
+  const gargalos=[];
+  const body=ordem.map(g=>{const rAM=real[g].Amazonas||0,rMA=real[g]['Maranhão']||0,rT=rAM+rMA;
+    const o=orc[g]||{};const oAM=o.Amazonas||0,oMA=o['Maranhão']||0,oT=oAM+oMA;const dv=rT-oT,dp=oT?dv/oT*100:0;const cls=dv>0?'pos':'neg';
+    if(temOrc&&oT>0&&dp>20)gargalos.push({g:GRUPO_NOME[g],dp});
+    if(temOrc)return `<tr><td class="txt">${GRUPO_NOME[g]}</td><td>${BRL.format(rAM)}</td><td>${BRL.format(rMA)}</td><td><b>${BRL.format(rT)}</b></td><td>${BRL.format(oAM)}</td><td>${BRL.format(oMA)}</td><td>${BRL.format(oT)}</td><td class="${cls}">${oT?BRL.format(dv):'—'}</td><td class="${cls}">${oT?PCT(dp):'—'}</td></tr>`;
+    return `<tr><td class="txt">${GRUPO_NOME[g]}</td><td>${BRL.format(rAM)}</td><td>${BRL.format(rMA)}</td><td><b>${BRL.format(rT)}</b></td><td>${(totGeral?rT/totGeral*100:0).toFixed(1).replace('.',',')}%</td></tr>`;}).join('');
+  document.querySelector('#tabResumo tbody').innerHTML=body;
+  const pr=document.getElementById('pareResumo');
+  if(temOrc&&gargalos.length){gargalos.sort((a,b)=>b.dp-a.dp);
+    pr.innerHTML='🚨 <b>Gargalos</b> (realizado &gt;20% acima do orçado): '+gargalos.map(x=>`<b>${x.g}</b> (${PCT(x.dp)})`).join(' · ')+'. Selecione o grupo abaixo para ver onde o custo se concentra.';}
+  else if(temOrc){pr.innerHTML='✅ Nenhum grupo estourou o orçado em mais de 20%. Veja abaixo onde cada grupo concentra o custo.';}
+  else{pr.innerHTML='📊 Pareto do realizado por grupo. Carregue a OBZ (orçado R$/km) para destacar os gargalos vs orçamento.';}
+  renderPareto2();
+}
+function renderPareto2(){
+  if(!DADOS.length) return;
+  const g=document.getElementById('pareGrupo').value;const loc=document.getElementById('pareLoc').value;const dim=document.getElementById('pareDim').value;
+  const dimKey=dim==='centro'?'centro':dim==='mes'?'mes':'material';
+  const rows=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc));
+  const agg={};rows.forEach(d=>{let k=d[dimKey];if(dimKey==='material'&&(!k||k==='—'||k==='')) k=d.objeto||'—';k=k||'—';agg[k]=(agg[k]||0)+d.valor;});
+  let items=Object.entries(agg).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const nItens=items.length;const tot=items.reduce((s,x)=>s+x[1],0);
+  const TOPN=15;let cauda=0,nCauda=0;if(items.length>TOPN){const resto=items.slice(TOPN);cauda=resto.reduce((s,x)=>s+x[1],0);nCauda=resto.length;items=items.slice(0,TOPN);}
+  let a=0;const cumItems=items.map(([,v])=>{a+=v;return tot?a/tot*100:0;});
+  const n80=cumItems.findIndex(p=>p>=80)+1;
+  document.getElementById('pareKpis').innerHTML=[
+    {lbl:'Custo do grupo'+(loc?' · '+loc:''),val:BRL.format(tot)},
+    {lbl:'Itens p/ 80% do custo',val:n80>0?INT.format(n80):'—',sub:'de '+INT.format(nItens)+' itens'},
+    {lbl:'Maior item',val:items.length?BRL.format(items[0][1]):'—',sub:items.length?String(items[0][0]).slice(0,30):''}
+  ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub" title="${String(c.sub).replace(/"/g,'')}">${c.sub}</div>`:''}</div>`).join('');
+  const dimLbl=dim==='centro'?'centro de custo':dim==='mes'?'mês':'material/serviço';
+  document.getElementById('pareChartTit').textContent='Pareto — '+(GRUPO_NOME[g]||g)+(loc?' · '+loc:'')+' (por '+dimLbl+')';
+  document.getElementById('pareTag').textContent=(GRUPO_NOME[g]||g)+(loc?' · '+loc:'');
+  const labels=items.map(x=>String(x[0]).slice(0,30)).concat(nCauda?['Outros ('+nCauda+')']:[]);
+  const vals=items.map(x=>x[1]).concat(nCauda?[cauda]:[]);
+  let a2=0;const cumAll=vals.map(v=>{a2+=v;return tot?a2/tot*100:0;});
+  destroy('chPareto2');
+  charts.chPareto2=new Chart('chPareto2',{data:{labels,datasets:[
+    {type:'bar',label:'Custo',data:vals,backgroundColor:'#38bdf8',yAxisID:'y',order:2,datalabels:{display:false}},
+    {type:'line',label:'% acumulado',data:cumAll,borderColor:'#fbbf24',backgroundColor:'#fbbf24',yAxisID:'y2',tension:.2,pointRadius:3,order:1,datalabels:{display:false}}
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.type==='line'?'Acum: '+c.parsed.y.toFixed(1).replace('.',',')+'%':BRL.format(c.parsed.y)+' ('+(tot?c.parsed.y/tot*100:0).toFixed(1).replace('.',',')+'%)'}}},
+    scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:55,minRotation:30,font:{size:10}}},
+      y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},
+      y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#fbbf24',callback:v=>v+'%'}}}}});
+  document.querySelector('#tabPareto2 thead').innerHTML='<tr><th class="txt">Item</th><th>Custo (R$)</th><th>% do grupo</th><th>% acumulado</th></tr>';
+  let a3=0;const tb=items.map(([k,v])=>{a3+=v;return `<tr><td class="txt" title="${String(k).replace(/"/g,'')}">${String(k).slice(0,60)}</td><td>${BRL.format(v)}</td><td>${(tot?v/tot*100:0).toFixed(1).replace('.',',')}%</td><td>${(tot?a3/tot*100:0).toFixed(1).replace('.',',')}%</td></tr>`;}).join('');
+  document.querySelector('#tabPareto2 tbody').innerHTML=tb+(nCauda?`<tr><td class="txt small">Outros ${nCauda} itens</td><td>${BRL.format(cauda)}</td><td>${(tot?cauda/tot*100:0).toFixed(1).replace('.',',')}%</td><td>100,0%</td></tr>`:'');
+}
+
 // ---------- ORÇADO vs REAL ----------
 function fatorPisCofins(){ const el=document.getElementById('pisCofins'); return (el&&el.checked)?(1-0.0925):1; }
-function recalcOrc(){ if(ORCAMENTO.length) renderOVR(); if(DADOS.length) renderOpsCalc(); }
+function recalcOrc(){ if(ORCAMENTO.length) renderOVR(); if(DADOS.length){ renderOpsCalc(); renderParetoTab(); } }
 function montarEscopoOVR(){
   if(!ORCAMENTO.length) return;
   const tipos=uniq(ORCAMENTO.map(o=>o.tipo)).filter(Boolean).sort();
