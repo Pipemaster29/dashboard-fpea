@@ -593,8 +593,14 @@ function renderOpsCalc(){
   const fPC=fatorPisCofins();
   const temOrc=!!ORCKPI;
   const rkm2=v=>v.toFixed(2).replace('.',',');
-  // custo realizado (SAP) por localidade|mês
-  const costReal={};DADOS.forEach(d=>{if(catSet.has(d.cat||classificarCusto((d.material||'')+' '+(d.objeto||''),d.classe))){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
+  const catDe=d=>d.cat||classificarCusto((d.material||'')+' '+(d.objeto||''),d.classe);
+  // custo realizado (SAP) por localidade|mês (restrito, para o R$/km bater com o KM)
+  const costReal={};
+  // #2 — custo TOTAL do período, sem depender de KM informado (todas localidades e meses)
+  let custoPeriodo=0; const custoLocPeriodo={}, custoMesPeriodo={};
+  DADOS.forEach(d=>{ if(!catSet.has(catDe(d))) return;
+    const k=d.loc+'|'+d.mes; costReal[k]=(costReal[k]||0)+d.valor;
+    custoPeriodo+=d.valor; custoLocPeriodo[d.loc]=(custoLocPeriodo[d.loc]||0)+d.valor; custoMesPeriodo[d.mes]=(custoMesPeriodo[d.mes]||0)+d.valor; });
   // KM informado por par localidade|mês — realizado e orçado, separados
   const kmRealP={},kmOrcP={};let viaTot=0;
   opsRows.forEach(r=>{viaTot+=(+r.viagens||0);if(!r.mes)return;const k=r.regiao+'|'+r.mes;
@@ -615,8 +621,10 @@ function renderOpsCalc(){
   const showOrc=temOrc&&orcKmTot>0;
 
   // KPIs
+  const locStr=Object.entries(custoLocPeriodo).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+': '+BRL.format(v)).join(' · ');
   const kpis=[
-    {lbl:'Custo realizado',val:BRL.format(realCustoTot),sub:catLabel+' · meses/locais informados'},
+    {lbl:'Custo total no período',val:BRL.format(custoPeriodo),sub:catLabel+' · todas localidades'+(locStr?' ('+locStr+')':'')},
+    {lbl:'Custo realizado (c/ KM)',val:BRL.format(realCustoTot),sub:'só meses/locais com KM informado'},
     {lbl:'KM realizado total',val:INT.format(Math.round(realKmTot))},
     {lbl:'R$/KM realizado',val:realKmTot?BRL.format(rkm):'—',sub:'custo SAP ÷ km realizado'}
   ];
