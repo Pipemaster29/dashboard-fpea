@@ -80,6 +80,8 @@
   tbody tr{transition:background-color .12s var(--ease-out)}
   tbody tr:hover{background:var(--panel2)}
   #tabPareto2 tbody tr:hover,#tabResumo tbody tr:hover{box-shadow:inset 3px 0 0 var(--accent)}
+  tr.gargalo td{background:rgba(248,113,113,.09)}
+  tr.gargalo td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
   .pos{color:var(--bad)}.neg{color:var(--good)}
   footer{text-align:center;color:var(--muted);font-size:12px;padding:24px}
   .badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--muted);margin-left:8px}
@@ -195,6 +197,7 @@
       <label>Detalhar por</label>
       <select id="pareDim" onchange="renderPareto2()">
         <option value="marca">Fornecedor / Marca</option>
+        <option value="conta">Conta (Diesel/ARLA/…)</option>
         <option value="material">Material / Serviço</option>
         <option value="centro">Centro de custo</option>
         <option value="mes">Mês</option>
@@ -789,7 +792,8 @@ function renderParetoTab(){
   const body=ordem.map(g=>{const rAM=real[g].Amazonas||0,rMA=real[g]['Maranhão']||0,rT=rAM+rMA;
     const o=orc[g]||{};const oAM=o.Amazonas||0,oMA=o['Maranhão']||0,oT=oAM+oMA;const dv=rT-oT,dp=oT?dv/oT*100:0;const cls=dv>0?'pos':'neg';
     if(temOrc&&oT>0&&dp>20)gargalos.push({g:GRUPO_NOME[g],dp});
-    if(temOrc)return `<tr><td class="txt">${GRUPO_NOME[g]}</td><td>${BRL.format(rAM)}</td><td>${BRL.format(rMA)}</td><td><b>${BRL.format(rT)}</b></td><td>${BRL.format(oAM)}</td><td>${BRL.format(oMA)}</td><td>${BRL.format(oT)}</td><td class="${cls}">${oT?BRL.format(dv):'—'}</td><td class="${cls}">${oT?PCT(dp):'—'}</td></tr>`;
+    const garg=temOrc&&oT>0&&dp>20;
+    if(temOrc)return `<tr class="${garg?'gargalo':''}"><td class="txt">${garg?'🚨 ':''}${GRUPO_NOME[g]}</td><td>${BRL.format(rAM)}</td><td>${BRL.format(rMA)}</td><td><b>${BRL.format(rT)}</b></td><td>${BRL.format(oAM)}</td><td>${BRL.format(oMA)}</td><td>${BRL.format(oT)}</td><td class="${cls}">${oT?BRL.format(dv):'—'}</td><td class="${cls}">${oT?PCT(dp):'—'}</td></tr>`;
     return `<tr><td class="txt">${GRUPO_NOME[g]}</td><td>${BRL.format(rAM)}</td><td>${BRL.format(rMA)}</td><td><b>${BRL.format(rT)}</b></td><td>${(totGeral?rT/totGeral*100:0).toFixed(1).replace('.',',')}%</td></tr>`;}).join('');
   document.querySelector('#tabResumo tbody').innerHTML=body;
   const pr=document.getElementById('pareResumo');
@@ -810,6 +814,7 @@ function marcaDe(d){
 }
 function pareKey(d,dim){
   if(dim==='marca') return d.forn || marcaDe(d);
+  if(dim==='conta'){ if(/\barla\b|agente redutor|adblue/.test(norm((d.material||'')+' '+(d.objeto||'')))) return 'ARLA (Agente Redutor)'; return d.classe||'—'; }
   if(dim==='centro') return d.centro||'—';
   if(dim==='mes') return d.mes||'—';
   let k=d.material; if(!k||k==='—'||k==='') k=d.objeto||'—'; return k||'—';
@@ -821,18 +826,21 @@ function renderPareto2(){
   _pareCtx={g,loc,dim};
   const rows=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc));
   const agg={};rows.forEach(d=>{const k=pareKey(d,dim);agg[k]=(agg[k]||0)+d.valor;});
+  const totNet=Object.values(agg).reduce((s,v)=>s+v,0);                    // líquido do grupo (bate com a DRE)
+  const estornos=Object.values(agg).filter(v=>v<0).reduce((s,v)=>s+v,0);   // baixas/estornos
   let items=Object.entries(agg).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  const nItens=items.length;const tot=items.reduce((s,x)=>s+x[1],0);
+  const nItens=items.length;const tot=items.reduce((s,x)=>s+x[1],0);       // bruto (base das % das barras)
   const TOPN=15;let cauda=0,nCauda=0;if(items.length>TOPN){const resto=items.slice(TOPN);cauda=resto.reduce((s,x)=>s+x[1],0);nCauda=resto.length;items=items.slice(0,TOPN);}
   _pareItems=items.map(([k,v])=>({key:k,val:v}));
   let a=0;const cumItems=items.map(([,v])=>{a+=v;return tot?a/tot*100:0;});
   const n80=cumItems.findIndex(p=>p>=80)+1;
+  const temEstorno=estornos<-1;
   document.getElementById('pareKpis').innerHTML=[
-    {lbl:'Custo do grupo'+(loc?' · '+loc:''),val:BRL.format(tot)},
-    {lbl:'Itens p/ 80% do custo',val:n80>0?INT.format(n80):'—',sub:'de '+INT.format(nItens)+' itens'},
+    {lbl:'Custo líquido do grupo'+(loc?' · '+loc:''),val:BRL.format(totNet),sub:temEstorno?'bruto '+kBRL(tot)+' · estornos '+kBRL(estornos):''},
+    {lbl:'Itens p/ 80% do bruto',val:n80>0?INT.format(n80):'—',sub:'de '+INT.format(nItens)+' itens'},
     {lbl:'Maior item',val:items.length?BRL.format(items[0][1]):'—',sub:items.length?String(items[0][0]).slice(0,30):''}
   ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub" title="${String(c.sub).replace(/"/g,'')}">${c.sub}</div>`:''}</div>`).join('');
-  const dimLbl=dim==='centro'?'centro de custo':dim==='mes'?'mês':dim==='marca'?'fornecedor/marca':'material/serviço';
+  const dimLbl=dim==='centro'?'centro de custo':dim==='mes'?'mês':dim==='marca'?'fornecedor/marca':dim==='conta'?'conta':'material/serviço';
   document.getElementById('pareChartTit').textContent='Pareto — '+(GRUPO_NOME[g]||g)+(loc?' · '+loc:'')+' (por '+dimLbl+')';
   document.getElementById('pareTag').textContent=(GRUPO_NOME[g]||g)+(loc?' · '+loc:'');
   const labels=items.map(x=>String(x[0]).slice(0,30)).concat(nCauda?['Outros ('+nCauda+')']:[]);
@@ -849,7 +857,9 @@ function renderPareto2(){
       y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#fbbf24',callback:v=>v+'%'}}}}});
   document.querySelector('#tabPareto2 thead').innerHTML='<tr><th class="txt">Item <span class="small">(clique para ver os lançamentos)</span></th><th>Custo (R$)</th><th>% do grupo</th><th>% acumulado</th></tr>';
   let a3=0;const tb=items.map(([k,v],i)=>{a3+=v;return `<tr style="cursor:pointer" onclick="abrirDrill(${i})"><td class="txt" title="${String(k).replace(/"/g,'')}">🔍 ${String(k).slice(0,60)}</td><td>${BRL.format(v)}</td><td>${(tot?v/tot*100:0).toFixed(1).replace('.',',')}%</td><td>${(tot?a3/tot*100:0).toFixed(1).replace('.',',')}%</td></tr>`;}).join('');
-  document.querySelector('#tabPareto2 tbody').innerHTML=tb+(nCauda?`<tr><td class="txt small">Outros ${nCauda} itens</td><td>${BRL.format(cauda)}</td><td>${(tot?cauda/tot*100:0).toFixed(1).replace('.',',')}%</td><td>100,0%</td></tr>`:'');
+  const rowCauda=nCauda?`<tr><td class="txt small">Outros ${nCauda} itens</td><td>${BRL.format(cauda)}</td><td>${(tot?cauda/tot*100:0).toFixed(1).replace('.',',')}%</td><td>100,0%</td></tr>`:'';
+  const rowEstorno=temEstorno?`<tr style="color:var(--good)"><td class="txt">↩︎ Estornos / baixas</td><td>${BRL.format(estornos)}</td><td>—</td><td>—</td></tr><tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt">= Líquido do grupo</td><td>${BRL.format(totNet)}</td><td>—</td><td>—</td></tr>`:'';
+  document.querySelector('#tabPareto2 tbody').innerHTML=tb+rowCauda+rowEstorno;
 }
 // drill-down: mostra todos os lançamentos do item clicado
 function abrirDrill(idx){
