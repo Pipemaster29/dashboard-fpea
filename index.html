@@ -470,10 +470,26 @@ function mapear(json,nome){
       mes:mesDe(kData?row[kData]:''),
       material: material || (kDescr?String(row[kDescr]):''),
       cat: classificarCusto(blob, classe),
+      forn: fornecedorDe(material, kDescr?String(row[kDescr]):'', kPedido?String(row[kPedido]):'', objeto),
       loc:localidadeDe(kCentro?row[kCentro]:''),
       origem
     };
   }).filter(d=>d.valor!==0);
+}
+
+// marcas/fornecedores conhecidos para juntar variações (Scania, Volks…)
+const MARCAS=['scania','volksw','volks','mercedes','randon','michelin','bridgestone','continental','goodyear','pirelli','ceat','iveco','volvo','librelato','guerra','facchini','noma','jost','meritor','fras-le','cummins','bosch','recauchutadora elo','giro','magnolia','ipiranga','vibra','raizen','shell'];
+const MARCA_NOME={volksw:'VOLKSWAGEN',volks:'VOLKSWAGEN',mercedes:'MERCEDES-BENZ','recauchutadora elo':'RECAUCHUTADORA ELO',giro:'GIRO PNEUS'};
+// fornecedor/descritivo do lançamento: marca conhecida > Descrição (nome do fornecedor) > marca após "/" > Denominação objeto (p/ provisões)
+function fornecedorDe(material, descr, pedido, objeto){
+  const full=norm((material||'')+' '+(descr||'')+' '+(pedido||'')+' '+(objeto||''));
+  for(const m of MARCAS){ if(full.includes(m)) return MARCA_NOME[m]||m.toUpperCase(); }
+  const d=String(descr||'').trim();
+  if(d && /[a-zA-Z]{3}/.test(d)) return d.replace(/\s+/g,' ').slice(0,42).toUpperCase();
+  const mt=String(material||'');
+  if(mt.includes('/')){ const last=mt.split('/').pop().trim(); if(last.length>1 && /[a-zA-Z]/.test(last)) return last.toUpperCase(); }
+  const o=String(objeto||'').replace(/^\([^)]*\)\s*/,'').trim();   // provisão/fechamento: usa o objeto (limpa prefixo (M)/(O))
+  return (o && o!=='—') ? o : '(sem descrição)';
 }
 
 // Classifica um lançamento em: pneus / combustivel / manutencao / outros.
@@ -783,17 +799,17 @@ function renderParetoTab(){
   else{pr.innerHTML='📊 Pareto do realizado por grupo. Carregue a OBZ (orçado R$/km) para destacar os gargalos vs orçamento.';}
   renderPareto2();
 }
-const MARCAS=['scania','volksw','volks','mercedes','randon','michelin','bridgestone','continental','goodyear','pirelli','ceat','iveco','volvo','librelato','guerra','facchini','noma','jost','meritor','fras-le','cummins','bosch','recauchutadora elo','giro'];
-const MARCA_NOME={volksw:'VOLKSWAGEN',volks:'VOLKSWAGEN',mercedes:'MERCEDES-BENZ','recauchutadora elo':'RECAUCHUTADORA ELO',giro:'GIRO PNEUS'};
+// fallback p/ bases antigas (sem d.forn): usa marca no texto ou objeto limpo
 function marcaDe(d){
   const full=norm((d.material||'')+' '+(d.objeto||''));
   for(const m of MARCAS){ if(full.includes(m)) return MARCA_NOME[m]||m.toUpperCase(); }
-  const t=String(d.material||'');                          // senão, texto após a última "/"
+  const t=String(d.material||'');
   if(t.includes('/')){const last=t.split('/').pop().trim(); if(last) return last.toUpperCase(); }
-  return '(sem fornecedor no texto)';
+  const o=String(d.objeto||'').replace(/^\([^)]*\)\s*/,'').trim();
+  return (o&&o!=='—')?o:'(sem descrição)';
 }
 function pareKey(d,dim){
-  if(dim==='marca') return marcaDe(d);
+  if(dim==='marca') return d.forn || marcaDe(d);
   if(dim==='centro') return d.centro||'—';
   if(dim==='mes') return d.mes||'—';
   let k=d.material; if(!k||k==='—'||k==='') k=d.objeto||'—'; return k||'—';
