@@ -11,20 +11,20 @@
 <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 <style>
   :root{--bg:#0f172a;--panel:#1e293b;--panel2:#273449;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;
-    --accent:#38bdf8;--accent2:#818cf8;--good:#34d399;--bad:#f87171;--warn:#fbbf24;
+    --accent:#00ABBC;--accent2:#17798a;--good:#2fb3a0;--bad:#EA5C50;--warn:#F5B432;--brand3:#6C5D48;
     --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-in-out:cubic-bezier(0.77,0,0.175,1);}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.4}
   header{background:linear-gradient(90deg,#0f172a,#1e293b);border-bottom:1px solid var(--line);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
   header h1{font-size:20px;font-weight:600;display:flex;align-items:center;gap:10px}
-  header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(56,189,248,.5);animation:pulse 2.4s var(--ease-out) infinite}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(56,189,248,.45)}70%{box-shadow:0 0 0 7px rgba(56,189,248,0)}100%{box-shadow:0 0 0 0 rgba(56,189,248,0)}}
+  header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(0,171,188,.5);animation:pulse 2.4s var(--ease-out) infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,171,188,.45)}70%{box-shadow:0 0 0 7px rgba(0,171,188,0)}100%{box-shadow:0 0 0 0 rgba(0,171,188,0)}}
   .actions{display:flex;gap:10px;flex-wrap:wrap}
   button{cursor:pointer;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;transition:background-color .16s var(--ease-out),border-color .16s var(--ease-out),color .16s var(--ease-out),transform .12s var(--ease-out),box-shadow .16s var(--ease-out)}
   button:active{transform:scale(.97)}
   .btn-primary{background:var(--accent);color:#06202c}
   .btn-ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
-  @media(hover:hover){.btn-primary:hover{background:#7dd3fc;box-shadow:0 4px 14px rgba(56,189,248,.25)}.btn-ghost:hover{border-color:var(--accent);color:#fff}}
+  @media(hover:hover){.btn-primary:hover{background:#7dd3fc;box-shadow:0 4px 14px rgba(0,171,188,.28)}.btn-ghost:hover{border-color:var(--accent);color:#fff}}
   main{padding:24px 28px;max-width:1480px;margin:0 auto}
   #drop{border:2px dashed var(--line);border-radius:14px;padding:44px 24px;text-align:center;background:var(--panel);transition:.2s;cursor:pointer;margin-bottom:24px}
   #drop:hover,#drop.drag{border-color:var(--accent);background:var(--panel2)}
@@ -33,7 +33,7 @@
   .sectitle{font-size:16px;font-weight:700;margin:6px 0 16px;display:flex;align-items:center;gap:10px}
   .sectitle .tag{font-size:11px;font-weight:600;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 11px;color:var(--muted)}
   .ovrbox{background:linear-gradient(180deg,#16233b,#1e293b);border:1px solid var(--accent2);border-radius:14px;padding:20px;margin-bottom:30px}
-  .resumo{background:rgba(56,189,248,.08);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
+  .resumo{background:rgba(0,171,188,.09);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
   .resumo b{color:#fff}
   .tabs{display:flex;gap:6px;margin-bottom:24px;border-bottom:1px solid var(--line);flex-wrap:wrap}
   .tabbtn{background:transparent;color:var(--muted);border:none;border-bottom:2px solid transparent;border-radius:0;padding:11px 18px;font-size:14px;font-weight:600;transition:color .16s var(--ease-out),border-color .16s var(--ease-out)}
@@ -254,7 +254,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real (agregado) + análise de custos realizados (SAP KSB1) · Chart.js + SheetJS · GitHub Pages</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v3 · paleta GNL · 03/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -560,7 +560,7 @@ function renderKPIs(rows){
   document.getElementById('kpis').innerHTML=cards.map(c=>`<div class="kpi"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub" title="${c.sub}">${c.sub}</div>`:''}</div>`).join('');
 }
 
-const COLORS=['#38bdf8','#818cf8','#34d399','#fbbf24','#f87171','#f472b6','#a78bfa','#2dd4bf','#fb923c','#60a5fa','#c084fc','#4ade80'];
+const COLORS=['#00ABBC','#F5B432','#6C5D48','#5FCEDB','#F8CE7A','#9E8A70','#17798A','#D99A2B','#8FB3BA','#C4B49B','#3FBFCE','#B5842E'];
 function destroy(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 function topN(obj,n){return Object.entries(obj).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,n);}
 
@@ -573,18 +573,18 @@ function renderCharts(rows){
   const totCl=rows.reduce((s,d)=>s+d.valor,0);
   const optCl=opts(true);
   optCl.plugins.tooltip.callbacks.label=c=>BRL.format(c.parsed.x)+'  ('+(totCl?(c.parsed.x/totCl*100):0).toFixed(1).replace('.',',')+'% do total)';
-  charts.chClasse=new Chart('chClasse',{type:'bar',data:{labels:cl.map(x=>x[0]),datasets:[{data:cl.map(x=>x[1]),backgroundColor:'#38bdf8'}]},options:optCl});
+  charts.chClasse=new Chart('chClasse',{type:'bar',data:{labels:cl.map(x=>x[0]),datasets:[{data:cl.map(x=>x[1]),backgroundColor:'#00ABBC'}]},options:optCl});
   const ce=topN(aggSoma(rows,'centro'),12);destroy('chCentro');
-  charts.chCentro=new Chart('chCentro',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:'#818cf8'}]},options:opts(true)});
+  charts.chCentro=new Chart('chCentro',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:'#6C5D48'}]},options:opts(true)});
   const pm=aggSoma(rows,'mes');const meses=Object.keys(pm).sort((a,b)=>mesOrd(a)-mesOrd(b));destroy('chMes');
-  charts.chMes=new Chart('chMes',{type:'bar',data:{labels:meses,datasets:[{data:meses.map(m=>pm[m]),backgroundColor:'#34d399'}]},options:opts(false)});
+  charts.chMes=new Chart('chMes',{type:'bar',data:{labels:meses,datasets:[{data:meses.map(m=>pm[m]),backgroundColor:'#00ABBC'}]},options:opts(false)});
   const ob=topN(aggSoma(rows,'objeto'),10);destroy('chObjeto');
   charts.chObjeto=new Chart('chObjeto',{type:'doughnut',data:{labels:ob.map(x=>x[0]),datasets:[{data:ob.map(x=>Math.abs(x[1])),backgroundColor:COLORS,borderColor:'#1e293b',borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>c.label+': '+BRL.format(c.parsed)}}}}});
 
   // Custo por Localidade
   const lo=aggSoma(rows,'loc');const loKeys=Object.keys(lo).sort((a,b)=>lo[b]-lo[a]);const totLo=loKeys.reduce((s,k)=>s+Math.abs(lo[k]),0);destroy('chLoc');
-  charts.chLoc=new Chart('chLoc',{type:'doughnut',data:{labels:loKeys,datasets:[{data:loKeys.map(k=>Math.abs(lo[k])),backgroundColor:['#34d399','#38bdf8','#fbbf24','#f87171'],borderColor:'#1e293b',borderWidth:2}]},
+  charts.chLoc=new Chart('chLoc',{type:'doughnut',data:{labels:loKeys,datasets:[{data:loKeys.map(k=>Math.abs(lo[k])),backgroundColor:['#00ABBC','#F5B432','#6C5D48','#5FCEDB'],borderColor:'#1e293b',borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:12},boxWidth:12}},
       tooltip:{callbacks:{label:c=>c.label+': '+BRL.format(c.parsed)+' ('+(totLo?(c.parsed/totLo*100):0).toFixed(1).replace('.',',')+'%)'}}}}});
 
@@ -601,13 +601,13 @@ function renderPareto(rows){
   let acc=0;const cum=items.map(([,v])=>{acc+=v;return tot?acc/tot*100:0;});
   destroy('chPareto');
   charts.chPareto=new Chart('chPareto',{data:{labels:items.map(x=>String(x[0]).slice(0,28)),datasets:[
-    {type:'bar',label:'Custo',data:items.map(x=>x[1]),backgroundColor:'#38bdf8',yAxisID:'y',order:2},
-    {type:'line',label:'% acumulado',data:cum,borderColor:'#fbbf24',backgroundColor:'#fbbf24',yAxisID:'y2',tension:.2,pointRadius:3,order:1}
+    {type:'bar',label:'Custo',data:items.map(x=>x[1]),backgroundColor:'#00ABBC',yAxisID:'y',order:2},
+    {type:'line',label:'% acumulado',data:cum,borderColor:'#F5B432',backgroundColor:'#F5B432',yAxisID:'y2',tension:.2,pointRadius:3,order:1}
   ]},options:{responsive:true,maintainAspectRatio:false,
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.type==='line'?'Acumulado: '+c.parsed.y.toFixed(1).replace('.',',')+'%':BRL.format(c.parsed.y)+' ('+(tot?c.parsed.y/tot*100:0).toFixed(1).replace('.',',')+'%)'}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:55,minRotation:30,font:{size:10}}},
       y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},
-      y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#fbbf24',callback:v=>v+'%'}}}}});
+      y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#F5B432',callback:v=>v+'%'}}}}});
 }
 
 function renderTabela(rows){
@@ -733,12 +733,12 @@ function renderOpsCalc(){
   // ----- gráfico mês a mês: barras orçado vs realizado + diferença (linha) -----
   destroy('chRkmMes');
   const dsMes=[];
-  if(showOrc)dsMes.push({type:'bar',label:'Orçado',data:orcArr,backgroundColor:'#0e7490',order:3,
+  if(showOrc)dsMes.push({type:'bar',label:'Orçado',data:orcArr,backgroundColor:'#6C5D48',order:3,
     datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,color:'#fff',anchor:'center',align:'center',font:{weight:'700',size:11},formatter:v=>v==null?'':rkm2(v)}});
-  dsMes.push({type:'bar',label:'Realizado',data:realArr,backgroundColor:'#22d3ee',order:2,
+  dsMes.push({type:'bar',label:'Realizado',data:realArr,backgroundColor:'#00ABBC',order:2,
     datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,color:'#06202c',anchor:'center',align:'center',font:{weight:'700',size:11},formatter:v=>v==null?'':rkm2(v)}});
-  if(showOrc)dsMes.push({type:'line',label:'Diferença',data:difArr,borderColor:'#f59e0b',backgroundColor:'#f59e0b',pointBackgroundColor:'#f59e0b',pointRadius:4,tension:.3,order:1,
-    datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,align:'top',color:'#f59e0b',backgroundColor:'rgba(245,158,11,.14)',borderRadius:4,padding:4,font:{weight:'700',size:11},formatter:v=>v==null?'':(v>=0?'+':'')+rkm2(v)}});
+  if(showOrc)dsMes.push({type:'line',label:'Diferença',data:difArr,borderColor:'#F5B432',backgroundColor:'#F5B432',pointBackgroundColor:'#F5B432',pointRadius:4,tension:.3,order:1,
+    datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,align:'top',color:'#F5B432',backgroundColor:'rgba(245,180,50,.16)',borderRadius:4,padding:4,font:{weight:'700',size:11},formatter:v=>v==null?'':(v>=0?'+':'')+rkm2(v)}});
   charts.chRkmMes=new Chart('chRkmMes',{data:{labels:meses,datasets:dsMes},
     options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:26}},
       plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+'/km'}}},
@@ -749,8 +749,8 @@ function renderOpsCalc(){
   let aRC=0,aRK=0,aOC=0,aOK=0;
   const acumReal=meses.map(m=>{aRC+=rMes.c[m]||0;aRK+=rMes.k[m]||0;return aRK?aRC/aRK:null;});
   const acumOrc =meses.map(m=>{aOC+=oMes.c[m]||0;aOK+=oMes.k[m]||0;return aOK?aOC/aOK:null;});
-  const dsAc=[{label:'Realizado acum.',data:acumReal,borderColor:'#22d3ee',backgroundColor:'#22d3ee',tension:.2,pointRadius:3,spanGaps:true}];
-  if(showOrc)dsAc.push({label:'Orçado acum.',data:acumOrc,borderColor:'#818cf8',backgroundColor:'#818cf8',borderDash:[5,4],tension:.2,pointRadius:3,spanGaps:true});
+  const dsAc=[{label:'Realizado acum.',data:acumReal,borderColor:'#00ABBC',backgroundColor:'#00ABBC',tension:.2,pointRadius:3,spanGaps:true}];
+  if(showOrc)dsAc.push({label:'Orçado acum.',data:acumOrc,borderColor:'#6C5D48',backgroundColor:'#6C5D48',borderDash:[5,4],tension:.2,pointRadius:3,spanGaps:true});
   charts.chRkmAcum=new Chart('chRkmAcum',{type:'line',data:{labels:meses,datasets:dsAc},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:showOrc,labels:{color:'#e2e8f0'}},datalabels:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+'/km'}}},
       scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
@@ -758,8 +758,8 @@ function renderOpsCalc(){
   // ----- gráfico por localidade -----
   destroy('chRkmLoc');
   const regs=uniq([...Object.keys(rReg.k),...Object.keys(oReg.k)]);
-  const dsLoc=[{label:'Realizado',data:regs.map(r=>rReg.k[r]?rReg.c[r]/rReg.k[r]:0),backgroundColor:'#22d3ee'}];
-  if(showOrc)dsLoc.push({label:'Orçado',data:regs.map(r=>oReg.k[r]?oReg.c[r]/oReg.k[r]:0),backgroundColor:'#818cf8'});
+  const dsLoc=[{label:'Realizado',data:regs.map(r=>rReg.k[r]?rReg.c[r]/rReg.k[r]:0),backgroundColor:'#00ABBC'}];
+  if(showOrc)dsLoc.push({label:'Orçado',data:regs.map(r=>oReg.k[r]?oReg.c[r]/oReg.k[r]:0),backgroundColor:'#6C5D48'});
   charts.chRkmLoc=new Chart('chRkmLoc',{type:'bar',data:{labels:regs,datasets:dsLoc},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:showOrc,labels:{color:'#e2e8f0'}},datalabels:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+'/km'}}},
       scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
@@ -848,13 +848,13 @@ function renderPareto2(){
   let a2=0;const cumAll=vals.map(v=>{a2+=v;return tot?a2/tot*100:0;});
   destroy('chPareto2');
   charts.chPareto2=new Chart('chPareto2',{data:{labels,datasets:[
-    {type:'bar',label:'Custo',data:vals,backgroundColor:'#38bdf8',yAxisID:'y',order:2,datalabels:{display:false}},
-    {type:'line',label:'% acumulado',data:cumAll,borderColor:'#fbbf24',backgroundColor:'#fbbf24',yAxisID:'y2',tension:.2,pointRadius:3,order:1,datalabels:{display:false}}
+    {type:'bar',label:'Custo',data:vals,backgroundColor:'#00ABBC',yAxisID:'y',order:2,datalabels:{display:false}},
+    {type:'line',label:'% acumulado',data:cumAll,borderColor:'#F5B432',backgroundColor:'#F5B432',yAxisID:'y2',tension:.2,pointRadius:3,order:1,datalabels:{display:false}}
   ]},options:{responsive:true,maintainAspectRatio:false,onClick:(e,el)=>{if(el&&el.length&&el[0].index<_pareItems.length)abrirDrill(el[0].index);},
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.type==='line'?'Acum: '+c.parsed.y.toFixed(1).replace('.',',')+'%':BRL.format(c.parsed.y)+' ('+(tot?c.parsed.y/tot*100:0).toFixed(1).replace('.',',')+'%)'}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:55,minRotation:30,font:{size:10}}},
       y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},
-      y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#fbbf24',callback:v=>v+'%'}}}}});
+      y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#F5B432',callback:v=>v+'%'}}}}});
   document.querySelector('#tabPareto2 thead').innerHTML='<tr><th class="txt">Item <span class="small">(clique para ver os lançamentos)</span></th><th>Custo (R$)</th><th>% do grupo</th><th>% acumulado</th></tr>';
   let a3=0;const tb=items.map(([k,v],i)=>{a3+=v;return `<tr style="cursor:pointer" onclick="abrirDrill(${i})"><td class="txt" title="${String(k).replace(/"/g,'')}">🔍 ${String(k).slice(0,60)}</td><td>${BRL.format(v)}</td><td>${(tot?v/tot*100:0).toFixed(1).replace('.',',')}%</td><td>${(tot?a3/tot*100:0).toFixed(1).replace('.',',')}%</td></tr>`;}).join('');
   const rowCauda=nCauda?`<tr><td class="txt small">Outros ${nCauda} itens</td><td>${BRL.format(cauda)}</td><td>${(tot?cauda/tot*100:0).toFixed(1).replace('.',',')}%</td><td>100,0%</td></tr>`:'';
@@ -927,8 +927,8 @@ function renderOVR(){
   }
 
   destroy('chOVR');
-  const dsOVR=[{label:'Orçado',data:meses.map(m=>bm[m]),backgroundColor:'#818cf8'}];
-  if(temReal) dsOVR.push({label:'Realizado',data:meses.map(m=>rm[m]||0),backgroundColor:'#38bdf8'});
+  const dsOVR=[{label:'Orçado',data:meses.map(m=>bm[m]),backgroundColor:'#6C5D48'}];
+  if(temReal) dsOVR.push({label:'Realizado',data:meses.map(m=>rm[m]||0),backgroundColor:'#00ABBC'});
   charts.chOVR=new Chart('chOVR',{type:'bar',data:{labels:meses,datasets:dsOVR},options:{responsive:true,maintainAspectRatio:false,
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
