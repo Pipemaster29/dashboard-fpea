@@ -86,6 +86,10 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   #flash{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-24px);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;box-shadow:0 12px 34px rgba(0,0,0,.45);z-index:2000;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
   #flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #drillModal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px}
+  .drillbox{background:var(--panel);border:1px solid var(--accent2);border-radius:14px;padding:18px;width:min(1100px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .drillhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;font-size:13.5px}
+  .drillhead button{flex:none}
 </style>
 </head>
 <body>
@@ -176,6 +180,7 @@
       <select id="pareLoc" onchange="renderPareto2()"><option value="">Todas</option><option>Amazonas</option><option>Maranhão</option></select>
       <label>Detalhar por</label>
       <select id="pareDim" onchange="renderPareto2()">
+        <option value="marca">Fornecedor / Marca</option>
         <option value="material">Material / Serviço</option>
         <option value="centro">Centro de custo</option>
         <option value="mes">Mês</option>
@@ -224,6 +229,13 @@
     </div>
   </div>
 </main>
+
+<div id="drillModal" class="hidden">
+  <div class="drillbox">
+    <div class="drillhead"><span id="drillTit"></span><button class="btn-ghost" onclick="fecharDrill()">✕ Fechar</button></div>
+    <div class="tablewrap" style="max-height:70vh"><table id="tabDrill"><thead></thead><tbody></tbody></table></div>
+  </div>
+</div>
 
 <footer>Dashboard FP&amp;A · Orçado vs Real (agregado) + análise de custos realizados (SAP KSB1) · Chart.js + SheetJS · GitHub Pages</footer>
 
@@ -725,7 +737,10 @@ function catDeLinha(d){return d.cat||classificarCusto((d.material||'')+' '+(d.ob
 function orcadoGrupoLoc(){ // orçado total por grupo x localidade, a partir da OBZ (R$/km→custo somado por mês)
   const map={combustivel:'comb',manutencao:'manut',pneus:'pneu',lubrificantes:'lubrif'};const out={};
   if(!ORCKPI) return out; const fPC=fatorPisCofins();
-  Object.keys(ORCKPI).forEach(loc=>Object.keys(ORCKPI[loc]).forEach(mes=>{const c=(ORCKPI[loc][mes]||{}).custo||{};
+  const mesesReal=new Set(DADOS.map(d=>d.mes));   // só compara os meses que têm realizado (senão orçado do ano vira o dobro)
+  Object.keys(ORCKPI).forEach(loc=>Object.keys(ORCKPI[loc]).forEach(mes=>{
+    if(mesesReal.size && !mesesReal.has(mes)) return;
+    const c=(ORCKPI[loc][mes]||{}).custo||{};
     Object.entries(map).forEach(([g,t])=>{out[g]=out[g]||{};out[g][loc]=(out[g][loc]||0)+(c[t]||0)*fPC;});}));
   return out;
 }
@@ -753,15 +768,32 @@ function renderParetoTab(){
   else{pr.innerHTML='📊 Pareto do realizado por grupo. Carregue a OBZ (orçado R$/km) para destacar os gargalos vs orçamento.';}
   renderPareto2();
 }
+const MARCAS=['scania','volksw','volks','mercedes','randon','michelin','bridgestone','continental','goodyear','pirelli','ceat','iveco','volvo','librelato','guerra','facchini','noma','jost','meritor','fras-le','cummins','bosch','recauchutadora elo','giro'];
+const MARCA_NOME={volksw:'VOLKSWAGEN',volks:'VOLKSWAGEN',mercedes:'MERCEDES-BENZ','recauchutadora elo':'RECAUCHUTADORA ELO',giro:'GIRO PNEUS'};
+function marcaDe(d){
+  const full=norm((d.material||'')+' '+(d.objeto||''));
+  for(const m of MARCAS){ if(full.includes(m)) return MARCA_NOME[m]||m.toUpperCase(); }
+  const t=String(d.material||'');                          // senão, texto após a última "/"
+  if(t.includes('/')){const last=t.split('/').pop().trim(); if(last) return last.toUpperCase(); }
+  return '(sem fornecedor no texto)';
+}
+function pareKey(d,dim){
+  if(dim==='marca') return marcaDe(d);
+  if(dim==='centro') return d.centro||'—';
+  if(dim==='mes') return d.mes||'—';
+  let k=d.material; if(!k||k==='—'||k==='') k=d.objeto||'—'; return k||'—';
+}
+let _pareItems=[], _pareCtx={};
 function renderPareto2(){
   if(!DADOS.length) return;
   const g=document.getElementById('pareGrupo').value;const loc=document.getElementById('pareLoc').value;const dim=document.getElementById('pareDim').value;
-  const dimKey=dim==='centro'?'centro':dim==='mes'?'mes':'material';
+  _pareCtx={g,loc,dim};
   const rows=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc));
-  const agg={};rows.forEach(d=>{let k=d[dimKey];if(dimKey==='material'&&(!k||k==='—'||k==='')) k=d.objeto||'—';k=k||'—';agg[k]=(agg[k]||0)+d.valor;});
+  const agg={};rows.forEach(d=>{const k=pareKey(d,dim);agg[k]=(agg[k]||0)+d.valor;});
   let items=Object.entries(agg).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const nItens=items.length;const tot=items.reduce((s,x)=>s+x[1],0);
   const TOPN=15;let cauda=0,nCauda=0;if(items.length>TOPN){const resto=items.slice(TOPN);cauda=resto.reduce((s,x)=>s+x[1],0);nCauda=resto.length;items=items.slice(0,TOPN);}
+  _pareItems=items.map(([k,v])=>({key:k,val:v}));
   let a=0;const cumItems=items.map(([,v])=>{a+=v;return tot?a/tot*100:0;});
   const n80=cumItems.findIndex(p=>p>=80)+1;
   document.getElementById('pareKpis').innerHTML=[
@@ -769,7 +801,7 @@ function renderPareto2(){
     {lbl:'Itens p/ 80% do custo',val:n80>0?INT.format(n80):'—',sub:'de '+INT.format(nItens)+' itens'},
     {lbl:'Maior item',val:items.length?BRL.format(items[0][1]):'—',sub:items.length?String(items[0][0]).slice(0,30):''}
   ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub" title="${String(c.sub).replace(/"/g,'')}">${c.sub}</div>`:''}</div>`).join('');
-  const dimLbl=dim==='centro'?'centro de custo':dim==='mes'?'mês':'material/serviço';
+  const dimLbl=dim==='centro'?'centro de custo':dim==='mes'?'mês':dim==='marca'?'fornecedor/marca':'material/serviço';
   document.getElementById('pareChartTit').textContent='Pareto — '+(GRUPO_NOME[g]||g)+(loc?' · '+loc:'')+' (por '+dimLbl+')';
   document.getElementById('pareTag').textContent=(GRUPO_NOME[g]||g)+(loc?' · '+loc:'');
   const labels=items.map(x=>String(x[0]).slice(0,30)).concat(nCauda?['Outros ('+nCauda+')']:[]);
@@ -779,15 +811,27 @@ function renderPareto2(){
   charts.chPareto2=new Chart('chPareto2',{data:{labels,datasets:[
     {type:'bar',label:'Custo',data:vals,backgroundColor:'#38bdf8',yAxisID:'y',order:2,datalabels:{display:false}},
     {type:'line',label:'% acumulado',data:cumAll,borderColor:'#fbbf24',backgroundColor:'#fbbf24',yAxisID:'y2',tension:.2,pointRadius:3,order:1,datalabels:{display:false}}
-  ]},options:{responsive:true,maintainAspectRatio:false,
+  ]},options:{responsive:true,maintainAspectRatio:false,onClick:(e,el)=>{if(el&&el.length&&el[0].index<_pareItems.length)abrirDrill(el[0].index);},
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.type==='line'?'Acum: '+c.parsed.y.toFixed(1).replace('.',',')+'%':BRL.format(c.parsed.y)+' ('+(tot?c.parsed.y/tot*100:0).toFixed(1).replace('.',',')+'%)'}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:55,minRotation:30,font:{size:10}}},
       y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},
       y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#fbbf24',callback:v=>v+'%'}}}}});
-  document.querySelector('#tabPareto2 thead').innerHTML='<tr><th class="txt">Item</th><th>Custo (R$)</th><th>% do grupo</th><th>% acumulado</th></tr>';
-  let a3=0;const tb=items.map(([k,v])=>{a3+=v;return `<tr><td class="txt" title="${String(k).replace(/"/g,'')}">${String(k).slice(0,60)}</td><td>${BRL.format(v)}</td><td>${(tot?v/tot*100:0).toFixed(1).replace('.',',')}%</td><td>${(tot?a3/tot*100:0).toFixed(1).replace('.',',')}%</td></tr>`;}).join('');
+  document.querySelector('#tabPareto2 thead').innerHTML='<tr><th class="txt">Item <span class="small">(clique para ver os lançamentos)</span></th><th>Custo (R$)</th><th>% do grupo</th><th>% acumulado</th></tr>';
+  let a3=0;const tb=items.map(([k,v],i)=>{a3+=v;return `<tr style="cursor:pointer" onclick="abrirDrill(${i})"><td class="txt" title="${String(k).replace(/"/g,'')}">🔍 ${String(k).slice(0,60)}</td><td>${BRL.format(v)}</td><td>${(tot?v/tot*100:0).toFixed(1).replace('.',',')}%</td><td>${(tot?a3/tot*100:0).toFixed(1).replace('.',',')}%</td></tr>`;}).join('');
   document.querySelector('#tabPareto2 tbody').innerHTML=tb+(nCauda?`<tr><td class="txt small">Outros ${nCauda} itens</td><td>${BRL.format(cauda)}</td><td>${(tot?cauda/tot*100:0).toFixed(1).replace('.',',')}%</td><td>100,0%</td></tr>`:'');
 }
+// drill-down: mostra todos os lançamentos do item clicado
+function abrirDrill(idx){
+  const it=_pareItems[idx]; if(!it) return; const {g,loc,dim}=_pareCtx;
+  const linhas=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&pareKey(d,dim)===it.key).sort((a,b)=>b.valor-a.valor);
+  const tot=linhas.reduce((s,d)=>s+d.valor,0);
+  document.getElementById('drillTit').innerHTML=`<b>${String(it.key).slice(0,70)}</b> · ${GRUPO_NOME[g]||g}${loc?' · '+loc:''} · ${INT.format(linhas.length)} lançamentos · ${BRL.format(tot)}`;
+  document.querySelector('#tabDrill thead').innerHTML='<tr><th class="txt">Mês</th><th class="txt">Local</th><th class="txt">Centro</th><th class="txt">Classe</th><th class="txt">Material / Serviço</th><th class="txt">Objeto</th><th>Valor</th></tr>';
+  const lim=linhas.slice(0,1000);
+  document.querySelector('#tabDrill tbody').innerHTML=lim.map(d=>`<tr><td class="txt">${d.mes}</td><td class="txt">${d.loc}</td><td class="txt">${d.centro||'—'}</td><td class="txt">${(d.classe||'').slice(0,22)}</td><td class="txt" title="${String(d.material||'').replace(/"/g,'')}">${String(d.material||'—').slice(0,40)}</td><td class="txt">${String(d.objeto||'—').slice(0,28)}</td><td>${BRL.format(d.valor)}</td></tr>`).join('')+(linhas.length>1000?`<tr><td colspan="7" class="small txt">… mostrando 1.000 de ${INT.format(linhas.length)}</td></tr>`:'');
+  document.getElementById('drillModal').classList.remove('hidden');
+}
+function fecharDrill(){ document.getElementById('drillModal').classList.add('hidden'); }
 
 // ---------- ORÇADO vs REAL ----------
 function fatorPisCofins(){ const el=document.getElementById('pisCofins'); return (el&&el.checked)?(1-0.0925):1; }
