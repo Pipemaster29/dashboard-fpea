@@ -11,16 +11,20 @@
 <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 <style>
   :root{--bg:#0f172a;--panel:#1e293b;--panel2:#273449;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;
-    --accent:#38bdf8;--accent2:#818cf8;--good:#34d399;--bad:#f87171;--warn:#fbbf24;}
+    --accent:#38bdf8;--accent2:#818cf8;--good:#34d399;--bad:#f87171;--warn:#fbbf24;
+    --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-in-out:cubic-bezier(0.77,0,0.175,1);}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.4}
   header{background:linear-gradient(90deg,#0f172a,#1e293b);border-bottom:1px solid var(--line);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
   header h1{font-size:20px;font-weight:600;display:flex;align-items:center;gap:10px}
-  header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+  header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(56,189,248,.5);animation:pulse 2.4s var(--ease-out) infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(56,189,248,.45)}70%{box-shadow:0 0 0 7px rgba(56,189,248,0)}100%{box-shadow:0 0 0 0 rgba(56,189,248,0)}}
   .actions{display:flex;gap:10px;flex-wrap:wrap}
-  button{cursor:pointer;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;transition:.15s}
-  .btn-primary{background:var(--accent);color:#06202c}.btn-primary:hover{background:#7dd3fc}
-  .btn-ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}.btn-ghost:hover{border-color:var(--accent)}
+  button{cursor:pointer;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;transition:background-color .16s var(--ease-out),border-color .16s var(--ease-out),color .16s var(--ease-out),transform .12s var(--ease-out),box-shadow .16s var(--ease-out)}
+  button:active{transform:scale(.97)}
+  .btn-primary{background:var(--accent);color:#06202c}
+  .btn-ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  @media(hover:hover){.btn-primary:hover{background:#7dd3fc;box-shadow:0 4px 14px rgba(56,189,248,.25)}.btn-ghost:hover{border-color:var(--accent);color:#fff}}
   main{padding:24px 28px;max-width:1480px;margin:0 auto}
   #drop{border:2px dashed var(--line);border-radius:14px;padding:44px 24px;text-align:center;background:var(--panel);transition:.2s;cursor:pointer;margin-bottom:24px}
   #drop:hover,#drop.drag{border-color:var(--accent);background:var(--panel2)}
@@ -32,9 +36,12 @@
   .resumo{background:rgba(56,189,248,.08);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
   .resumo b{color:#fff}
   .tabs{display:flex;gap:6px;margin-bottom:24px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .tabbtn{background:transparent;color:var(--muted);border:none;border-bottom:2px solid transparent;border-radius:0;padding:11px 18px;font-size:14px;font-weight:600;transition:.15s}
-  .tabbtn:hover{color:var(--txt)}
+  .tabbtn{background:transparent;color:var(--muted);border:none;border-bottom:2px solid transparent;border-radius:0;padding:11px 18px;font-size:14px;font-weight:600;transition:color .16s var(--ease-out),border-color .16s var(--ease-out)}
+  @media(hover:hover){.tabbtn:hover{color:var(--txt)}}
+  .tabbtn:active{transform:none}
   .tabbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
+  @keyframes tabEnter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .tab-enter{animation:tabEnter .24s var(--ease-out)}
   .scope{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
   .scope label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
   .catsel{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
@@ -49,14 +56,16 @@
   #tabOps td{padding:6px 8px}
   .delbtn{background:transparent;color:var(--bad);border:1px solid var(--line);padding:3px 9px;border-radius:6px;font-size:14px;font-weight:700}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:22px}
-  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;transition:border-color .18s var(--ease-out),box-shadow .18s var(--ease-out)}
   .kpi.glass{background:rgba(255,255,255,.04)}
+  @media(hover:hover){.kpi:hover{border-color:#3f5170}}
   .kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
   .kpi .val{font-size:22px;font-weight:700}
   .kpi .sub{font-size:12px;margin-top:5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:24px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;transition:border-color .18s var(--ease-out)}
   .card.full{grid-column:1/-1}
+  @media(hover:hover){.card:hover{border-color:#3f5170}}
   .card h3{font-size:14px;font-weight:600;margin-bottom:14px}
   .card .wrap{position:relative;height:320px}
   @media(max-width:900px){.grid{grid-template-columns:1fr}}
@@ -68,7 +77,9 @@
   th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px;cursor:pointer}
   th:hover{color:var(--accent)}
   td:first-child,th:first-child,td.txt,th.txt{text-align:left}
+  tbody tr{transition:background-color .12s var(--ease-out)}
   tbody tr:hover{background:var(--panel2)}
+  #tabPareto2 tbody tr:hover,#tabResumo tbody tr:hover{box-shadow:inset 3px 0 0 var(--accent)}
   .pos{color:var(--bad)}.neg{color:var(--good)}
   footer{text-align:center;color:var(--muted);font-size:12px;padding:24px}
   .badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--muted);margin-left:8px}
@@ -84,12 +95,15 @@
   .cloudbadge{display:inline-flex;align-items:center;gap:5px;background:rgba(52,211,153,.12);border:1px solid var(--good);color:var(--good);border-radius:20px;padding:3px 11px;font-size:11px}
   .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle}
   @keyframes sp{to{transform:rotate(360deg)}}
-  #flash{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-24px);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;box-shadow:0 12px 34px rgba(0,0,0,.45);z-index:2000;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
+  #flash{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-24px);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;box-shadow:0 12px 34px rgba(0,0,0,.45);z-index:2000;opacity:0;pointer-events:none;transition:opacity .24s var(--ease-out),transform .24s var(--ease-out);max-width:90vw;text-align:center}
   #flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  #drillModal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px}
-  .drillbox{background:var(--panel);border:1px solid var(--accent2);border-radius:14px;padding:18px;width:min(1100px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  #drillModal{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;visibility:hidden;transition:opacity .2s var(--ease-out),background-color .2s var(--ease-out),visibility 0s linear .2s}
+  #drillModal.show{opacity:1;visibility:visible;background:rgba(0,0,0,.62);transition:opacity .2s var(--ease-out),background-color .2s var(--ease-out)}
+  .drillbox{background:var(--panel);border:1px solid var(--accent2);border-radius:14px;padding:18px;width:min(1100px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.55);transform:scale(.96);transition:transform .22s var(--ease-out)}
+  #drillModal.show .drillbox{transform:scale(1)}
   .drillhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;font-size:13.5px}
   .drillhead button{flex:none}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}.drillbox{transform:none}}
 </style>
 </head>
 <body>
@@ -230,7 +244,7 @@
   </div>
 </main>
 
-<div id="drillModal" class="hidden">
+<div id="drillModal" onclick="if(event.target===this)fecharDrill()">
   <div class="drillbox">
     <div class="drillhead"><span id="drillTit"></span><button class="btn-ghost" onclick="fecharDrill()">✕ Fechar</button></div>
     <div class="tablewrap" style="max-height:70vh"><table id="tabDrill"><thead></thead><tbody></tbody></table></div>
@@ -258,7 +272,8 @@ try{ if(window.ChartDataLabels){ Chart.register(window.ChartDataLabels); Chart.d
 let activeTab=localStorage.getItem('activeTab')||'ovr';
 let _has={ovr:false};
 function tabHasContent(id){ if(id==='ovr') return _has.ovr; return DADOS.length>0; }
-function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs(); }
+function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs();
+  const el=document.getElementById(t); if(el){ el.classList.remove('tab-enter'); void el.offsetWidth; el.classList.add('tab-enter'); } }
 function applyTabs(){
   const nav=document.getElementById('tabs');
   const temDados=DADOS.length||ORCAMENTO.length||ORCKPI;
@@ -829,9 +844,10 @@ function abrirDrill(idx){
   document.querySelector('#tabDrill thead').innerHTML='<tr><th class="txt">Mês</th><th class="txt">Local</th><th class="txt">Centro</th><th class="txt">Classe</th><th class="txt">Material / Serviço</th><th class="txt">Objeto</th><th>Valor</th></tr>';
   const lim=linhas.slice(0,1000);
   document.querySelector('#tabDrill tbody').innerHTML=lim.map(d=>`<tr><td class="txt">${d.mes}</td><td class="txt">${d.loc}</td><td class="txt">${d.centro||'—'}</td><td class="txt">${(d.classe||'').slice(0,22)}</td><td class="txt" title="${String(d.material||'').replace(/"/g,'')}">${String(d.material||'—').slice(0,40)}</td><td class="txt">${String(d.objeto||'—').slice(0,28)}</td><td>${BRL.format(d.valor)}</td></tr>`).join('')+(linhas.length>1000?`<tr><td colspan="7" class="small txt">… mostrando 1.000 de ${INT.format(linhas.length)}</td></tr>`:'');
-  document.getElementById('drillModal').classList.remove('hidden');
+  document.getElementById('drillModal').classList.add('show');
 }
-function fecharDrill(){ document.getElementById('drillModal').classList.add('hidden'); }
+function fecharDrill(){ document.getElementById('drillModal').classList.remove('show'); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharDrill(); });
 
 // ---------- ORÇADO vs REAL ----------
 function fatorPisCofins(){ const el=document.getElementById('pisCofins'); return (el&&el.checked)?(1-0.0925):1; }
