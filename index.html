@@ -257,7 +257,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v7 · redeploy · 06/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v8 · R$/km líquido PIS/Cofins · 06/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -673,7 +673,8 @@ function renderOpsCalc(){
   const fPC=fatorPisCofins();
   const orcTypes=OPS_ORC[cat]||[];
   const meses=opsMeses();
-  const costReal={};DADOS.forEach(d=>{if(catDeLinha(d)===cat){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
+  // realizado líquido de crédito PIS/Cofins (KSB1 vem bruto; DRE usa -9,25%) — mesmo toggle do Orçado vs Real
+  const costReal={};DADOS.forEach(d=>{if(catDeLinha(d)===cat){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor*fPC;}});
   opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcTypes,fPC),tipo);
   opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcTypes,fPC),tipo);
   document.getElementById('opsTag').textContent=GRUPO_NOME[cat]+' · R$/km por região';
