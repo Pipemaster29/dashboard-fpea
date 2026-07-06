@@ -52,8 +52,9 @@
   .filters .grp{display:flex;flex-direction:column;gap:5px}
   .filters label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
   select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;min-width:150px;max-width:240px}
-  #tabOps input,#tabOps select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12.5px;width:100%;min-width:64px;max-width:none}
-  #tabOps td{padding:6px 8px}
+  #tabKm input{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12.5px;width:100%;min-width:64px;max-width:none;text-align:right}
+  #tabKm td{padding:6px 8px}
+  #tabKm input:focus{outline:none;border-color:var(--accent)}
   .delbtn{background:transparent;color:var(--bad);border:1px solid var(--line);padding:3px 9px;border-radius:6px;font-size:14px;font-weight:700}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:22px}
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;transition:border-color .18s var(--ease-out),box-shadow .18s var(--ease-out)}
@@ -157,31 +158,33 @@
 
   <!-- OPERAÇÕES & R$/KM -->
   <div id="ops" class="ovrbox hidden">
-    <div class="sectitle">🚚 Operações & Custo por KM <span class="tag" id="opsTag">R$/KM · R$/viagem</span></div>
-    <div class="scope" style="align-items:flex-start">
-      <label style="padding-top:6px">Categorias de custo</label>
-      <div id="opsCats" class="catsel">
-        <label><input type="checkbox" value="combustivel" checked onchange="renderOpsCalc()"> Combustível / Diesel <span class="small">(inclui ARLA)</span></label>
-        <label><input type="checkbox" value="lubrificantes" onchange="renderOpsCalc()"> Lubrificantes</label>
-        <label><input type="checkbox" value="manutencao" onchange="renderOpsCalc()"> Manutenção</label>
-        <label><input type="checkbox" value="pneus" onchange="renderOpsCalc()"> Pneus</label>
-        <label><input type="checkbox" value="transporte" onchange="renderOpsCalc()"> Transporte / Frete</label>
-        <label><input type="checkbox" value="outros" onchange="renderOpsCalc()"> Outros</label>
-        <button class="btn-ghost" style="padding:4px 10px" onclick="marcarCats(true)">Todas</button>
-        <button class="btn-ghost" style="padding:4px 10px" onclick="marcarCats(false)">Limpar</button>
-      </div>
-      <button class="btn-ghost" onclick="addOpsRow()">+ Adicionar operação</button>
-      <span class="small">Marque uma ou mais categorias (somam juntas). Digite o <b>KM realizado</b> e o <b>KM orçado</b> por operação/mês. Realizado usa o custo SAP; orçado usa o custo da OBZ.</span>
+    <div class="sectitle">🚚 Operações & Custo por KM <span class="tag" id="opsTag">R$/km por região</span></div>
+    <div class="scope">
+      <label>Categoria</label>
+      <select id="opsCat" onchange="renderOpsCalc()">
+        <option value="combustivel">Combustível / Diesel</option>
+        <option value="manutencao">Manutenção</option>
+        <option value="pneus">Pneus</option>
+        <option value="lubrificantes">Lubrificantes</option>
+        <option value="transporte">Transporte / Frete</option>
+      </select>
+      <label>Gráfico</label>
+      <select id="opsTipo" onchange="renderOpsCalc()">
+        <option value="barlin">Barras + linha de diferença</option>
+        <option value="linhas">Linhas</option>
+        <option value="barras">Barras (orçado × real)</option>
+      </select>
+      <span class="small">Digite o <b>KM realizado</b> e o <b>KM orçado</b> por mês na tabela abaixo. R$/km = custo da categoria ÷ KM.</span>
     </div>
     <div class="resumo" id="opsResumo" style="display:none"></div>
     <div class="kpis" id="opsKpis"></div>
     <div class="grid">
-      <div class="card full"><h3>R$/KM Orçado vs Realizado por Mês <span class="small">— diferença em destaque</span></h3><div class="wrap"><canvas id="chRkmMes"></canvas></div></div>
-      <div class="card"><h3>R$/KM Acumulado no Ano <span class="small">— custo acumulado ÷ km acumulado</span></h3><div class="wrap"><canvas id="chRkmAcum"></canvas></div></div>
-      <div class="card"><h3>R$/KM por Localidade</h3><div class="wrap"><canvas id="chRkmLoc"></canvas></div></div>
+      <div class="card"><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
+      <div class="card"><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
     </div>
-    <div class="tablewrap"><table id="tabOps"><thead></thead><tbody></tbody></table></div>
-    <div class="note">R$/KM realizado = custo da categoria (bases SAP, por localidade e mês) ÷ KM realizado. R$/KM orçado = custo da categoria na OBZ ÷ KM orçado. Cada ponta usa o seu próprio KM e o seu próprio custo; só entram nos cálculos os meses/localidades em que você informou o respectivo KM.</div>
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem por mês <span class="small">(preencha à mão — realizado e orçado, por região)</span></h3>
+    <div class="tablewrap"><table id="tabKm"><thead></thead><tbody></tbody></table></div>
+    <div class="note">R$/km realizado = custo SAP da categoria (por região e mês) ÷ KM realizado. R$/km orçado = custo OBZ ÷ KM orçado. Diferença = realizado − orçado. O KM fica salvo no navegador.</div>
   </div>
 
   <!-- PARETO & GARGALOS -->
@@ -254,7 +257,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v5 · fix manutenção · 03/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v6 · Operações redesenhada · 03/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -627,144 +630,66 @@ function renderTabela(rows){
 function ordenar(col){sortState.dir=sortState.col===col?-sortState.dir:1;sortState.col=col;render();}
 
 // ---------- OPERAÇÕES & R$/KM ----------
-let opsRows=[];try{opsRows=JSON.parse(localStorage.getItem('opsRows')||'[]');}catch(e){opsRows=[];}
-function saveOps(){try{localStorage.setItem('opsRows',JSON.stringify(opsRows));}catch(e){}}
-function addOpsRow(){const meses=uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
-  opsRows.push({mes:meses[meses.length-1]||'',regiao:'Amazonas',operacao:'',km:0,kmOrc:0,viagens:0});saveOps();renderOpsTable();renderOpsCalc();}
-function delOpsRow(i){opsRows.splice(i,1);saveOps();renderOpsTable();renderOpsCalc();}
-function setOps(i,k,v){if(!opsRows[i])return;opsRows[i][k]=(k==='km'||k==='kmOrc'||k==='viagens')?num(v):v;saveOps();renderOpsCalc();}
-function restaurarCats(){
-  let sel=null;try{sel=JSON.parse(localStorage.getItem('opsCats')||'null');}catch(e){}
-  if(sel&&sel.length)document.querySelectorAll('#opsCats input').forEach(c=>c.checked=sel.includes(c.value));
+let kmGrid={};try{kmGrid=JSON.parse(localStorage.getItem('kmGrid')||'{}');}catch(e){kmGrid={};}
+function saveKm(){try{localStorage.setItem('kmGrid',JSON.stringify(kmGrid));}catch(e){}}
+function kmGet(loc,mes,campo){const k=loc+'|'+mes;return kmGrid[k]?(+kmGrid[k][campo]||0):0;}
+function setKm(loc,mes,campo,val){const k=loc+'|'+mes;kmGrid[k]=kmGrid[k]||{km:0,kmOrc:0};kmGrid[k][campo]=num(val);saveKm();renderOpsCalc();}
+function opsMeses(){return uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));}
+function renderOps(){ if(!DADOS.length) return; renderKmTable(); renderOpsCalc(); }
+function renderKmTable(){
+  const meses=opsMeses();
+  document.querySelector('#tabKm thead').innerHTML='<tr><th class="txt">Mês</th><th>Amazonas · KM real</th><th>Amazonas · KM orçado</th><th>Maranhão · KM real</th><th>Maranhão · KM orçado</th></tr>';
+  document.querySelector('#tabKm tbody').innerHTML=meses.map(m=>`<tr>
+    <td class="txt">${m}</td>
+    <td><input type="number" min="0" value="${kmGet('Amazonas',m,'km')||''}" placeholder="real" oninput="setKm('Amazonas','${m}','km',this.value)"></td>
+    <td><input type="number" min="0" value="${kmGet('Amazonas',m,'kmOrc')||''}" placeholder="orçado" oninput="setKm('Amazonas','${m}','kmOrc',this.value)"></td>
+    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'km')||''}" placeholder="real" oninput="setKm('Maranhão','${m}','km',this.value)"></td>
+    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'kmOrc')||''}" placeholder="orçado" oninput="setKm('Maranhão','${m}','kmOrc',this.value)"></td></tr>`).join('');
 }
-function renderOps(){
-  if(!DADOS.length){return;}
-  restaurarCats();
-  if(!opsRows.length){addOpsRow();}else{renderOpsTable();renderOpsCalc();}}
-function renderOpsTable(){
-  const meses=uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
-  const regs=uniq([...uniq(DADOS.map(d=>d.loc)), ...opsRows.map(r=>r.regiao)].filter(Boolean));
-  document.querySelector('#tabOps thead').innerHTML='<tr><th class="txt">Operação / Rota</th><th class="txt">Localidade</th><th class="txt">Mês</th><th>KM realizado</th><th>KM orçado</th><th>Nº viagens</th><th></th></tr>';
-  document.querySelector('#tabOps tbody').innerHTML=opsRows.map((r,i)=>`<tr>
-    <td class="txt"><input value="${(r.operacao||'').replace(/"/g,'&quot;')}" placeholder="ex: Azulão" oninput="setOps(${i},'operacao',this.value)"></td>
-    <td class="txt"><select onchange="setOps(${i},'regiao',this.value)">${regs.map(x=>`<option ${x===r.regiao?'selected':''}>${x}</option>`).join('')}</select></td>
-    <td class="txt"><select onchange="setOps(${i},'mes',this.value)">${meses.map(x=>`<option ${x===r.mes?'selected':''}>${x}</option>`).join('')}</select></td>
-    <td><input type="number" min="0" value="${r.km||''}" placeholder="real" oninput="setOps(${i},'km',this.value)"></td>
-    <td><input type="number" min="0" value="${r.kmOrc||''}" placeholder="orçado" oninput="setOps(${i},'kmOrc',this.value)"></td>
-    <td><input type="number" min="0" value="${r.viagens||''}" oninput="setOps(${i},'viagens',this.value)"></td>
-    <td><button class="delbtn" onclick="delOpsRow(${i})" title="remover">✕</button></td></tr>`).join('');
+const OPS_ORC={combustivel:['comb'],manutencao:['manut'],pneus:['pneu'],lubrificantes:['lubrif'],transporte:[]};
+function opsSerie(loc,meses,costReal,orcTypes,fPC){
+  const real=meses.map(m=>{const km=kmGet(loc,m,'km');const c=costReal[loc+'|'+m]||0;return km?c/km:null;});
+  const orc=meses.map(m=>{const kmO=kmGet(loc,m,'kmOrc');if(!ORCKPI||!orcTypes.length||!kmO)return null;const reg=regiaoOBZ(loc);const o=ORCKPI[reg]&&ORCKPI[reg][m];if(!o)return null;return orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC/kmO;});
+  const dif=meses.map((m,i)=>(real[i]!=null&&orc[i]!=null)?real[i]-orc[i]:null);
+  return {real,orc,dif};
 }
-function marcarCats(on){document.querySelectorAll('#opsCats input').forEach(c=>c.checked=on);renderOpsCalc();}
-function opsCatsSel(){return [...document.querySelectorAll('#opsCats input:checked')].map(c=>c.value);}
+function opsChart(id,meses,s,tipo){
+  destroy(id);
+  const rkm2=v=>v==null?'':v.toFixed(2).replace('.',',');
+  const barOrc={type:'bar',label:'Orçado',data:s.orc,backgroundColor:'#818cf8',order:3,datalabels:{display:false}};
+  const barReal={type:'bar',label:'Realizado',data:s.real,backgroundColor:'#38bdf8',order:2,datalabels:{display:false}};
+  const linOrc={type:'line',label:'Orçado',data:s.orc,borderColor:'#818cf8',backgroundColor:'#818cf8',borderDash:[5,4],tension:.25,pointRadius:3,order:3,datalabels:{display:false}};
+  const linReal={type:'line',label:'Realizado',data:s.real,borderColor:'#38bdf8',backgroundColor:'#38bdf8',tension:.25,pointRadius:3,order:2,datalabels:{display:false}};
+  const linDif={type:'line',label:'Diferença',data:s.dif,borderColor:'#fbbf24',backgroundColor:'#fbbf24',pointBackgroundColor:'#fbbf24',tension:.3,pointRadius:4,order:1,datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,align:'top',color:'#fbbf24',backgroundColor:'rgba(251,191,36,.14)',borderRadius:4,padding:3,font:{weight:'700',size:10},formatter:v=>v==null?'':(v>=0?'+':'')+rkm2(v)}};
+  let ds; if(tipo==='linhas') ds=[linOrc,linReal,linDif]; else if(tipo==='barras') ds=[barOrc,barReal]; else ds=[barOrc,barReal,linDif];
+  charts[id]=new Chart(id,{data:{labels:meses,datasets:ds},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},
+    plugins:{legend:{labels:{color:'#e2e8f0',font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':BRL.format(c.parsed.y)+'/km')}}},
+    scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
+}
 function renderOpsCalc(){
-  const cats=opsCatsSel();
-  try{localStorage.setItem('opsCats',JSON.stringify(cats));}catch(e){}
-  const catSet=new Set(cats);
-  // categorias OBZ correspondentes (combustível inclui lubrificantes; outros não tem orçado)
-  const orcMap={manutencao:['manut'],combustivel:['comb'],lubrificantes:['lubrif'],pneus:['pneu']};
-  const orcTypes=[...new Set(cats.flatMap(c=>orcMap[c]||[]))];
-  const nomeCat={combustivel:'Combustível',arla:'ARLA',lubrificantes:'Lubrificantes',manutencao:'Manutenção',pneus:'Pneus',transporte:'Transporte',outros:'Outros'};
-  const catLabel=cats.length?cats.map(c=>nomeCat[c]||c).join(' + '):'—';
+  if(!DADOS.length) return;
+  const cat=document.getElementById('opsCat').value;
+  const tipo=document.getElementById('opsTipo').value;
   const fPC=fatorPisCofins();
-  const temOrc=!!ORCKPI;
-  const rkm2=v=>v.toFixed(2).replace('.',',');
-  const catDe=d=>d.cat||classificarCusto((d.material||'')+' '+(d.objeto||''),d.classe);
-  // custo realizado (SAP) por localidade|mês (restrito, para o R$/km bater com o KM)
-  const costReal={};
-  // #2 — custo TOTAL do período, sem depender de KM informado (todas localidades e meses)
-  let custoPeriodo=0; const custoLocPeriodo={}, custoMesPeriodo={};
-  DADOS.forEach(d=>{ if(!catSet.has(catDe(d))) return;
-    const k=d.loc+'|'+d.mes; costReal[k]=(costReal[k]||0)+d.valor;
-    custoPeriodo+=d.valor; custoLocPeriodo[d.loc]=(custoLocPeriodo[d.loc]||0)+d.valor; custoMesPeriodo[d.mes]=(custoMesPeriodo[d.mes]||0)+d.valor; });
-  // KM informado por par localidade|mês — realizado e orçado, separados
-  const kmRealP={},kmOrcP={};let viaTot=0;
-  opsRows.forEach(r=>{viaTot+=(+r.viagens||0);if(!r.mes)return;const k=r.regiao+'|'+r.mes;
-    if(r.km)kmRealP[k]=(kmRealP[k]||0)+(+r.km||0);
-    if(r.kmOrc)kmOrcP[k]=(kmOrcP[k]||0)+(+r.kmOrc||0);});
-  // custo orçado (OBZ) por par, restrito aos pares com KM orçado informado
-  const costOrc={};
-  if(temOrc&&orcTypes.length)Object.keys(kmOrcP).forEach(k=>{const p=k.split('|');const reg=regiaoOBZ(p[0]);const o=ORCKPI[reg]&&ORCKPI[reg][p[1]];if(o)costOrc[k]=orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC;});
-  // agregadores por mês / por localidade
-  const aggBy=(idx,costP,kmP)=>{const c={},k={};Object.keys(kmP).forEach(pr=>{const key=pr.split('|')[idx];c[key]=(c[key]||0)+(costP[pr]||0);k[key]=(k[key]||0)+kmP[pr];});return{c,k};};
-  const rMes=aggBy(1,costReal,kmRealP), oMes=aggBy(1,costOrc,kmOrcP);
-  const rReg=aggBy(0,costReal,kmRealP), oReg=aggBy(0,costOrc,kmOrcP);
-  const sum=o=>Object.values(o).reduce((s,v)=>s+v,0);
-  const realCustoTot=sum(rMes.c), realKmTot=sum(rMes.k);
-  const orcCustoTot=sum(oMes.c), orcKmTot=sum(oMes.k);
-  const rkm=realKmTot?realCustoTot/realKmTot:0;
-  const orcRkm=orcKmTot?orcCustoTot/orcKmTot:0;
-  const showOrc=temOrc&&orcKmTot>0;
-
-  // KPIs
-  const locStr=Object.entries(custoLocPeriodo).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+': '+BRL.format(v)).join(' · ');
+  const orcTypes=OPS_ORC[cat]||[];
+  const meses=opsMeses();
+  const costReal={};DADOS.forEach(d=>{if(catDeLinha(d)===cat){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
+  opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcTypes,fPC),tipo);
+  opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcTypes,fPC),tipo);
+  document.getElementById('opsTag').textContent=GRUPO_NOME[cat]+' · R$/km por região';
+  const agg=loc=>{let c=0,kmR=0,cOrc=0,kmO=0;meses.forEach(m=>{const km=kmGet(loc,m,'km');if(km){c+=costReal[loc+'|'+m]||0;kmR+=km;}const kmo=kmGet(loc,m,'kmOrc');if(kmo&&ORCKPI&&orcTypes.length){const o=ORCKPI[regiaoOBZ(loc)]&&ORCKPI[regiaoOBZ(loc)][m];if(o){cOrc+=orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC;kmO+=kmo;}}});return{c,kmR,cOrc,kmO};};
+  const A=agg('Amazonas'),M=agg('Maranhão');
+  const cR=A.c+M.c,kR=A.kmR+M.kmR,cO=A.cOrc+M.cOrc,kO=A.kmO+M.kmO;
+  const rkmR=kR?cR/kR:0,rkmO=kO?cO/kO:0;
   const kpis=[
-    {lbl:'Custo total no período',val:BRL.format(custoPeriodo),sub:catLabel+' · todas localidades'+(locStr?' ('+locStr+')':'')},
-    {lbl:'Custo realizado (c/ KM)',val:BRL.format(realCustoTot),sub:'só meses/locais com KM informado'},
-    {lbl:'KM realizado total',val:INT.format(Math.round(realKmTot))},
-    {lbl:'R$/KM realizado',val:realKmTot?BRL.format(rkm):'—',sub:'custo SAP ÷ km realizado'}
+    {lbl:'R$/km realizado',val:kR?BRL.format(rkmR):'—',sub:kR?INT.format(Math.round(kR))+' km · '+BRL.format(cR):'preencha o KM real'},
+    {lbl:'R$/km orçado',val:kO?BRL.format(rkmO):'—',sub:kO?INT.format(Math.round(kO))+' km orçado':'informe KM orçado + OBZ'}
   ];
-  if(showOrc){const dv=rkm-orcRkm,dpct=orcRkm?dv/orcRkm*100:0,cls=dv>0?'pos':'neg';
-    kpis.push({lbl:'R$/KM orçado',val:BRL.format(orcRkm),sub:'custo OBZ ÷ km orçado'});
-    kpis.push({lbl:'Variação R$/KM',val:(dv>=0?'+':'')+BRL.format(dv),cls,sub:PCT(dpct)+(dv>0?' acima':' abaixo')});
-  }else{
-    kpis.push({lbl:'Nº de viagens',val:INT.format(viaTot)});
-    kpis.push({lbl:'R$/viagem',val:viaTot?BRL.format(realCustoTot/viaTot):'—'});
-  }
-  document.getElementById('opsKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
-  document.getElementById('opsTag').textContent=catLabel+(showOrc?' · real vs orçado':' · R$/KM');
-
-  // meses ordenados (união do que tem realizado ou orçado)
-  const meses=uniq([...Object.keys(rMes.k),...Object.keys(oMes.k)]).sort((a,b)=>mesOrd(a)-mesOrd(b));
-  const realArr=meses.map(m=>rMes.k[m]?rMes.c[m]/rMes.k[m]:null);
-  const orcArr =meses.map(m=>oMes.k[m]?oMes.c[m]/oMes.k[m]:null);
-  const difArr =meses.map((m,i)=>(realArr[i]!=null&&orcArr[i]!=null)?realArr[i]-orcArr[i]:null);
-
-  // resumo do ano
-  const opsResumo=document.getElementById('opsResumo');
-  if(realKmTot){
-    let txt=`📌 No acumulado, o R$/km realizado foi <b>${BRL.format(rkm)}</b> (${INT.format(Math.round(realKmTot))} km · custo ${BRL.format(realCustoTot)}).`;
-    if(showOrc){const dv=rkm-orcRkm,dpct=orcRkm?dv/orcRkm*100:0;
-      txt+=` Orçado <b>${BRL.format(orcRkm)}</b> — realizado está <b>${PCT(dpct)}</b> ${dv>0?'<b>acima</b>':'<b>abaixo</b>'} da meta.`;
-      const difs=meses.map((m,i)=>({m,d:difArr[i]})).filter(x=>x.d!=null);
-      if(difs.length){const melhor=[...difs].sort((a,b)=>Math.abs(a.d)-Math.abs(b.d))[0];const pior=[...difs].sort((a,b)=>Math.abs(b.d)-Math.abs(a.d))[0];
-        txt+=` Mês mais aderente: <b>${melhor.m}</b> (${(melhor.d>=0?'+':'')+BRL.format(melhor.d)}/km); maior desvio: <b>${pior.m}</b> (${(pior.d>=0?'+':'')+BRL.format(pior.d)}/km).`;}
-    }else{ txt+=` Carregue a planilha OBZ e informe o KM orçado para comparar com a meta.`; }
-    opsResumo.innerHTML=txt;opsResumo.style.display='';
-  }else{opsResumo.style.display='none';}
-
-  // ----- gráfico mês a mês: barras orçado vs realizado + diferença (linha) -----
-  destroy('chRkmMes');
-  const dsMes=[];
-  if(showOrc)dsMes.push({type:'bar',label:'Orçado',data:orcArr,backgroundColor:'#818cf8',order:3,
-    datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,color:'#fff',anchor:'center',align:'center',font:{weight:'700',size:11},formatter:v=>v==null?'':rkm2(v)}});
-  dsMes.push({type:'bar',label:'Realizado',data:realArr,backgroundColor:'#38bdf8',order:2,
-    datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,color:'#06202c',anchor:'center',align:'center',font:{weight:'700',size:11},formatter:v=>v==null?'':rkm2(v)}});
-  if(showOrc)dsMes.push({type:'line',label:'Diferença',data:difArr,borderColor:'#fbbf24',backgroundColor:'#fbbf24',pointBackgroundColor:'#fbbf24',pointRadius:4,tension:.3,order:1,
-    datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,align:'top',color:'#fbbf24',backgroundColor:'rgba(245,158,11,.14)',borderRadius:4,padding:4,font:{weight:'700',size:11},formatter:v=>v==null?'':(v>=0?'+':'')+rkm2(v)}});
-  charts.chRkmMes=new Chart('chRkmMes',{data:{labels:meses,datasets:dsMes},
-    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:26}},
-      plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+'/km'}}},
-      scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
-
-  // ----- gráfico acumulado correndo no ano -----
-  destroy('chRkmAcum');
-  let aRC=0,aRK=0,aOC=0,aOK=0;
-  const acumReal=meses.map(m=>{aRC+=rMes.c[m]||0;aRK+=rMes.k[m]||0;return aRK?aRC/aRK:null;});
-  const acumOrc =meses.map(m=>{aOC+=oMes.c[m]||0;aOK+=oMes.k[m]||0;return aOK?aOC/aOK:null;});
-  const dsAc=[{label:'Realizado acum.',data:acumReal,borderColor:'#38bdf8',backgroundColor:'#38bdf8',tension:.2,pointRadius:3,spanGaps:true}];
-  if(showOrc)dsAc.push({label:'Orçado acum.',data:acumOrc,borderColor:'#818cf8',backgroundColor:'#818cf8',borderDash:[5,4],tension:.2,pointRadius:3,spanGaps:true});
-  charts.chRkmAcum=new Chart('chRkmAcum',{type:'line',data:{labels:meses,datasets:dsAc},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:showOrc,labels:{color:'#e2e8f0'}},datalabels:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+'/km'}}},
-      scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
-
-  // ----- gráfico por localidade -----
-  destroy('chRkmLoc');
-  const regs=uniq([...Object.keys(rReg.k),...Object.keys(oReg.k)]);
-  const dsLoc=[{label:'Realizado',data:regs.map(r=>rReg.k[r]?rReg.c[r]/rReg.k[r]:0),backgroundColor:'#38bdf8'}];
-  if(showOrc)dsLoc.push({label:'Orçado',data:regs.map(r=>oReg.k[r]?oReg.c[r]/oReg.k[r]:0),backgroundColor:'#818cf8'});
-  charts.chRkmLoc=new Chart('chRkmLoc',{type:'bar',data:{labels:regs,datasets:dsLoc},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:showOrc,labels:{color:'#e2e8f0'}},datalabels:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+'/km'}}},
-      scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}}}}});
+  if(kR&&kO){const dv=rkmR-rkmO,dp=rkmO?dv/rkmO*100:0,cls=dv>0?'pos':'neg';kpis.push({lbl:'Variação R$/km',val:(dv>=0?'+':'')+BRL.format(dv),cls,sub:PCT(dp)+(dv>0?' acima':' abaixo')});}
+  document.getElementById('opsKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub" title="${String(c.sub).replace(/"/g,'')}">${c.sub}</div>`:''}</div>`).join('');
+  const pr=document.getElementById('opsResumo');pr.style.display='';
+  if(kR)pr.innerHTML=`📌 <b>${GRUPO_NOME[cat]}</b>: R$/km realizado <b>${BRL.format(rkmR)}</b>`+(kO?` vs orçado <b>${BRL.format(rkmO)}</b> (${PCT(rkmO?(rkmR-rkmO)/rkmO*100:0)}).`:` — informe o KM orçado e carregue a OBZ para comparar.`);
+  else pr.innerHTML='✏️ Preencha o KM realizado na tabela abaixo para ver o R$/km por região.';
 }
 
 // ---------- PARETO & GARGALOS ----------
