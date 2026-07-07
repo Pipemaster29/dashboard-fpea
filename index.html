@@ -256,7 +256,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v14 · peças de veículo · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v15 · pé de apoio → outros · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -508,6 +508,7 @@ function fornecedorDe(material, descr, pedido, objeto){
 // excluindo itens "pneumáticos" (válvula/mola/pistola pneumática) que não são pneu.
 function classificarCusto(texto, classe){
   const t=norm(texto), c=norm(classe);
+  if(/pe de apoio/.test(t)) return 'outros';   // pé de apoio Randon = estrutura de reboque, não é frete nem manutenção
   if(/pneu(?!m)|recap|recauchut|vulcaniz|borracharia|camara de ar|\bcamara ar\b/.test(t)) return 'pneus';
   if(/\barla\b|agente redutor|adblue/.test(t)) return 'combustivel';          // ARLA junto do combustível (o orçamento OBZ inclui ARLA)
   if(/lubrific|\bgraxa\b/.test(c)) return 'lubrificantes';                    // Lubrificantes separado (OBZ tem linha própria)
@@ -518,7 +519,7 @@ function classificarCusto(texto, classe){
   if(/manuten|sobressalent|outros servicos de t/.test(c)) return 'manutencao';
   // peça de veículo caindo em classe genérica (elétricos, químicos, tubulação…) → manutenção, por marca/termo automotivo
   if(/\bmoura\b|\bvdo\b|cofap|fras-?le|nakata|\bwega\b|donaldson|bateria automot|pastilha.*freio|amortecedor|feixe.*mola|coxim.*motor/.test(t)
-     || (/volksw|volks|\bvw\b|scania|\bvolvo\b|mercedes|iveco|randon|\bman\b/.test(t) && /filtro|bateria|aditivo|bobina|sensor|valvula|junta|correia|interrupt|\bfarol|lanterna|\bcabo\b|\brele\b|modulo|chicote|\bbomba|radiador|parafuso|arruela|rolamento|retentor/.test(t)))
+     || (/volksw|volks|\bvw\b|scania|\bvolvo\b|mercedes|iveco|\bman\b/.test(t) && /filtro|bateria|aditivo|bobina|sensor|valvula|junta|correia|interrupt|\bfarol|lanterna|\bcabo\b|\brele\b|modulo|chicote|\bbomba|radiador|parafuso|arruela|rolamento|retentor/.test(t)))
      return 'manutencao';
   return 'outros';
 }
