@@ -163,9 +163,8 @@
       <label>Categoria</label>
       <select id="opsCat" onchange="renderOpsCalc()">
         <option value="combustivel">Combustível / Diesel</option>
-        <option value="manutencao">Manutenção</option>
+        <option value="manutencao">Manutenção (inclui Lubrificantes)</option>
         <option value="pneus">Pneus</option>
-        <option value="lubrificantes">Lubrificantes</option>
         <option value="transporte">Transporte / Frete</option>
       </select>
       <label>Gráfico</label>
@@ -257,7 +256,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v12 · orçado unificado · 06/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v13 · manut+lubrif · 06/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -678,10 +677,12 @@ function renderOpsCalc(){
   const tipo=document.getElementById('opsTipo').value;
   const fPC=fatorPisCofins();
   const meses=opsMeses();
+  // nesta análise, Manutenção inclui Lubrificantes (orçado e real)
+  const inc=new Set(cat==='manutencao'?['manutencao','lubrificantes']:[cat]);
   // realizado direto do KSB1 (a base já vem líquida de crédito PIS/Cofins)
-  const costReal={};DADOS.forEach(d=>{if(catDeLinha(d)===cat){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
+  const costReal={};DADOS.forEach(d=>{if(inc.has(catDeLinha(d))){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
   // orçado do ORÇAMENTO consolidado (Custos Variáveis) por categoria×região×mês, com crédito PIS/Cofins (-9,25%)
-  const orcCost={};ORCAMENTO.forEach(o=>{if(o.cat===cat&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+o.valor*fPC;}});
+  const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+o.valor*fPC;}});
   opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcCost),tipo);
   opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcCost),tipo);
   document.getElementById('opsTag').textContent=GRUPO_NOME[cat]+' · R$/km por região';
