@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
   :root{--bg:#0f172a;--panel:#1e293b;--panel2:#273449;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;
     --accent:#38bdf8;--accent2:#818cf8;--good:#34d399;--bad:#f87171;--warn:#fbbf24;
@@ -68,7 +69,7 @@
   .card.full{grid-column:1/-1}
   .expbar{position:absolute;top:12px;right:12px;z-index:3;display:flex;gap:6px}
   .xls{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;cursor:pointer;line-height:1.4}
-  @media(hover:hover){.xls:hover{border-color:var(--good);color:var(--good)}.xls.png:hover{border-color:var(--accent);color:var(--accent)}}
+  @media(hover:hover){.xls:hover{border-color:var(--good);color:var(--good)}.xls.png:hover{border-color:var(--accent);color:var(--accent)}.xls.ppt:hover{border-color:var(--warn);color:var(--warn)}}
   @media(hover:hover){.card:hover{border-color:#3f5170}}
   .card h3{font-size:14px;font-weight:600;margin-bottom:14px}
   .card .wrap{position:relative;height:320px}
@@ -154,7 +155,7 @@
     <div class="resumo" id="ovrResumo"></div>
     <div class="kpis" id="ovrKpis"></div>
     <div class="grid">
-      <div class="card full"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chOVR','Orcado vs Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button></div><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
+      <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOVR','Orcado vs Real por mes')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOVR','Orcado vs Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button></div><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
     </div>
     <div class="tablewrap"><table id="tabOVR"><thead></thead><tbody></tbody></table></div>
     <div class="note" id="ovrNote"></div>
@@ -182,8 +183,8 @@
     <div class="resumo" id="opsResumo" style="display:none"></div>
     <div class="kpis" id="opsKpis"></div>
     <div class="grid">
-      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chOpsAM','Amazonas R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsAM','Amazonas R$ por km')">⬇ Excel</button></div><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
-      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chOpsMA','Maranhao R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsMA','Maranhao R$ por km')">⬇ Excel</button></div><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOpsAM','Amazonas R$ por km')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOpsAM','Amazonas R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsAM','Amazonas R$ por km')">⬇ Excel</button></div><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOpsMA','Maranhao R$ por km')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOpsMA','Maranhao R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsMA','Maranhao R$ por km')">⬇ Excel</button></div><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
     </div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem por mês <span class="small">(preencha à mão — realizado e orçado, por região)</span></h3>
     <div class="tablewrap"><table id="tabKm"><thead></thead><tbody></tbody></table></div>
@@ -210,7 +211,7 @@
       </select>
     </div>
     <div class="kpis" id="pareKpis"></div>
-    <div class="grid"><div class="card full"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chPareto2','Pareto')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPareto2','Pareto')">⬇ Excel</button></div><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
+    <div class="grid"><div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chPareto2','Pareto')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chPareto2','Pareto')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPareto2','Pareto')">⬇ Excel</button></div><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
     <div class="tablewrap"><table id="tabPareto2"><thead></thead><tbody></tbody></table></div>
     <div class="note">Cada valor é a soma dos lançamentos SAP (KSB1) daquele grupo/localidade. Ordenado do maior para o menor, com % do grupo e % acumulado — os poucos itens que somam ~80% são o gargalo a atacar.</div>
   </div>
@@ -229,12 +230,12 @@
     </div>
     <div class="kpis" id="kpis"></div>
     <div class="grid">
-      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chClasse','Custo por classe')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chClasse','Custo por classe')">⬇ Excel</button></div><h3>Custo por Classe de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chClasse"></canvas></div></div>
-      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chCentro','Custo por centro')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chCentro','Custo por centro')">⬇ Excel</button></div><h3>Custo por Centro de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chCentro"></canvas></div></div>
-      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chMes','Evolucao mensal')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chMes','Evolucao mensal')">⬇ Excel</button></div><h3>Evolução Mensal do Custo</h3><div class="wrap"><canvas id="chMes"></canvas></div></div>
-      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chLoc','Custo por localidade')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chLoc','Custo por localidade')">⬇ Excel</button></div><h3>Custo por Localidade <span class="small">(por centro de custo)</span></h3><div class="wrap"><canvas id="chLoc"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chClasse','Custo por classe')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chClasse','Custo por classe')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chClasse','Custo por classe')">⬇ Excel</button></div><h3>Custo por Classe de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chClasse"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chCentro','Custo por centro')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chCentro','Custo por centro')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chCentro','Custo por centro')">⬇ Excel</button></div><h3>Custo por Centro de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chCentro"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chMes','Evolucao mensal')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chMes','Evolucao mensal')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chMes','Evolucao mensal')">⬇ Excel</button></div><h3>Evolução Mensal do Custo</h3><div class="wrap"><canvas id="chMes"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chLoc','Custo por localidade')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chLoc','Custo por localidade')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chLoc','Custo por localidade')">⬇ Excel</button></div><h3>Custo por Localidade <span class="small">(por centro de custo)</span></h3><div class="wrap"><canvas id="chLoc"></canvas></div></div>
       <div class="card full">
-        <div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chPareto','Pareto custos')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPareto','Pareto custos')">⬇ Excel</button></div>
+        <div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chPareto','Pareto custos')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chPareto','Pareto custos')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPareto','Pareto custos')">⬇ Excel</button></div>
         <h3>Análise de Pareto <span class="small">— onde está concentrado o custo (80/20)</span>
           &nbsp; <select id="paretoDim" onchange="render()" style="min-width:150px">
             <option value="classe">por Classe de Custo</option>
@@ -245,7 +246,7 @@
         </h3>
         <div class="wrap" style="height:360px"><canvas id="chPareto"></canvas></div>
       </div>
-      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chObjeto','Composicao por objeto')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chObjeto','Composicao por objeto')">⬇ Excel</button></div><h3>Composição por Objeto</h3><div class="wrap"><canvas id="chObjeto"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chObjeto','Composicao por objeto')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chObjeto','Composicao por objeto')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chObjeto','Composicao por objeto')">⬇ Excel</button></div><h3>Composição por Objeto</h3><div class="wrap"><canvas id="chObjeto"></canvas></div></div>
     </div>
     <div class="tablecard">
       <h3>Detalhamento <span class="small" id="tabInfo"></span></h3>
@@ -261,7 +262,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v17 · export Excel + imagem PNG · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v18 · PPT editável + Excel + imagem · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -598,6 +599,45 @@ function exportarGraficoPNG(id,nome){
   const a=document.createElement('a');
   a.href=cv.toDataURL('image/png'); a.download=(nome||'grafico').replace(/[^\w-]+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.png';
   a.click();
+}
+// gera um .pptx com GRÁFICO NATIVO editável (PowerPoint → "Editar Dados" muda números e tipo)
+function exportarGraficoPPT(id,nome){
+  if(typeof PptxGenJS==='undefined'){ alert('A biblioteca de PowerPoint não carregou (precisa de internet ao abrir a página).'); return; }
+  const ch=charts[id];
+  if(!ch||!ch.data){ alert('Gere o gráfico primeiro (carregue as bases e abra a aba).'); return; }
+  const labels=(ch.data.labels||[]).map(x=>String(x));
+  const dss=ch.data.datasets||[];
+  if(!dss.length){ alert('Sem dados no gráfico.'); return; }
+  const val=v=>(v&&typeof v==='object')?(v.y==null?null:v.y):(v==null?null:v);
+  const baseType=(ch.config&&ch.config.type)||'bar';
+  const pptx=new PptxGenJS();
+  pptx.defineLayout({name:'W169',width:10,height:5.63}); pptx.layout='W169';
+  const slide=pptx.addSlide(); slide.background={color:'1E293B'};
+  slide.addText(nome||'Gráfico',{x:0.4,y:0.22,w:9.2,h:0.6,fontSize:20,bold:true,color:'FFFFFF'});
+  // agrupa séries por tipo (bar / line / pie) para montar combo se preciso
+  const grupos={};
+  dss.forEach((d,i)=>{
+    const t=String(d.type||baseType);
+    const key=/line/.test(t)?'line':(/doughnut|pie/.test(t)?'pie':'bar');
+    (grupos[key]=grupos[key]||[]).push({name:d.label||('Série '+(i+1)),labels,values:(d.data||[]).map(val)});
+  });
+  const cores=['38BDF8','818CF8','FBBF24','34D399','F87171'];
+  const opts={x:0.4,y:0.95,w:9.2,h:4.45,showLegend:true,legendPos:'b',legendColor:'E2E8F0',
+    catAxisLabelColor:'94A3B8',valAxisLabelColor:'94A3B8',chartColors:cores,dataBorder:{pt:0,color:'1E293B'}};
+  const keys=Object.keys(grupos);
+  if(keys.length===1){
+    const k=keys[0];
+    const T=k==='line'?pptx.ChartType.line:k==='pie'?pptx.ChartType.doughnut:pptx.ChartType.bar;
+    slide.addChart(T,grupos[k],opts);
+  } else {
+    const combo=keys.filter(k=>k!=='pie').map((k,ix)=>({
+      type:k==='line'?pptx.ChartType.line:pptx.ChartType.bar,
+      data:grupos[k],
+      options:{chartColors:k==='line'?['FBBF24']:cores}
+    }));
+    slide.addChart(combo,opts);
+  }
+  pptx.writeFile({fileName:(nome||'grafico').replace(/[^\w-]+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.pptx'});
 }
 function exportarBases(){
   if(!DADOS.length&&!ORCAMENTO.length){ alert('Nenhuma base carregada.'); return; }
