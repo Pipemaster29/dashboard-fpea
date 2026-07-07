@@ -162,7 +162,15 @@
     <div class="kpis" id="ovrKpis"></div>
     <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOVR','Orcado vs Real por mes')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOVR','Orcado vs Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button></div><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
-      <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarWaterfallPPT()">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chWf','Cascata Orcado x Real')">🖼️ Imagem</button><button class="xls" onclick="exportarWaterfall()">⬇ Excel</button></div><h3>Cascata Orçado → Real <span class="small">— Custos Variáveis (ponte por categoria, acumulado do período)</span></h3><div class="wrap" style="height:380px"><canvas id="chWf"></canvas></div></div>
+      <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarWaterfallPPT()">📊 PPT</button><button class="xls png" onclick="exportarWaterfallPNG()">🖼️ Imagem</button><button class="xls" onclick="exportarWaterfall()">⬇ Excel</button></div>
+        <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Cascata Orçado → Real <span class="small">— Custos Variáveis (ponte por categoria, acumulado do período)</span>
+          <select id="wfLoc" onchange="renderWaterfall()" style="margin-left:auto;min-width:150px">
+            <option value="">Geral (AM + MA)</option>
+            <option value="Amazonas">Amazonas</option>
+            <option value="Maranhão">Maranhão</option>
+          </select>
+        </h3>
+        <div class="wrap" style="height:380px"><canvas id="chWf"></canvas></div></div>
     </div>
     <div class="tablewrap"><table id="tabOVR"><thead></thead><tbody></tbody></table></div>
     <div class="note" id="ovrNote"></div>
@@ -269,7 +277,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v21 · logo GNL + header teal + PPT cascata · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v22 · cascata por operação (Geral/AM/MA) · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1017,13 +1025,14 @@ function renderOVR(){
 // ---------- CASCATA (waterfall) Orçado → Real, Custos Variáveis ----------
 let WF_LAST=null;   // guarda os dados da última cascata para exportar
 const WF_CATS=['combustivel','manutencao','pneus','lubrificantes','transporte','outros'];
-function wfDados(){
+function wfLocSel(){ return (document.getElementById('wfLoc')||{}).value||''; }   // '' = Geral
+function wfDados(loc){
   const fPC=fatorPisCofins();
-  const mesesReal=new Set(DADOS.map(d=>d.mes));          // só meses com realizado (comparação do período)
+  const mesesReal=new Set(DADOS.filter(d=>!loc||d.loc===loc).map(d=>d.mes));   // meses com realizado da operação
   const real={},orc={};
   WF_CATS.forEach(c=>{real[c]=0;orc[c]=0;});
-  DADOS.forEach(d=>{const c=catDeLinha(d); if(real[c]!=null) real[c]+=d.valor;});
-  ORCAMENTO.forEach(o=>{ if(!/variav/.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
+  DADOS.forEach(d=>{ if(loc&&d.loc!==loc) return; const c=catDeLinha(d); if(real[c]!=null) real[c]+=d.valor;});
+  ORCAMENTO.forEach(o=>{ if(loc&&o.regiao!==loc) return; if(!/variav/.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
     if(orc[o.cat]!=null) orc[o.cat]+=o.valor*fPC; });
   const orcTot=WF_CATS.reduce((s,c)=>s+orc[c],0);
   const realTot=WF_CATS.reduce((s,c)=>s+real[c],0);
@@ -1032,7 +1041,8 @@ function wfDados(){
 function renderWaterfall(){
   destroy('chWf');
   if(!DADOS.length||!ORCAMENTO.length){ WF_LAST=null; return; }
-  const {orc,real,orcTot,realTot}=wfDados();
+  const loc=wfLocSel();
+  const {orc,real,orcTot,realTot}=wfDados(loc);
   const nomeCat={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros'};
   const labels=['Orçado'], barras=[], cores=[], rotulos=[];
   barras.push([0,orcTot]); cores.push('#02585C'); rotulos.push(orcTot);   // total inicial (teal escuro)
@@ -1047,7 +1057,7 @@ function renderWaterfall(){
     cum+=d;
   });
   labels.push('Real'); barras.push([0,realTot]); cores.push('#00A0A8'); rotulos.push(realTot);   // total final (teal)
-  WF_LAST={labels,rotulos:rotulos.slice()};
+  WF_LAST={labels,rotulos:rotulos.slice(),loc};
   charts.chWf=new Chart('chWf',{type:'bar',data:{labels,datasets:[{data:barras,backgroundColor:cores,borderWidth:0,borderRadius:2}]},
     options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},
       plugins:{legend:{display:false},
@@ -1061,7 +1071,8 @@ function renderWaterfall(){
 function exportarWaterfallPPT(){
   if(typeof PptxGenJS==='undefined'){ alert('A biblioteca de PowerPoint não carregou (precisa de internet).'); return; }
   if(!DADOS.length||!ORCAMENTO.length){ alert('Cascata ainda não gerada (carregue as bases e abra a aba Orçado vs Real).'); return; }
-  const {orc,real,orcTot,realTot}=wfDados();
+  const loc=wfLocSel(), regTxt=loc||'Geral (AM + MA)';
+  const {orc,real,orcTot,realTot}=wfDados(loc);
   const nomeCat={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros'};
   const labels=['Orçado'],base=[0],eco=[0],aci=[0],tot=[orcTot];
   let cum=orcTot;
@@ -1079,17 +1090,19 @@ function exportarWaterfallPPT(){
   ];
   const pptx=new PptxGenJS(); pptx.defineLayout({name:'W169',width:10,height:5.63}); pptx.layout='W169';
   const slide=pptx.addSlide(); slide.background={color:'1E293B'};
-  slide.addText('Cascata Orçado → Real · Custos Variáveis',{x:0.4,y:0.22,w:9.2,h:0.6,fontSize:20,bold:true,color:'FFFFFF'});
+  slide.addText('Cascata Orçado → Real · Custos Variáveis · '+regTxt,{x:0.4,y:0.22,w:9.2,h:0.6,fontSize:20,bold:true,color:'FFFFFF'});
   slide.addChart(pptx.ChartType.bar,data,{x:0.4,y:0.95,w:9.2,h:4.45,barGrouping:'stacked',
     chartColors:['1E293B','00B050','E4562E','00A0A8'],showLegend:false,showValue:false,
     catAxisLabelColor:'94A3B8',valAxisLabelColor:'94A3B8',valAxisLabelFormatCode:'"R$ "#,##0,"k"',dataBorder:{pt:0,color:'1E293B'}});
-  pptx.writeFile({fileName:'Cascata_Orcado_Real_'+new Date().toISOString().slice(0,10)+'.pptx'});
+  pptx.writeFile({fileName:('Cascata_Orcado_Real_'+regTxt).replace(/[^\w-]+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.pptx'});
 }
+function exportarWaterfallPNG(){ exportarGraficoPNG('chWf','Cascata Orcado x Real '+(wfLocSel()||'Geral')); }
 function exportarWaterfall(){
   if(!WF_LAST){ alert('Cascata ainda não gerada (carregue as bases e abra a aba Orçado vs Real).'); return; }
+  const reg=WF_LAST.loc||'Geral';
   const aoa=[['Etapa','Valor (R$)','Tipo']];
   WF_LAST.labels.forEach((l,i)=>{const tot=(i===0||i===WF_LAST.labels.length-1);aoa.push([l,WF_LAST.rotulos[i],tot?'Total':(WF_LAST.rotulos[i]>0?'Acima do orçado':'Abaixo do orçado')]);});
-  baixarXlsx('Cascata_Orcado_Real',[{nome:'Cascata',aoa}]);
+  baixarXlsx('Cascata_Orcado_Real_'+reg,[{nome:'Cascata',aoa}]);
 }
 
 function limpar(){
