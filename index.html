@@ -66,8 +66,9 @@
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:24px}
   .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;transition:border-color .18s var(--ease-out)}
   .card.full{grid-column:1/-1}
-  .xls{position:absolute;top:12px;right:12px;z-index:3;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;cursor:pointer;line-height:1.4}
-  @media(hover:hover){.xls:hover{border-color:var(--good);color:var(--good)}}
+  .expbar{position:absolute;top:12px;right:12px;z-index:3;display:flex;gap:6px}
+  .xls{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;cursor:pointer;line-height:1.4}
+  @media(hover:hover){.xls:hover{border-color:var(--good);color:var(--good)}.xls.png:hover{border-color:var(--accent);color:var(--accent)}}
   @media(hover:hover){.card:hover{border-color:#3f5170}}
   .card h3{font-size:14px;font-weight:600;margin-bottom:14px}
   .card .wrap{position:relative;height:320px}
@@ -153,7 +154,7 @@
     <div class="resumo" id="ovrResumo"></div>
     <div class="kpis" id="ovrKpis"></div>
     <div class="grid">
-      <div class="card full"><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
+      <div class="card full"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chOVR','Orcado vs Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button></div><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
     </div>
     <div class="tablewrap"><table id="tabOVR"><thead></thead><tbody></tbody></table></div>
     <div class="note" id="ovrNote"></div>
@@ -181,8 +182,8 @@
     <div class="resumo" id="opsResumo" style="display:none"></div>
     <div class="kpis" id="opsKpis"></div>
     <div class="grid">
-      <div class="card"><button class="xls" onclick="exportarGrafico('chOpsAM','Amazonas R$ por km')">⬇ Excel</button><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
-      <div class="card"><button class="xls" onclick="exportarGrafico('chOpsMA','Maranhao R$ por km')">⬇ Excel</button><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chOpsAM','Amazonas R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsAM','Amazonas R$ por km')">⬇ Excel</button></div><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chOpsMA','Maranhao R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsMA','Maranhao R$ por km')">⬇ Excel</button></div><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
     </div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem por mês <span class="small">(preencha à mão — realizado e orçado, por região)</span></h3>
     <div class="tablewrap"><table id="tabKm"><thead></thead><tbody></tbody></table></div>
@@ -209,7 +210,7 @@
       </select>
     </div>
     <div class="kpis" id="pareKpis"></div>
-    <div class="grid"><div class="card full"><button class="xls" onclick="exportarGrafico('chPareto2','Pareto')">⬇ Excel</button><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
+    <div class="grid"><div class="card full"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chPareto2','Pareto')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPareto2','Pareto')">⬇ Excel</button></div><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
     <div class="tablewrap"><table id="tabPareto2"><thead></thead><tbody></tbody></table></div>
     <div class="note">Cada valor é a soma dos lançamentos SAP (KSB1) daquele grupo/localidade. Ordenado do maior para o menor, com % do grupo e % acumulado — os poucos itens que somam ~80% são o gargalo a atacar.</div>
   </div>
@@ -228,12 +229,12 @@
     </div>
     <div class="kpis" id="kpis"></div>
     <div class="grid">
-      <div class="card"><button class="xls" onclick="exportarGrafico('chClasse','Custo por classe')">⬇ Excel</button><h3>Custo por Classe de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chClasse"></canvas></div></div>
-      <div class="card"><button class="xls" onclick="exportarGrafico('chCentro','Custo por centro')">⬇ Excel</button><h3>Custo por Centro de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chCentro"></canvas></div></div>
-      <div class="card"><button class="xls" onclick="exportarGrafico('chMes','Evolucao mensal')">⬇ Excel</button><h3>Evolução Mensal do Custo</h3><div class="wrap"><canvas id="chMes"></canvas></div></div>
-      <div class="card"><button class="xls" onclick="exportarGrafico('chLoc','Custo por localidade')">⬇ Excel</button><h3>Custo por Localidade <span class="small">(por centro de custo)</span></h3><div class="wrap"><canvas id="chLoc"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chClasse','Custo por classe')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chClasse','Custo por classe')">⬇ Excel</button></div><h3>Custo por Classe de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chClasse"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chCentro','Custo por centro')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chCentro','Custo por centro')">⬇ Excel</button></div><h3>Custo por Centro de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chCentro"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chMes','Evolucao mensal')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chMes','Evolucao mensal')">⬇ Excel</button></div><h3>Evolução Mensal do Custo</h3><div class="wrap"><canvas id="chMes"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chLoc','Custo por localidade')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chLoc','Custo por localidade')">⬇ Excel</button></div><h3>Custo por Localidade <span class="small">(por centro de custo)</span></h3><div class="wrap"><canvas id="chLoc"></canvas></div></div>
       <div class="card full">
-        <button class="xls" onclick="exportarGrafico('chPareto','Pareto custos')">⬇ Excel</button>
+        <div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chPareto','Pareto custos')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPareto','Pareto custos')">⬇ Excel</button></div>
         <h3>Análise de Pareto <span class="small">— onde está concentrado o custo (80/20)</span>
           &nbsp; <select id="paretoDim" onchange="render()" style="min-width:150px">
             <option value="classe">por Classe de Custo</option>
@@ -244,7 +245,7 @@
         </h3>
         <div class="wrap" style="height:360px"><canvas id="chPareto"></canvas></div>
       </div>
-      <div class="card"><button class="xls" onclick="exportarGrafico('chObjeto','Composicao por objeto')">⬇ Excel</button><h3>Composição por Objeto</h3><div class="wrap"><canvas id="chObjeto"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chObjeto','Composicao por objeto')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chObjeto','Composicao por objeto')">⬇ Excel</button></div><h3>Composição por Objeto</h3><div class="wrap"><canvas id="chObjeto"></canvas></div></div>
     </div>
     <div class="tablecard">
       <h3>Detalhamento <span class="small" id="tabInfo"></span></h3>
@@ -260,7 +261,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v16 · Randon fora do frete + export Excel · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v17 · export Excel + imagem PNG · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -585,6 +586,18 @@ function exportarGrafico(id,nome){
   const aoa=graficoParaAoa(id);
   if(!aoa){ alert('Gere o gráfico primeiro (carregue as bases e abra a aba).'); return; }
   baixarXlsx(nome||'grafico',[{nome:'Dados',aoa}]);
+}
+// baixa a IMAGEM do gráfico já gerado (PNG), com fundo (canvas do Chart.js é transparente)
+function exportarGraficoPNG(id,nome){
+  const ch=charts[id];
+  if(!ch){ alert('Gere o gráfico primeiro (carregue as bases e abra a aba).'); return; }
+  const src=ch.canvas, esc=2; // 2x pra ficar nítido no slide
+  const cv=document.createElement('canvas'); cv.width=src.width*esc; cv.height=src.height*esc;
+  const cx=cv.getContext('2d'); cx.fillStyle='#1e293b'; cx.fillRect(0,0,cv.width,cv.height);
+  cx.drawImage(src,0,0,cv.width,cv.height);
+  const a=document.createElement('a');
+  a.href=cv.toDataURL('image/png'); a.download=(nome||'grafico').replace(/[^\w-]+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.png';
+  a.click();
 }
 function exportarBases(){
   if(!DADOS.length&&!ORCAMENTO.length){ alert('Nenhuma base carregada.'); return; }
