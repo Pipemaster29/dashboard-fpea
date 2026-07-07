@@ -277,7 +277,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v23 · export Excel no drill do Pareto · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v24 · conferência Ops×Pareto (manut+lubrif) · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -832,9 +832,20 @@ function renderOpsCalc(){
   ];
   if(kR&&kO){const dv=rkmR-rkmO,dp=rkmO?dv/rkmO*100:0,cls=dv>0?'pos':'neg';kpis.push({lbl:'Variação R$/km',val:(dv>=0?'+':'')+BRL.format(dv),cls,sub:PCT(dp)+(dv>0?' acima':' abaixo')});}
   document.getElementById('opsKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub" title="${String(c.sub).replace(/"/g,'')}">${c.sub}</div>`:''}</div>`).join('');
+  // reconciliação com o Pareto: custo realizado acumulado da categoria em TODOS os meses/regiões
+  const totRealCat=Object.values(costReal).reduce((s,v)=>s+v,0);
+  let recon='';
+  if(cat==='manutencao'){
+    let lub=0;DADOS.forEach(d=>{if(catDeLinha(d)==='lubrificantes')lub+=d.valor;});
+    const manutPura=totRealCat-lub;
+    recon=`<div class="small" style="margin-top:8px;opacity:.9">🔎 Conferência: aqui <b>Manutenção inclui Lubrificantes</b> = <b>${BRL.format(totRealCat)}</b> acumulado `+
+          `(Manutenção ${BRL.format(manutPura)} + Lubrificantes ${BRL.format(lub)}). No <b>Pareto</b> elas aparecem separadas — por isso o número lá é ${BRL.format(manutPura)}, não ${BRL.format(totRealCat)}.</div>`;
+  } else {
+    recon=`<div class="small" style="margin-top:8px;opacity:.9">🔎 Conferência: custo realizado acumulado de <b>${GRUPO_NOME[cat]}</b> (todos os meses/regiões) = <b>${BRL.format(totRealCat)}</b> — deve bater com o Pareto deste grupo.</div>`;
+  }
   const pr=document.getElementById('opsResumo');pr.style.display='';
-  if(kR)pr.innerHTML=`📌 <b>${GRUPO_NOME[cat]}</b>: R$/km realizado <b>${BRL.format(rkmR)}</b>`+(kO?` vs orçado <b>${BRL.format(rkmO)}</b> (${PCT(rkmO?(rkmR-rkmO)/rkmO*100:0)}).`:` — informe o KM orçado e carregue a OBZ para comparar.`);
-  else pr.innerHTML='✏️ Preencha o KM realizado na tabela abaixo para ver o R$/km por região.';
+  if(kR)pr.innerHTML=`📌 <b>${GRUPO_NOME[cat]}</b>: R$/km realizado <b>${BRL.format(rkmR)}</b>`+(kO?` vs orçado <b>${BRL.format(rkmO)}</b> (${PCT(rkmO?(rkmR-rkmO)/rkmO*100:0)}).`:` — informe o KM orçado e carregue a OBZ para comparar.`)+recon;
+  else pr.innerHTML='✏️ Preencha o KM realizado na tabela abaixo para ver o R$/km por região.'+recon;
 }
 
 // ---------- PARETO & GARGALOS ----------
