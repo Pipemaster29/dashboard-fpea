@@ -64,8 +64,10 @@
   .kpi .val{font-size:22px;font-weight:700}
   .kpi .sub{font-size:12px;margin-top:5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:24px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;transition:border-color .18s var(--ease-out)}
+  .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;transition:border-color .18s var(--ease-out)}
   .card.full{grid-column:1/-1}
+  .xls{position:absolute;top:12px;right:12px;z-index:3;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;cursor:pointer;line-height:1.4}
+  @media(hover:hover){.xls:hover{border-color:var(--good);color:var(--good)}}
   @media(hover:hover){.card:hover{border-color:#3f5170}}
   .card h3{font-size:14px;font-weight:600;margin-bottom:14px}
   .card .wrap{position:relative;height:320px}
@@ -116,6 +118,7 @@
     <span id="cloudInfo" class="small"></span>
     <button class="btn-primary" onclick="document.getElementById('file').click()" title="Recarregar um arquivo SUBSTITUI a versão anterior daquela base (serviços, materiais ou orçamento) — não duplica. Salva na nuvem automaticamente.">📂 Carregar/atualizar base</button>
     <button class="btn-ghost" id="btnSalvar" onclick="salvarNaNuvem()" title="Forçar o salvamento na nuvem agora (já salva sozinho ao atualizar uma base)">☁️ Salvar na nuvem</button>
+    <button class="btn-ghost" onclick="exportarBases()" title="Baixar um Excel com as bases (Realizado classificado + Orçamento) — uma aba cada, pronto pra dinâmica.">⬇️ Exportar bases (Excel)</button>
     <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple class="hidden">
   </div>
 </header>
@@ -150,7 +153,7 @@
     <div class="resumo" id="ovrResumo"></div>
     <div class="kpis" id="ovrKpis"></div>
     <div class="grid">
-      <div class="card full"><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
+      <div class="card full"><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
     </div>
     <div class="tablewrap"><table id="tabOVR"><thead></thead><tbody></tbody></table></div>
     <div class="note" id="ovrNote"></div>
@@ -178,8 +181,8 @@
     <div class="resumo" id="opsResumo" style="display:none"></div>
     <div class="kpis" id="opsKpis"></div>
     <div class="grid">
-      <div class="card"><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
-      <div class="card"><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
+      <div class="card"><button class="xls" onclick="exportarGrafico('chOpsAM','Amazonas R$ por km')">⬇ Excel</button><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
+      <div class="card"><button class="xls" onclick="exportarGrafico('chOpsMA','Maranhao R$ por km')">⬇ Excel</button><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
     </div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem por mês <span class="small">(preencha à mão — realizado e orçado, por região)</span></h3>
     <div class="tablewrap"><table id="tabKm"><thead></thead><tbody></tbody></table></div>
@@ -206,7 +209,7 @@
       </select>
     </div>
     <div class="kpis" id="pareKpis"></div>
-    <div class="grid"><div class="card full"><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
+    <div class="grid"><div class="card full"><button class="xls" onclick="exportarGrafico('chPareto2','Pareto')">⬇ Excel</button><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
     <div class="tablewrap"><table id="tabPareto2"><thead></thead><tbody></tbody></table></div>
     <div class="note">Cada valor é a soma dos lançamentos SAP (KSB1) daquele grupo/localidade. Ordenado do maior para o menor, com % do grupo e % acumulado — os poucos itens que somam ~80% são o gargalo a atacar.</div>
   </div>
@@ -225,11 +228,12 @@
     </div>
     <div class="kpis" id="kpis"></div>
     <div class="grid">
-      <div class="card"><h3>Custo por Classe de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chClasse"></canvas></div></div>
-      <div class="card"><h3>Custo por Centro de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chCentro"></canvas></div></div>
-      <div class="card"><h3>Evolução Mensal do Custo</h3><div class="wrap"><canvas id="chMes"></canvas></div></div>
-      <div class="card"><h3>Custo por Localidade <span class="small">(por centro de custo)</span></h3><div class="wrap"><canvas id="chLoc"></canvas></div></div>
+      <div class="card"><button class="xls" onclick="exportarGrafico('chClasse','Custo por classe')">⬇ Excel</button><h3>Custo por Classe de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chClasse"></canvas></div></div>
+      <div class="card"><button class="xls" onclick="exportarGrafico('chCentro','Custo por centro')">⬇ Excel</button><h3>Custo por Centro de Custo <span class="small">(top 12)</span></h3><div class="wrap"><canvas id="chCentro"></canvas></div></div>
+      <div class="card"><button class="xls" onclick="exportarGrafico('chMes','Evolucao mensal')">⬇ Excel</button><h3>Evolução Mensal do Custo</h3><div class="wrap"><canvas id="chMes"></canvas></div></div>
+      <div class="card"><button class="xls" onclick="exportarGrafico('chLoc','Custo por localidade')">⬇ Excel</button><h3>Custo por Localidade <span class="small">(por centro de custo)</span></h3><div class="wrap"><canvas id="chLoc"></canvas></div></div>
       <div class="card full">
+        <button class="xls" onclick="exportarGrafico('chPareto','Pareto custos')">⬇ Excel</button>
         <h3>Análise de Pareto <span class="small">— onde está concentrado o custo (80/20)</span>
           &nbsp; <select id="paretoDim" onchange="render()" style="min-width:150px">
             <option value="classe">por Classe de Custo</option>
@@ -240,7 +244,7 @@
         </h3>
         <div class="wrap" style="height:360px"><canvas id="chPareto"></canvas></div>
       </div>
-      <div class="card"><h3>Composição por Objeto</h3><div class="wrap"><canvas id="chObjeto"></canvas></div></div>
+      <div class="card"><button class="xls" onclick="exportarGrafico('chObjeto','Composicao por objeto')">⬇ Excel</button><h3>Composição por Objeto</h3><div class="wrap"><canvas id="chObjeto"></canvas></div></div>
     </div>
     <div class="tablecard">
       <h3>Detalhamento <span class="small" id="tabInfo"></span></h3>
@@ -256,7 +260,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v15 · pé de apoio → outros · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v16 · Randon fora do frete + export Excel · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -514,7 +518,7 @@ function classificarCusto(texto, classe){
   if(/lubrific|\bgraxa\b/.test(c)) return 'lubrificantes';                    // Lubrificantes separado (OBZ tem linha própria)
   if(/diesel|combust|gasolin|etanol/.test(c)) return 'combustivel';          // Insumo Diesel + Combustíveis + ARLA
   // transporte só de verdade: classe de transporte OU fornecedor de transporte no texto (transportadora/logística/frete)
-  if(/transporte|armazenag|pedagio/.test(c) || /transportadora|logistica|rodoviario|\bcargas\b|multimodal|navegacao|\bfrete\b/.test(t)) return 'transporte';
+  if(!/randon/.test(t) && (/transporte|armazenag|pedagio/.test(c) || /transportadora|logistica|rodoviario|\bcargas\b|multimodal|navegacao|\bfrete\b/.test(t))) return 'transporte';
   // "Outros serviços de terceiros" (4002019999) é majoritariamente manutenção (Scania, Pole-tec) → manutenção
   if(/manuten|sobressalent|outros servicos de t/.test(c)) return 'manutencao';
   // peça de veículo caindo em classe genérica (elétricos, químicos, tubulação…) → manutenção, por marca/termo automotivo
@@ -559,6 +563,44 @@ function filtrar(){const g=id=>document.getElementById(id).value;
 function aggSoma(rows,key){const m={};rows.forEach(d=>{m[d[key]]=(m[d[key]]||0)+d.valor;});return m;}
 
 function render(){const rows=filtrar();renderKPIs(rows);renderCharts(rows);renderTabela(rows);}
+
+// ---------- EXPORTAR PARA EXCEL ----------
+// gera uma planilha (.xlsx) com os DADOS do gráfico — pra montar/editar o gráfico no Excel/PowerPoint
+function pontoVal(v){ return (v&&typeof v==='object')?(v.y!=null?v.y:''):(v==null?'':v); }
+function graficoParaAoa(id){
+  const ch=charts[id]; if(!ch||!ch.data) return null;
+  const labels=ch.data.labels||[]; const dss=(ch.data.datasets||[]);
+  if(!dss.length) return null;
+  const head=['', ...dss.map((d,i)=>d.label||('Série '+(i+1)))];
+  const linhas=labels.map((l,r)=>[l, ...dss.map(d=>pontoVal((d.data||[])[r]))]);
+  return [head,...linhas];
+}
+function baixarXlsx(nome,abas){ // abas = [{nome, aoa}]
+  const wb=XLSX.utils.book_new();
+  abas.forEach(a=>{ const ws=XLSX.utils.aoa_to_sheet(a.aoa); XLSX.utils.book_append_sheet(wb,ws,a.nome.slice(0,31)); });
+  const stamp=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,nome.replace(/[^\w-]+/g,'_')+'_'+stamp+'.xlsx');
+}
+function exportarGrafico(id,nome){
+  const aoa=graficoParaAoa(id);
+  if(!aoa){ alert('Gere o gráfico primeiro (carregue as bases e abra a aba).'); return; }
+  baixarXlsx(nome||'grafico',[{nome:'Dados',aoa}]);
+}
+function exportarBases(){
+  if(!DADOS.length&&!ORCAMENTO.length){ alert('Nenhuma base carregada.'); return; }
+  const abas=[];
+  if(DADOS.length){
+    const h=['Mês','Localidade','Centro de custo','Classe de custo','Categoria','Fornecedor','Material/Objeto','Origem','Valor (R$)'];
+    const rows=DADOS.map(d=>[d.mes,d.loc,d.centro||'',d.classe||'',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.forn||'',(d.material||d.objeto||''),d.origem||'',d.valor]);
+    abas.push({nome:'Realizado (KSB1)',aoa:[h,...rows]});
+  }
+  if(ORCAMENTO.length){
+    const h=['Tipo','Mês','Região','Categoria','Classe (cód)','Classe (nome)','Valor orçado (R$)'];
+    const rows=ORCAMENTO.map(o=>[o.tipo,o.mes,o.regiao,GRUPO_NOME[o.cat]||o.cat,o.classeCod||'',o.classeNome||'',o.valor]);
+    abas.push({nome:'Orçamento',aoa:[h,...rows]});
+  }
+  baixarXlsx('bases_dashboard_fpea',abas);
+}
 
 function renderKPIs(rows){
   const total=rows.reduce((s,d)=>s+d.valor,0);
