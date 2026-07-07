@@ -256,7 +256,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v13 · manut+lubrif · 06/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v14 · peças de veículo · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -516,6 +516,10 @@ function classificarCusto(texto, classe){
   if(/transporte|armazenag|pedagio/.test(c) || /transportadora|logistica|rodoviario|\bcargas\b|multimodal|navegacao|\bfrete\b/.test(t)) return 'transporte';
   // "Outros serviços de terceiros" (4002019999) é majoritariamente manutenção (Scania, Pole-tec) → manutenção
   if(/manuten|sobressalent|outros servicos de t/.test(c)) return 'manutencao';
+  // peça de veículo caindo em classe genérica (elétricos, químicos, tubulação…) → manutenção, por marca/termo automotivo
+  if(/\bmoura\b|\bvdo\b|cofap|fras-?le|nakata|\bwega\b|donaldson|bateria automot|pastilha.*freio|amortecedor|feixe.*mola|coxim.*motor/.test(t)
+     || (/volksw|volks|\bvw\b|scania|\bvolvo\b|mercedes|iveco|randon|\bman\b/.test(t) && /filtro|bateria|aditivo|bobina|sensor|valvula|junta|correia|interrupt|\bfarol|lanterna|\bcabo\b|\brele\b|modulo|chicote|\bbomba|radiador|parafuso|arruela|rolamento|retentor/.test(t)))
+     return 'manutencao';
   return 'outros';
 }
 
