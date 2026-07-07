@@ -262,7 +262,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v18 · PPT editável + Excel + imagem · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v19 · PPT com eixo secundário (Pareto) · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -614,27 +614,44 @@ function exportarGraficoPPT(id,nome){
   pptx.defineLayout({name:'W169',width:10,height:5.63}); pptx.layout='W169';
   const slide=pptx.addSlide(); slide.background={color:'1E293B'};
   slide.addText(nome||'Gráfico',{x:0.4,y:0.22,w:9.2,h:0.6,fontSize:20,bold:true,color:'FFFFFF'});
-  // agrupa séries por tipo (bar / line / pie) para montar combo se preciso
-  const grupos={};
-  dss.forEach((d,i)=>{
+  // info por série: tipo (bar/line/pie), eixo (y / y2) e dados
+  const info=dss.map((d,i)=>{
     const t=String(d.type||baseType);
-    const key=/line/.test(t)?'line':(/doughnut|pie/.test(t)?'pie':'bar');
-    (grupos[key]=grupos[key]||[]).push({name:d.label||('Série '+(i+1)),labels,values:(d.data||[]).map(val)});
+    return {tipo:/line/.test(t)?'line':(/doughnut|pie/.test(t)?'pie':'bar'),
+      axis:d.yAxisID||'y',
+      serie:{name:d.label||('Série '+(i+1)),labels,values:(d.data||[]).map(val)}};
   });
+  const primAxis=info[0].axis;
+  const secAxis=(info.find(x=>x.axis!==primAxis)||{}).axis;   // eixo secundário (ex.: % acumulado do Pareto)
+  const temSec=!!secAxis;
   const cores=['38BDF8','818CF8','FBBF24','34D399','F87171'];
   const opts={x:0.4,y:0.95,w:9.2,h:4.45,showLegend:true,legendPos:'b',legendColor:'E2E8F0',
     catAxisLabelColor:'94A3B8',valAxisLabelColor:'94A3B8',chartColors:cores,dataBorder:{pt:0,color:'1E293B'}};
-  const keys=Object.keys(grupos);
-  if(keys.length===1){
-    const k=keys[0];
+  // agrupa por tipo (preservando ordem: barras antes de linha) para combo
+  const ordem=[],grupos={};
+  info.forEach(x=>{ if(!grupos[x.tipo]){grupos[x.tipo]=[];ordem.push(x.tipo);} grupos[x.tipo].push(x); });
+  if(ordem.length===1 && !temSec){
+    const k=ordem[0];
     const T=k==='line'?pptx.ChartType.line:k==='pie'?pptx.ChartType.doughnut:pptx.ChartType.bar;
-    slide.addChart(T,grupos[k],opts);
+    slide.addChart(T,grupos[k].map(x=>x.serie),opts);
   } else {
-    const combo=keys.filter(k=>k!=='pie').map((k,ix)=>({
-      type:k==='line'?pptx.ChartType.line:pptx.ChartType.bar,
-      data:grupos[k],
-      options:{chartColors:k==='line'?['FBBF24']:cores}
-    }));
+    const combo=ordem.filter(k=>k!=='pie').map(k=>{
+      const arr=grupos[k];
+      const noSec=temSec && arr.every(x=>x.axis===secAxis);   // este grupo vai no eixo secundário
+      const o={chartColors:k==='line'?['FBBF24']:cores};
+      if(noSec){o.secondaryValAxis=true;o.secondaryCatAxis=true;}
+      return {type:k==='line'?pptx.ChartType.line:pptx.ChartType.bar,data:arr.map(x=>x.serie),options:o};
+    });
+    if(temSec){
+      const secVals=info.filter(x=>x.axis===secAxis).flatMap(x=>x.serie.values).filter(v=>v!=null);
+      const ehPct=secVals.length && Math.max(...secVals)<=100 && Math.max(...secVals)>1;  // eixo secundário é % (0–100)
+      opts.valAxes=[
+        {showValAxisTitle:false,valAxisLabelColor:'94A3B8',valAxisLabelFormatCode:'"R$ "#,##0,"k"'},
+        Object.assign({showValAxisTitle:false,valAxisLabelColor:'FBBF24',valAxisLabelFormatCode:ehPct?'0"%"':'#,##0'},
+          ehPct?{valAxisMinVal:0,valAxisMaxVal:100,valAxisMajorUnit:20}:{})
+      ];
+      opts.catAxes=[{catAxisLabelColor:'94A3B8'},{catAxisHidden:true}];
+    }
     slide.addChart(combo,opts);
   }
   pptx.writeFile({fileName:(nome||'grafico').replace(/[^\w-]+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.pptx'});
