@@ -257,7 +257,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v10 · orçado KM manual (debug) · 06/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v11 · orçado do orçamento consolidado · 06/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -439,6 +439,8 @@ function parseOrcamento(aoa){
   const iTipo=hdr.findIndex(h=>norm(h)==='tipo');
   const iC4=idx(['conta 4']);
   const iD4=idx(['descricao conta 4','denominacao conta 4']);
+  const iCC=hdr.findIndex(h=>norm(h)==='cc'); const iCC2=iCC>=0?iCC:idx(['centro custo','centro']);
+  const iDescr=hdr.findIndex((h,i)=>norm(h)==='descricao'&&i!==iD4);
   const meses=[]; hdr.forEach((h,i)=>{ if(h instanceof Date) meses.push({i,mes:mesDe(h)}); });
   const out=[];
   for(let r=hi+1;r<aoa.length;r++){
@@ -447,7 +449,11 @@ function parseOrcamento(aoa){
     const cod=iC4>=0?String(row[iC4]||'').trim():'';
     const nome=iD4>=0?String(row[iD4]||''):'';
     if(!tipo&&!cod) continue;
-    meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,mes,classeCod:cod,classeNome:nome,valor:v}); });
+    const cc=iCC2>=0?String(row[iCC2]||''):'';
+    const descrLinha=iDescr>=0?String(row[iDescr]||''):'';
+    const regiao=localidadeDe(cc);                                   // Amazonas / Maranhão pela letra do CC
+    const cat=classificarCusto(descrLinha+' '+nome, nome);           // mesma categorização do realizado
+    meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,mes,classeCod:cod,classeNome:nome,valor:v,regiao,cat}); });
   }
   return out;
 }
@@ -647,9 +653,9 @@ function renderKmTable(){
     <td><input type="number" min="0" value="${kmGet('Maranhão',m,'kmOrc')||''}" placeholder="orçado" oninput="setKm('Maranhão','${m}','kmOrc',this.value)"></td></tr>`).join('');
 }
 const OPS_ORC={combustivel:['comb'],manutencao:['manut'],pneus:['pneu'],lubrificantes:['lubrif'],transporte:[]};
-function opsSerie(loc,meses,costReal,orcTypes,fPC){
+function opsSerie(loc,meses,costReal,orcCost){
   const real=meses.map(m=>{const km=kmGet(loc,m,'km');const c=costReal[loc+'|'+m]||0;return km?c/km:null;});
-  const orc=meses.map(m=>{const kmO=kmGet(loc,m,'kmOrc');if(!ORCKPI||!orcTypes.length||!kmO)return null;const reg=regiaoOBZ(loc);const o=ORCKPI[reg]&&ORCKPI[reg][m];if(!o)return null;return orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC/kmO;});
+  const orc=meses.map(m=>{const kmO=kmGet(loc,m,'kmOrc');const oc=orcCost[loc+'|'+m];if(!oc||!kmO)return null;return oc/kmO;});
   const dif=meses.map((m,i)=>(real[i]!=null&&orc[i]!=null)?real[i]-orc[i]:null);
   return {real,orc,dif};
 }
@@ -671,14 +677,15 @@ function renderOpsCalc(){
   const cat=document.getElementById('opsCat').value;
   const tipo=document.getElementById('opsTipo').value;
   const fPC=fatorPisCofins();
-  const orcTypes=OPS_ORC[cat]||[];
   const meses=opsMeses();
   // realizado direto do KSB1 (a base já vem líquida de crédito PIS/Cofins)
   const costReal={};DADOS.forEach(d=>{if(catDeLinha(d)===cat){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
-  opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcTypes,fPC),tipo);
-  opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcTypes,fPC),tipo);
+  // orçado do ORÇAMENTO consolidado (Custos Variáveis) por categoria×região×mês, com crédito PIS/Cofins (-9,25%)
+  const orcCost={};ORCAMENTO.forEach(o=>{if(o.cat===cat&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+o.valor*fPC;}});
+  opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcCost),tipo);
+  opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcCost),tipo);
   document.getElementById('opsTag').textContent=GRUPO_NOME[cat]+' · R$/km por região';
-  const agg=loc=>{let c=0,kmR=0,cOrc=0,kmO=0;meses.forEach(m=>{const km=kmGet(loc,m,'km');if(km){c+=costReal[loc+'|'+m]||0;kmR+=km;}const kmo=kmGet(loc,m,'kmOrc');if(kmo&&ORCKPI&&orcTypes.length){const o=ORCKPI[regiaoOBZ(loc)]&&ORCKPI[regiaoOBZ(loc)][m];if(o){cOrc+=orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC;kmO+=kmo;}}});return{c,kmR,cOrc,kmO};};
+  const agg=loc=>{let c=0,kmR=0,cOrc=0,kmO=0;meses.forEach(m=>{const km=kmGet(loc,m,'km');if(km){c+=costReal[loc+'|'+m]||0;kmR+=km;}const kmo=kmGet(loc,m,'kmOrc');const oc=orcCost[loc+'|'+m];if(kmo&&oc){cOrc+=oc;kmO+=kmo;}});return{c,kmR,cOrc,kmO};};
   const A=agg('Amazonas'),M=agg('Maranhão');
   const cR=A.c+M.c,kR=A.kmR+M.kmR,cO=A.cOrc+M.cOrc,kO=A.kmO+M.kmO;
   const rkmR=kR?cR/kR:0,rkmO=kO?cO/kO:0;
@@ -696,14 +703,11 @@ function renderOpsCalc(){
 // ---------- PARETO & GARGALOS ----------
 const GRUPO_NOME={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus',lubrificantes:'Lubrificantes',transporte:'Frete/Transporte',outros:'Outros'};
 function catDeLinha(d){return d.cat||classificarCusto((d.material||'')+' '+(d.objeto||''),d.classe);}
-function orcadoGrupoLoc(){ // orçado total por grupo x localidade, a partir da OBZ (R$/km→custo somado por mês)
-  const map={combustivel:'comb',manutencao:'manut',pneus:'pneu',lubrificantes:'lubrif'};const out={};
-  if(!ORCKPI) return out; const fPC=fatorPisCofins();
-  const mesesReal=new Set(DADOS.map(d=>d.mes));   // só compara os meses que têm realizado (senão orçado do ano vira o dobro)
-  Object.keys(ORCKPI).forEach(loc=>Object.keys(ORCKPI[loc]).forEach(mes=>{
-    if(mesesReal.size && !mesesReal.has(mes)) return;
-    const c=(ORCKPI[loc][mes]||{}).custo||{};
-    Object.entries(map).forEach(([g,t])=>{out[g]=out[g]||{};out[g][loc]=(out[g][loc]||0)+(c[t]||0)*fPC;});}));
+function orcadoGrupoLoc(){ // orçado por grupo x localidade, do ORÇAMENTO consolidado (Custos Variáveis), só meses com realizado
+  const out={}; if(!ORCAMENTO.length) return out; const fPC=fatorPisCofins();
+  const mesesReal=new Set(DADOS.map(d=>d.mes));
+  ORCAMENTO.forEach(o=>{ if(!/variav/.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
+    out[o.cat]=out[o.cat]||{}; out[o.cat][o.regiao]=(out[o.cat][o.regiao]||0)+o.valor*fPC; });
   return out;
 }
 function renderParetoTab(){
