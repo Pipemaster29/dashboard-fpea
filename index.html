@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard FP&A — Orçado vs Real + Análise de Custos</title>
+<title>Dashboard FP&A — GNL Brasil</title>
+<link rel="icon" type="image/png" href="gnl-logo.png">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
@@ -31,7 +32,8 @@
   button:active{transform:scale(.97)}
   .btn-primary{background:var(--accent);color:#06202c}
   .btn-ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
-  @media(hover:hover){.btn-primary:hover{background:#7dd3fc;box-shadow:0 4px 14px rgba(56,189,248,.28)}.btn-ghost:hover{border-color:var(--accent);color:#fff}}
+  @media(hover:hover){.btn-primary:hover{background:#00b9c2;box-shadow:0 4px 14px rgba(0,160,168,.3)}.btn-ghost:hover{border-color:var(--accent);color:#fff}
+    header .btn-primary:hover{background:#ffc23d;box-shadow:0 4px 14px rgba(252,179,22,.32)}}
   main{padding:24px 28px;max-width:1480px;margin:0 auto}
   #drop{border:2px dashed var(--line);border-radius:14px;padding:44px 24px;text-align:center;background:var(--panel);transition:.2s;cursor:pointer;margin-bottom:24px}
   #drop:hover,#drop.drag{border-color:var(--accent);background:var(--panel2)}
@@ -40,7 +42,7 @@
   .sectitle{font-size:16px;font-weight:700;margin:6px 0 16px;display:flex;align-items:center;gap:10px}
   .sectitle .tag{font-size:11px;font-weight:600;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 11px;color:var(--muted)}
   .ovrbox{background:linear-gradient(180deg,#16233b,#1e293b);border:1px solid var(--accent2);border-radius:14px;padding:20px;margin-bottom:30px}
-  .resumo{background:rgba(56,189,248,.09);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
+  .resumo{background:rgba(0,160,168,.10);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
   .resumo b{color:#fff}
   .tabs{display:flex;gap:6px;margin-bottom:24px;border-bottom:1px solid var(--line);flex-wrap:wrap}
   .tabbtn{background:transparent;color:var(--muted);border:none;border-bottom:2px solid transparent;border-radius:0;padding:11px 18px;font-size:14px;font-weight:600;transition:color .16s var(--ease-out),border-color .16s var(--ease-out)}
@@ -77,7 +79,8 @@
   .xls{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;cursor:pointer;line-height:1.4}
   @media(hover:hover){.xls:hover{border-color:var(--good);color:var(--good)}.xls.png:hover{border-color:var(--accent);color:var(--accent)}.xls.ppt:hover{border-color:var(--warn);color:var(--warn)}}
   @media(hover:hover){.card:hover{border-color:#3f5170}}
-  .card h3{font-size:14px;font-weight:600;margin-bottom:14px}
+  .card h3{font-size:14px;font-weight:600;margin-bottom:14px;padding-right:200px}   /* espaço p/ os botões de export no canto */
+  @media(max-width:700px){.card h3{padding-right:0;padding-top:30px}}
   .card .wrap{position:relative;height:320px}
   @media(max-width:900px){.grid{grid-template-columns:1fr}}
   .tablecard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:24px}
@@ -91,20 +94,12 @@
   tbody tr{transition:background-color .12s var(--ease-out)}
   tbody tr:hover{background:var(--panel2)}
   #tabPareto2 tbody tr:hover,#tabResumo tbody tr:hover{box-shadow:inset 3px 0 0 var(--accent)}
-  tr.gargalo td{background:rgba(248,113,113,.09)}
+  tr.gargalo td{background:rgba(228,86,46,.10)}
   tr.gargalo td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
   .pos{color:var(--bad)}.neg{color:var(--good)}
   footer{text-align:center;color:var(--muted);font-size:12px;padding:24px}
   .badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--muted);margin-left:8px}
   .small{font-size:11px;color:var(--muted);font-weight:400}
-  #login{position:fixed;inset:0;background:radial-gradient(circle at 30% 20%,#16233b,#0f172a);display:flex;align-items:center;justify-content:center;z-index:1000}
-  .loginbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:34px 32px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
-  .loginbox h2{font-size:19px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
-  .loginbox p{color:var(--muted);font-size:13px;margin-bottom:20px}
-  .loginbox label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:5px}
-  .loginbox input{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:11px 12px;font-size:14px;margin-bottom:14px}
-  .loginbox button{width:100%;margin-top:4px}
-  #loginErr{color:var(--bad);font-size:13px;margin-top:12px;min-height:18px}
   .cloudbadge{display:inline-flex;align-items:center;gap:5px;background:rgba(52,211,153,.12);border:1px solid var(--good);color:var(--good);border-radius:20px;padding:3px 11px;font-size:11px}
   .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -277,7 +272,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v24 · conferência Ops×Pareto (manut+lubrif) · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v25 · revisão geral + fix rótulos de eixo · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -345,7 +340,6 @@ const mesOrd=m=>{const p=m.split('/');return p.length===2?+p[1]*100+ +p[0]:99999
 function origemDe(nome){const n=norm(nome);if(n.includes('servic'))return'Serviços';if(n.includes('material')||n.includes('materiais'))return'Materiais';return nome.replace(/\.(xlsx|xls|csv)$/i,'');}
 // operação dividida em 2 regiões: Amazonas (centro de custo terminando em A) e Maranhão (demais)
 function localidadeDe(cc){const m=String(cc||'').match(/([A-Za-z])(?=[^A-Za-z]*$)/);if(!m)return'Maranhão';return m[1].toUpperCase()==='A'?'Amazonas':'Maranhão';}
-function regiaoOBZ(loc){return loc==='Amazonas'?'Amazonas':'Maranhão';}
 
 document.getElementById('file').addEventListener('change',e=>{[...e.target.files].forEach(lerArquivo);e.target.value='';});
 const drop=document.getElementById('drop');
@@ -639,7 +633,7 @@ function exportarGraficoPPT(id,nome){
   const primAxis=info[0].axis;
   const secAxis=(info.find(x=>x.axis!==primAxis)||{}).axis;   // eixo secundário (ex.: % acumulado do Pareto)
   const temSec=!!secAxis;
-  const cores=['38BDF8','818CF8','FBBF24','34D399','F87171'];
+  const cores=['00A0A8','FCB316','02585C','6CBDC4','E4562E'];   // paleta GNL — igual ao dashboard
   const opts={x:0.4,y:0.95,w:9.2,h:4.45,showLegend:true,legendPos:'b',legendColor:'E2E8F0',
     catAxisLabelColor:'94A3B8',valAxisLabelColor:'94A3B8',chartColors:cores,dataBorder:{pt:0,color:'1E293B'}};
   // agrupa por tipo (preservando ordem: barras antes de linha) para combo
@@ -653,7 +647,7 @@ function exportarGraficoPPT(id,nome){
     const combo=ordem.filter(k=>k!=='pie').map(k=>{
       const arr=grupos[k];
       const noSec=temSec && arr.every(x=>x.axis===secAxis);   // este grupo vai no eixo secundário
-      const o={chartColors:k==='line'?['FBBF24']:cores};
+      const o={chartColors:k==='line'?['FCB316']:cores};
       if(noSec){o.secondaryValAxis=true;o.secondaryCatAxis=true;}
       return {type:k==='line'?pptx.ChartType.line:pptx.ChartType.bar,data:arr.map(x=>x.serie),options:o};
     });
@@ -662,7 +656,7 @@ function exportarGraficoPPT(id,nome){
       const ehPct=secVals.length && Math.max(...secVals)<=100 && Math.max(...secVals)>1;  // eixo secundário é % (0–100)
       opts.valAxes=[
         {showValAxisTitle:false,valAxisLabelColor:'94A3B8',valAxisLabelFormatCode:'"R$ "#,##0,"k"'},
-        Object.assign({showValAxisTitle:false,valAxisLabelColor:'FBBF24',valAxisLabelFormatCode:ehPct?'0"%"':'#,##0'},
+        Object.assign({showValAxisTitle:false,valAxisLabelColor:'FCB316',valAxisLabelFormatCode:ehPct?'0"%"':'#,##0'},
           ehPct?{valAxisMinVal:0,valAxisMaxVal:100,valAxisMajorUnit:20}:{})
       ];
       opts.catAxes=[{catAxisLabelColor:'94A3B8'},{catAxisHidden:true}];
@@ -707,10 +701,15 @@ function destroy(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 function topN(obj,n){return Object.entries(obj).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,n);}
 
 function renderCharts(rows){
-  const opts=horiz=>({responsive:true,maintainAspectRatio:false,indexAxis:horiz?'y':'x',
-    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>BRL.format(horiz?c.parsed.x:c.parsed.y)}}},
-    scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:horiz?(v=>kBRL(v)):undefined}},
-            y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:horiz?undefined:(v=>kBRL(v))}}}});
+  // não deixar callback:undefined explícito — isso quebra o rótulo do eixo categoria no Chart.js 4 (mostra o índice)
+  const opts=horiz=>{
+    const o={responsive:true,maintainAspectRatio:false,indexAxis:horiz?'y':'x',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>BRL.format(horiz?c.parsed.x:c.parsed.y)}}},
+      scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},
+              y:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}}}};
+    if(horiz) o.scales.x.ticks.callback=v=>kBRL(v); else o.scales.y.ticks.callback=v=>kBRL(v);
+    return o;
+  };
   const cl=topN(aggSoma(rows,'classe'),12);destroy('chClasse');
   const totCl=rows.reduce((s,d)=>s+d.valor,0);
   const optCl=opts(true);
@@ -1046,6 +1045,7 @@ function renderOVR(){
 // ---------- CASCATA (waterfall) Orçado → Real, Custos Variáveis ----------
 let WF_LAST=null;   // guarda os dados da última cascata para exportar
 const WF_CATS=['combustivel','manutencao','pneus','lubrificantes','transporte','outros'];
+const WF_NOME={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros'};
 function wfLocSel(){ return (document.getElementById('wfLoc')||{}).value||''; }   // '' = Geral
 function wfDados(loc){
   const fPC=fatorPisCofins();
@@ -1064,13 +1064,12 @@ function renderWaterfall(){
   if(!DADOS.length||!ORCAMENTO.length){ WF_LAST=null; return; }
   const loc=wfLocSel();
   const {orc,real,orcTot,realTot}=wfDados(loc);
-  const nomeCat={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros'};
   const labels=['Orçado'], barras=[], cores=[], rotulos=[];
   barras.push([0,orcTot]); cores.push('#02585C'); rotulos.push(orcTot);   // total inicial (teal escuro)
   let cum=orcTot;
   WF_CATS.forEach(c=>{
     const d=real[c]-orc[c]; if(Math.abs(d)<1 && orc[c]===0 && real[c]===0) return;   // pula categoria vazia
-    labels.push(nomeCat[c]);
+    labels.push(WF_NOME[c]);
     const lo=Math.min(cum,cum+d), hi=Math.max(cum,cum+d);
     barras.push([lo,hi]);
     cores.push(d>0?'#E4562E':'#00B050');   // acima do orçado = laranja (ruim) · abaixo = verde (economia)
@@ -1094,11 +1093,10 @@ function exportarWaterfallPPT(){
   if(!DADOS.length||!ORCAMENTO.length){ alert('Cascata ainda não gerada (carregue as bases e abra a aba Orçado vs Real).'); return; }
   const loc=wfLocSel(), regTxt=loc||'Geral (AM + MA)';
   const {orc,real,orcTot,realTot}=wfDados(loc);
-  const nomeCat={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros'};
   const labels=['Orçado'],base=[0],eco=[0],aci=[0],tot=[orcTot];
   let cum=orcTot;
   WF_CATS.forEach(c=>{const d=real[c]-orc[c]; if(Math.abs(d)<1&&orc[c]===0&&real[c]===0) return;
-    labels.push(nomeCat[c]);
+    labels.push(WF_NOME[c]);
     base.push(Math.min(cum,cum+d));
     if(d>0){aci.push(Math.abs(d));eco.push(0);} else {eco.push(Math.abs(d));aci.push(0);}
     tot.push(0); cum+=d;});
