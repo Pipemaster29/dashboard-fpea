@@ -257,7 +257,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v11 · orçado do orçamento consolidado · 06/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v12 · orçado unificado · 06/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -713,7 +713,7 @@ function orcadoGrupoLoc(){ // orçado por grupo x localidade, do ORÇAMENTO cons
 function renderParetoTab(){
   if(!DADOS.length) return;
   const real={};DADOS.forEach(d=>{const g=catDeLinha(d);real[g]=real[g]||{Amazonas:0,'Maranhão':0};real[g][d.loc]=(real[g][d.loc]||0)+d.valor;});
-  const orc=orcadoGrupoLoc();const temOrc=!!ORCKPI;
+  const orc=orcadoGrupoLoc();const temOrc=ORCAMENTO.length>0;
   const ordem=['combustivel','manutencao','pneus','lubrificantes','transporte','outros'].filter(g=>real[g]);
   const sel=document.getElementById('pareGrupo');const cur=sel.value;
   sel.innerHTML=ordem.map(g=>`<option value="${g}" ${g===cur?'selected':''}>${GRUPO_NOME[g]}</option>`).join('');
