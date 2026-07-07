@@ -16,10 +16,16 @@
     --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-in-out:cubic-bezier(0.77,0,0.175,1);}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.4}
-  header{background:linear-gradient(90deg,#0f172a,#1e293b);border-bottom:1px solid var(--line);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
-  header h1{font-size:20px;font-weight:600;display:flex;align-items:center;gap:10px}
-  header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(56,189,248,.5);animation:pulse 2.4s var(--ease-out) infinite}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(56,189,248,.45)}70%{box-shadow:0 0 0 7px rgba(56,189,248,0)}100%{box-shadow:0 0 0 0 rgba(56,189,248,0)}}
+  header{background:linear-gradient(90deg,#02585C 0%,#00A0A8 100%);border-bottom:1px solid #013b3e;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
+  header h1{font-size:20px;font-weight:600;display:flex;align-items:center;gap:12px;color:#fff}
+  header .brand{display:flex;align-items:center;background:#fff;border-radius:10px;padding:6px 10px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  header .brand img{height:34px;display:block}
+  header h1 .dot{width:10px;height:10px;border-radius:50%;background:#FCB316;box-shadow:0 0 0 0 rgba(252,179,22,.6);animation:pulse 2.4s var(--ease-out) infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(252,179,22,.5)}70%{box-shadow:0 0 0 7px rgba(252,179,22,0)}100%{box-shadow:0 0 0 0 rgba(252,179,22,0)}}
+  header .btn-primary{background:#FCB316;color:#3a2a00}
+  header .btn-ghost{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.4)}
+  header #cloudInfo{color:rgba(255,255,255,.85)}
+  header .badge{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.3);color:#fff}
   .actions{display:flex;gap:10px;flex-wrap:wrap}
   button{cursor:pointer;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;transition:background-color .16s var(--ease-out),border-color .16s var(--ease-out),color .16s var(--ease-out),transform .12s var(--ease-out),box-shadow .16s var(--ease-out)}
   button:active{transform:scale(.97)}
@@ -115,7 +121,7 @@
 </head>
 <body>
 <header>
-  <h1><span class="dot"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge">carregando…</span></h1>
+  <h1><span class="brand"><img src="gnl-logo.png" alt="GNL Brasil Logística"></span><span class="dot"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge">carregando…</span></h1>
   <div class="actions">
     <span id="cloudInfo" class="small"></span>
     <button class="btn-primary" onclick="document.getElementById('file').click()" title="Recarregar um arquivo SUBSTITUI a versão anterior daquela base (serviços, materiais ou orçamento) — não duplica. Salva na nuvem automaticamente.">📂 Carregar/atualizar base</button>
@@ -156,7 +162,7 @@
     <div class="kpis" id="ovrKpis"></div>
     <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOVR','Orcado vs Real por mes')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOVR','Orcado vs Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button></div><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
-      <div class="card full"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chWf','Cascata Orcado x Real')">🖼️ Imagem</button><button class="xls" onclick="exportarWaterfall()">⬇ Excel</button></div><h3>Cascata Orçado → Real <span class="small">— Custos Variáveis (ponte por categoria, acumulado do período)</span></h3><div class="wrap" style="height:380px"><canvas id="chWf"></canvas></div></div>
+      <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarWaterfallPPT()">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chWf','Cascata Orcado x Real')">🖼️ Imagem</button><button class="xls" onclick="exportarWaterfall()">⬇ Excel</button></div><h3>Cascata Orçado → Real <span class="small">— Custos Variáveis (ponte por categoria, acumulado do período)</span></h3><div class="wrap" style="height:380px"><canvas id="chWf"></canvas></div></div>
     </div>
     <div class="tablewrap"><table id="tabOVR"><thead></thead><tbody></tbody></table></div>
     <div class="note" id="ovrNote"></div>
@@ -263,7 +269,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v20 · paleta GNL + cascata + eixo 2º no Ops · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v21 · logo GNL + header teal + PPT cascata · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1050,6 +1056,34 @@ function renderWaterfall(){
           formatter:(_,ctx)=>{const i=ctx.dataIndex,v=rotulos[i],tot=(i===0||i===labels.length-1);return (tot?'':(v>=0?'+':''))+kBRL(v);}}},
       scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',maxRotation:35,minRotation:0,font:{size:10}}},
         y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+}
+// PPT nativo editável da cascata: barra empilhada com "Base" invisível + segmentos (economia/acima/total)
+function exportarWaterfallPPT(){
+  if(typeof PptxGenJS==='undefined'){ alert('A biblioteca de PowerPoint não carregou (precisa de internet).'); return; }
+  if(!DADOS.length||!ORCAMENTO.length){ alert('Cascata ainda não gerada (carregue as bases e abra a aba Orçado vs Real).'); return; }
+  const {orc,real,orcTot,realTot}=wfDados();
+  const nomeCat={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros'};
+  const labels=['Orçado'],base=[0],eco=[0],aci=[0],tot=[orcTot];
+  let cum=orcTot;
+  WF_CATS.forEach(c=>{const d=real[c]-orc[c]; if(Math.abs(d)<1&&orc[c]===0&&real[c]===0) return;
+    labels.push(nomeCat[c]);
+    base.push(Math.min(cum,cum+d));
+    if(d>0){aci.push(Math.abs(d));eco.push(0);} else {eco.push(Math.abs(d));aci.push(0);}
+    tot.push(0); cum+=d;});
+  labels.push('Real'); base.push(0); eco.push(0); aci.push(0); tot.push(realTot);
+  const data=[
+    {name:'Base',labels,values:base},
+    {name:'Abaixo do orçado',labels,values:eco},
+    {name:'Acima do orçado',labels,values:aci},
+    {name:'Total',labels,values:tot}
+  ];
+  const pptx=new PptxGenJS(); pptx.defineLayout({name:'W169',width:10,height:5.63}); pptx.layout='W169';
+  const slide=pptx.addSlide(); slide.background={color:'1E293B'};
+  slide.addText('Cascata Orçado → Real · Custos Variáveis',{x:0.4,y:0.22,w:9.2,h:0.6,fontSize:20,bold:true,color:'FFFFFF'});
+  slide.addChart(pptx.ChartType.bar,data,{x:0.4,y:0.95,w:9.2,h:4.45,barGrouping:'stacked',
+    chartColors:['1E293B','00B050','E4562E','00A0A8'],showLegend:false,showValue:false,
+    catAxisLabelColor:'94A3B8',valAxisLabelColor:'94A3B8',valAxisLabelFormatCode:'"R$ "#,##0,"k"',dataBorder:{pt:0,color:'1E293B'}});
+  pptx.writeFile({fileName:'Cascata_Orcado_Real_'+new Date().toISOString().slice(0,10)+'.pptx'});
 }
 function exportarWaterfall(){
   if(!WF_LAST){ alert('Cascata ainda não gerada (carregue as bases e abra a aba Orçado vs Real).'); return; }
