@@ -272,12 +272,12 @@
 
 <div id="drillModal" onclick="if(event.target===this)fecharDrill()">
   <div class="drillbox">
-    <div class="drillhead"><span id="drillTit"></span><button class="btn-ghost" onclick="fecharDrill()">✕ Fechar</button></div>
+    <div class="drillhead"><span id="drillTit"></span><span style="display:flex;gap:8px;flex:none"><button class="btn-primary" onclick="exportarDrill()" title="Baixar um Excel com todos estes lançamentos (a base que forma este número) — ótimo para conferir.">⬇ Excel destes lançamentos</button><button class="btn-ghost" onclick="fecharDrill()">✕ Fechar</button></span></div>
     <div class="tablewrap" style="max-height:70vh"><table id="tabDrill"><thead></thead><tbody></tbody></table></div>
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v22 · cascata por operação (Geral/AM/MA) · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v23 · export Excel no drill do Pareto · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -931,15 +931,25 @@ function renderPareto2(){
   document.querySelector('#tabPareto2 tbody').innerHTML=tb+rowCauda+rowEstorno;
 }
 // drill-down: mostra todos os lançamentos do item clicado
+let DRILL_LAST=null;   // lançamentos do drill aberto, para exportar
 function abrirDrill(idx){
   const it=_pareItems[idx]; if(!it) return; const {g,loc,dim}=_pareCtx;
   const linhas=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&pareKey(d,dim)===it.key).sort((a,b)=>b.valor-a.valor);
   const tot=linhas.reduce((s,d)=>s+d.valor,0);
+  DRILL_LAST={linhas,nome:(GRUPO_NOME[g]||g)+' '+(loc?loc+' ':'')+String(it.key)};
   document.getElementById('drillTit').innerHTML=`<b>${String(it.key).slice(0,70)}</b> · ${GRUPO_NOME[g]||g}${loc?' · '+loc:''} · ${INT.format(linhas.length)} lançamentos · ${BRL.format(tot)}`;
   document.querySelector('#tabDrill thead').innerHTML='<tr><th class="txt">Mês</th><th class="txt">Local</th><th class="txt">Centro</th><th class="txt">Classe</th><th class="txt">Material / Serviço</th><th class="txt">Objeto</th><th>Valor</th></tr>';
   const lim=linhas.slice(0,1000);
   document.querySelector('#tabDrill tbody').innerHTML=lim.map(d=>`<tr><td class="txt">${d.mes}</td><td class="txt">${d.loc}</td><td class="txt">${d.centro||'—'}</td><td class="txt">${(d.classe||'').slice(0,22)}</td><td class="txt" title="${String(d.material||'').replace(/"/g,'')}">${String(d.material||'—').slice(0,40)}</td><td class="txt">${String(d.objeto||'—').slice(0,28)}</td><td>${BRL.format(d.valor)}</td></tr>`).join('')+(linhas.length>1000?`<tr><td colspan="7" class="small txt">… mostrando 1.000 de ${INT.format(linhas.length)}</td></tr>`:'');
   document.getElementById('drillModal').classList.add('show');
+}
+function exportarDrill(){
+  if(!DRILL_LAST||!DRILL_LAST.linhas.length){ alert('Abra um item do Pareto primeiro.'); return; }
+  const h=['Mês','Localidade','Centro de custo','Classe de custo','Categoria','Fornecedor','Material/Serviço','Objeto','Origem','Valor (R$)'];
+  const rows=DRILL_LAST.linhas.map(d=>[d.mes,d.loc,d.centro||'',d.classe||'',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.forn||'',(d.material||''),(d.objeto||''),d.origem||'',d.valor]);
+  const tot=DRILL_LAST.linhas.reduce((s,d)=>s+d.valor,0);
+  rows.push(['','','','','','','','','TOTAL',tot]);
+  baixarXlsx('Lancamentos_'+DRILL_LAST.nome.slice(0,40),[{nome:'Lançamentos',aoa:[h,...rows]}]);
 }
 function fecharDrill(){ document.getElementById('drillModal').classList.remove('show'); }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharDrill(); });
