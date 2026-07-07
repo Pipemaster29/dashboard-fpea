@@ -174,7 +174,7 @@
         <option value="linhas">Linhas</option>
         <option value="barras">Barras (orçado × real)</option>
       </select>
-      <span class="small">Digite o <b>KM realizado</b> por mês na tabela abaixo. R$/km realizado = custo SAP ÷ KM. R$/km orçado = taxa da OBZ.</span>
+      <span class="small">Digite o <b>KM realizado</b> e o <b>KM orçado</b> por mês na tabela abaixo. R$/km = custo da categoria ÷ KM.</span>
     </div>
     <div class="resumo" id="opsResumo" style="display:none"></div>
     <div class="kpis" id="opsKpis"></div>
@@ -182,9 +182,9 @@
       <div class="card"><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
       <div class="card"><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
     </div>
-    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem realizada por mês <span class="small">(preencha à mão, por região)</span></h3>
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem por mês <span class="small">(preencha à mão — realizado e orçado, por região)</span></h3>
     <div class="tablewrap"><table id="tabKm"><thead></thead><tbody></tbody></table></div>
-    <div class="note">R$/km realizado = custo SAP da categoria (por região e mês) ÷ KM realizado (você digita). R$/km orçado = <b>taxa da própria OBZ</b> (custo OBZ ÷ KM da OBZ) — fixa, igual ao seu KPI. Diferença = realizado − orçado. O KM fica salvo no navegador.</div>
+    <div class="note">R$/km realizado = custo SAP da categoria (por região e mês) ÷ KM realizado. R$/km orçado = custo do orçamento ÷ KM orçado. Diferença = realizado − orçado. O KM fica salvo no navegador.</div>
   </div>
 
   <!-- PARETO & GARGALOS -->
@@ -257,7 +257,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v9 · orçado = taxa OBZ · 06/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v10 · orçado KM manual (debug) · 06/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -638,17 +638,18 @@ function opsMeses(){return uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOr
 function renderOps(){ if(!DADOS.length) return; renderKmTable(); renderOpsCalc(); }
 function renderKmTable(){
   const meses=opsMeses();
-  document.querySelector('#tabKm thead').innerHTML='<tr><th class="txt">Mês</th><th>Amazonas · KM realizado</th><th>Maranhão · KM realizado</th></tr>';
+  document.querySelector('#tabKm thead').innerHTML='<tr><th class="txt">Mês</th><th>Amazonas · KM real</th><th>Amazonas · KM orçado</th><th>Maranhão · KM real</th><th>Maranhão · KM orçado</th></tr>';
   document.querySelector('#tabKm tbody').innerHTML=meses.map(m=>`<tr>
     <td class="txt">${m}</td>
-    <td><input type="number" min="0" value="${kmGet('Amazonas',m,'km')||''}" placeholder="km" oninput="setKm('Amazonas','${m}','km',this.value)"></td>
-    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'km')||''}" placeholder="km" oninput="setKm('Maranhão','${m}','km',this.value)"></td></tr>`).join('');
+    <td><input type="number" min="0" value="${kmGet('Amazonas',m,'km')||''}" placeholder="real" oninput="setKm('Amazonas','${m}','km',this.value)"></td>
+    <td><input type="number" min="0" value="${kmGet('Amazonas',m,'kmOrc')||''}" placeholder="orçado" oninput="setKm('Amazonas','${m}','kmOrc',this.value)"></td>
+    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'km')||''}" placeholder="real" oninput="setKm('Maranhão','${m}','km',this.value)"></td>
+    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'kmOrc')||''}" placeholder="orçado" oninput="setKm('Maranhão','${m}','kmOrc',this.value)"></td></tr>`).join('');
 }
 const OPS_ORC={combustivel:['comb'],manutencao:['manut'],pneus:['pneu'],lubrificantes:['lubrif'],transporte:[]};
 function opsSerie(loc,meses,costReal,orcTypes,fPC){
   const real=meses.map(m=>{const km=kmGet(loc,m,'km');const c=costReal[loc+'|'+m]||0;return km?c/km:null;});
-  // orçado = TAXA da própria OBZ (custo OBZ ÷ KM da OBZ), não o KM que você digita → bate com o KPI orçado
-  const orc=meses.map(m=>{if(!ORCKPI||!orcTypes.length)return null;const reg=regiaoOBZ(loc);const o=ORCKPI[reg]&&ORCKPI[reg][m];if(!o||!o.km)return null;return orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC/o.km;});
+  const orc=meses.map(m=>{const kmO=kmGet(loc,m,'kmOrc');if(!ORCKPI||!orcTypes.length||!kmO)return null;const reg=regiaoOBZ(loc);const o=ORCKPI[reg]&&ORCKPI[reg][m];if(!o)return null;return orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC/kmO;});
   const dif=meses.map((m,i)=>(real[i]!=null&&orc[i]!=null)?real[i]-orc[i]:null);
   return {real,orc,dif};
 }
@@ -677,7 +678,7 @@ function renderOpsCalc(){
   opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcTypes,fPC),tipo);
   opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcTypes,fPC),tipo);
   document.getElementById('opsTag').textContent=GRUPO_NOME[cat]+' · R$/km por região';
-  const agg=loc=>{let c=0,kmR=0,cOrc=0,kmO=0;meses.forEach(m=>{const km=kmGet(loc,m,'km');if(km){c+=costReal[loc+'|'+m]||0;kmR+=km;}if(ORCKPI&&orcTypes.length){const o=ORCKPI[regiaoOBZ(loc)]&&ORCKPI[regiaoOBZ(loc)][m];if(o&&o.km){cOrc+=orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC;kmO+=o.km;}}});return{c,kmR,cOrc,kmO};};
+  const agg=loc=>{let c=0,kmR=0,cOrc=0,kmO=0;meses.forEach(m=>{const km=kmGet(loc,m,'km');if(km){c+=costReal[loc+'|'+m]||0;kmR+=km;}const kmo=kmGet(loc,m,'kmOrc');if(kmo&&ORCKPI&&orcTypes.length){const o=ORCKPI[regiaoOBZ(loc)]&&ORCKPI[regiaoOBZ(loc)][m];if(o){cOrc+=orcTypes.reduce((s,t)=>s+(o.custo[t]||0),0)*fPC;kmO+=kmo;}}});return{c,kmR,cOrc,kmO};};
   const A=agg('Amazonas'),M=agg('Maranhão');
   const cR=A.c+M.c,kR=A.kmR+M.kmR,cO=A.cOrc+M.cOrc,kO=A.kmO+M.kmO;
   const rkmR=kR?cR/kR:0,rkmO=kO?cO/kO:0;
