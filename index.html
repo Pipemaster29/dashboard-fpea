@@ -83,6 +83,14 @@
   @media(max-width:700px){.card h3{padding-right:0;padding-top:30px}}
   .card .wrap{position:relative;height:320px}
   @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .kpipage{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .kpipage .colhead{background:linear-gradient(90deg,#02585C,#00A0A8);color:#fff;border-radius:10px;text-align:center;font-weight:700;font-size:15px;padding:9px 6px}
+  .kpipage .colhead .small{color:rgba(255,255,255,.85)}
+  .kpipage .cell{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .kpipage .cell h4{font-size:12.5px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .kpipage .cell h4 .small{margin-left:auto}
+  .kpipage .wrapk{position:relative;height:200px}
+  @media(max-width:900px){.kpipage{grid-template-columns:1fr}}
   .execgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px;margin-bottom:10px}
   .execard h3{display:flex;align-items:center;gap:8px;padding-right:0!important}
   .execard h3 .farol{margin-left:auto;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--panel2);border:1px solid var(--line)}
@@ -219,6 +227,10 @@
       <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOpsAM','Amazonas R$ por km')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOpsAM','Amazonas R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsAM','Amazonas R$ por km')">⬇ Excel</button></div><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
       <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOpsMA','Maranhao R$ por km')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOpsMA','Maranhao R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsMA','Maranhao R$ por km')">⬇ Excel</button></div><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
     </div>
+    <div class="card full" style="margin-bottom:24px"><div class="expbar"><button class="xls ppt" onclick="exportarKpiPPT()">📊 PPT</button><button class="xls png" onclick="exportarKpiPNG()">🖼️ Imagem</button></div>
+      <h3>📑 Página KPI — R$/km <span class="small">— Combustível, Manutenção e Pneus × Amazonas e Maranhão (formato do slide do CA)</span></h3>
+      <div class="kpipage" id="kpiPage"></div>
+    </div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem por mês <span class="small">(preencha à mão — realizado e orçado, por região)</span></h3>
     <div class="tablewrap"><table id="tabKm"><thead></thead><tbody></tbody></table></div>
     <div class="note">R$/km realizado = custo SAP da categoria (por região e mês) ÷ KM realizado. R$/km orçado = custo do orçamento ÷ KM orçado. Diferença = realizado − orçado. O KM fica salvo no navegador.</div>
@@ -295,7 +307,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v26 · aba Execução por Área (gestores) · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v27 · Página KPI R$/km (slide do CA) · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -868,6 +880,100 @@ function renderOpsCalc(){
   const pr=document.getElementById('opsResumo');pr.style.display='';
   if(kR)pr.innerHTML=`📌 <b>${GRUPO_NOME[cat]}</b>: R$/km realizado <b>${BRL.format(rkmR)}</b>`+(kO?` vs orçado <b>${BRL.format(rkmO)}</b> (${PCT(rkmO?(rkmR-rkmO)/rkmO*100:0)}).`:` — informe o KM orçado e carregue a OBZ para comparar.`)+recon;
   else pr.innerHTML='✏️ Preencha o KM realizado na tabela abaixo para ver o R$/km por região.'+recon;
+  renderKpiPage();
+}
+
+// ---------- PÁGINA KPI R$/km (formato do slide do CA) ----------
+const KPI_CATS=[['combustivel','⛽','Combustível (Diesel)'],['manutencao','🔧','Manutenção (c/ Lubrificantes)'],['pneus','🛞','Pneus']];
+const MES_ABREV=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const mesCurto=m=>{const p=m.split('/');return p.length===2?MES_ABREV[+p[0]-1]:m;};
+function kpiSeries(cat){ // custo por região|mês da categoria (manutenção inclui lubrificantes), real e orçado
+  const fPC=fatorPisCofins();
+  const inc=new Set(cat==='manutencao'?['manutencao','lubrificantes']:[cat]);
+  const costReal={};DADOS.forEach(d=>{if(inc.has(catDeLinha(d))){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
+  const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+o.valor*fPC;}});
+  return {costReal,orcCost};
+}
+function kpiChart(id,meses,s){
+  destroy(id);
+  const rkm2=v=>v==null?'':v.toFixed(2).replace('.',',');
+  const lblBar=cor=>({display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,anchor:'end',align:'top',color:cor,font:{weight:'700',size:10},formatter:v=>rkm2(v)});
+  const rDif=v=>Math.round(v*100)/100;   // evita "-0,00" e decide a cor pelo valor exibido
+  charts[id]=new Chart(id,{data:{labels:meses.map(mesCurto),datasets:[
+    {type:'bar',label:'Orçado',data:s.orc,backgroundColor:'#02585C',datalabels:lblBar('#6CBDC4')},
+    {type:'bar',label:'Realizado',data:s.real,backgroundColor:'#00A0A8',datalabels:lblBar('#e2e8f0')},
+    {type:'line',label:'Diferença',data:s.dif,borderColor:'#FCB316',backgroundColor:'#FCB316',pointBackgroundColor:'#FCB316',tension:.3,pointRadius:4,
+      datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,align:'bottom',offset:6,
+        color:ctx=>rDif(ctx.dataset.data[ctx.dataIndex])>=0?'#00B050':'#E4562E',
+        backgroundColor:'rgba(15,23,42,.85)',borderColor:ctx=>rDif(ctx.dataset.data[ctx.dataIndex])>=0?'#00B050':'#E4562E',borderWidth:1,borderRadius:5,padding:{top:2,bottom:2,left:5,right:5},
+        font:{weight:'700',size:10},formatter:v=>{if(v==null)return '';const r=rDif(v);return (r>0?'+':'')+rkm2(r);}}}
+  ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20,bottom:4}},
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':BRL.format(c.parsed.y)+'/km')}}},
+    scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',font:{size:10},callback:v=>v.toFixed(2).replace('.',',')}}}}});
+}
+function renderKpiPage(){
+  const el=document.getElementById('kpiPage'); if(!el) return;
+  if(!DADOS.length){ el.innerHTML=''; return; }
+  const meses=opsMeses();
+  let html='<div class="colhead">Amazonas <span class="small">(Custo R$ p/km)</span></div><div class="colhead">Maranhão <span class="small">(Custo R$ p/km)</span></div>';
+  KPI_CATS.forEach(([cat,ico,nome])=>{ ['Amazonas','Maranhão'].forEach(loc=>{
+    html+=`<div class="cell"><h4>${ico} ${nome} <span class="small">Orçado × Real × Dif.</span></h4><div class="wrapk"><canvas id="kpi_${cat}_${loc==='Amazonas'?'AM':'MA'}"></canvas></div></div>`; }); });
+  el.innerHTML=html;
+  KPI_CATS.forEach(([cat])=>{ const {costReal,orcCost}=kpiSeries(cat);
+    ['Amazonas','Maranhão'].forEach(loc=>{ kpiChart('kpi_'+cat+'_'+(loc==='Amazonas'?'AM':'MA'),meses,opsSerie(loc,meses,costReal,orcCost)); }); });
+}
+// imagem única da página KPI (título + 6 gráficos compostos num canvas só)
+function exportarKpiPNG(){
+  const meses=opsMeses(); if(!DADOS.length){ alert('Carregue as bases primeiro.'); return; }
+  const cw=760,chh=300,pad=16,headH=64,rowT=34;
+  const cv=document.createElement('canvas'); cv.width=cw*2+pad*3; cv.height=headH+3*(chh+rowT)+pad*2;
+  const cx=cv.getContext('2d'); cx.fillStyle='#0f172a'; cx.fillRect(0,0,cv.width,cv.height);
+  cx.fillStyle='#e2e8f0'; cx.font='700 26px Segoe UI,Arial'; cx.textAlign='left';
+  cx.fillText('KPIs — Orçamento · R$/km · '+(meses.length?mesCurto(meses[0])+'–'+mesCurto(meses[meses.length-1]):''),pad,38);
+  const colX=[pad,cw+pad*2];
+  cx.font='700 20px Segoe UI,Arial'; cx.textAlign='center';
+  cx.fillStyle='#00A0A8'; cx.fillText('AMAZONAS',colX[0]+cw/2,headH-6); cx.fillText('MARANHÃO',colX[1]+cw/2,headH-6);
+  KPI_CATS.forEach(([cat,ico,nome],r)=>{
+    const y=headH+r*(chh+rowT);
+    cx.fillStyle='#e2e8f0'; cx.font='700 16px Segoe UI,Arial'; cx.textAlign='left'; cx.fillText(ico+' '+nome,pad,y+20);
+    ['AM','MA'].forEach((suf,c)=>{ const ch=charts['kpi_'+cat+'_'+suf]; if(!ch) return;
+      cx.drawImage(ch.canvas,colX[c],y+rowT-6,cw,chh-6); });
+  });
+  const a=document.createElement('a'); a.href=cv.toDataURL('image/png');
+  a.download='KPIs_R_km_'+new Date().toISOString().slice(0,10)+'.png'; a.click();
+}
+// PPT: um slide com os 6 gráficos NATIVOS editáveis (3 categorias × 2 operações)
+function exportarKpiPPT(){
+  if(typeof PptxGenJS==='undefined'){ alert('A biblioteca de PowerPoint não carregou (precisa de internet).'); return; }
+  if(!DADOS.length){ alert('Carregue as bases primeiro.'); return; }
+  const meses=opsMeses(), lbl=meses.map(mesCurto);
+  const pptx=new PptxGenJS(); pptx.defineLayout({name:'W169',width:10,height:5.63}); pptx.layout='W169';
+  const s=pptx.addSlide(); s.background={color:'FFFFFF'};
+  s.addText('KPIs — Orçamento · R$/km',{x:0.3,y:0.12,w:5.5,h:0.42,fontSize:19,bold:true,color:'02585C'});
+  s.addShape(pptx.ShapeType.roundRect,{x:1.55,y:0.62,w:3.9,h:0.34,fill:{color:'02585C'},rectRadius:0.08});
+  s.addText('Amazonas (Custo R$ p/km)',{x:1.55,y:0.62,w:3.9,h:0.34,fontSize:12,bold:true,color:'FFFFFF',align:'center'});
+  s.addShape(pptx.ShapeType.roundRect,{x:5.85,y:0.62,w:3.9,h:0.34,fill:{color:'02585C'},rectRadius:0.08});
+  s.addText('Maranhão (Custo R$ p/km)',{x:5.85,y:0.62,w:3.9,h:0.34,fontSize:12,bold:true,color:'FFFFFF',align:'center'});
+  const nomes={combustivel:'Combustível\n(Diesel)',manutencao:'Manutenção\n(c/ Lubrif.)',pneus:'Pneus'};
+  KPI_CATS.forEach(([cat],r)=>{
+    const {costReal,orcCost}=kpiSeries(cat);
+    const y=1.05+r*1.52;
+    s.addText(nomes[cat],{x:0.15,y:y+0.35,w:1.35,h:0.8,fontSize:11,bold:true,color:'02585C',align:'center'});
+    ['Amazonas','Maranhão'].forEach((loc,c)=>{
+      const sr=opsSerie(loc,meses,costReal,orcCost);
+      const clean=a=>a.map(v=>v==null?null:Math.round(v*100)/100);
+      const combo=[
+        {type:pptx.ChartType.bar,data:[{name:'Orçado',labels:lbl,values:clean(sr.orc)},{name:'Realizado',labels:lbl,values:clean(sr.real)}],options:{chartColors:['02585C','00A0A8']}},
+        {type:pptx.ChartType.line,data:[{name:'Diferença',labels:lbl,values:clean(sr.dif)}],options:{chartColors:['FCB316'],secondaryValAxis:true,secondaryCatAxis:true}}
+      ];
+      s.addChart(combo,{x:1.55+c*4.3,y,w:3.9,h:1.48,showLegend:r===0,legendPos:'t',legendFontSize:8,legendColor:'404040',
+        catAxisLabelColor:'575757',catAxisLabelFontSize:8,dataBorder:{pt:0,color:'FFFFFF'},
+        valAxes:[{valAxisLabelColor:'575757',valAxisLabelFontSize:8},{valAxisHidden:true,valAxisLabelFontSize:8,valAxisLabelColor:'FCB316'}],
+        catAxes:[{catAxisLabelColor:'575757',catAxisLabelFontSize:8},{catAxisHidden:true}]});
+    });
+  });
+  s.addText('Orçado (barra escura) · Realizado (barra clara) · Diferença = realizado − orçado (linha âmbar, eixo oculto)',{x:0.3,y:5.28,w:9.4,h:0.3,fontSize:9,color:'575757'});
+  pptx.writeFile({fileName:'KPIs_R_km_'+new Date().toISOString().slice(0,10)+'.pptx'});
 }
 
 // ---------- PARETO & GARGALOS ----------
