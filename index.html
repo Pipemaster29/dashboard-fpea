@@ -83,6 +83,18 @@
   @media(max-width:700px){.card h3{padding-right:0;padding-top:30px}}
   .card .wrap{position:relative;height:320px}
   @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .execgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px;margin-bottom:10px}
+  .execard h3{display:flex;align-items:center;gap:8px;padding-right:0!important}
+  .execard h3 .farol{margin-left:auto;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--panel2);border:1px solid var(--line)}
+  .execard .farol.ok{color:var(--good);border-color:var(--good)}
+  .execard .farol.warn{color:var(--warn);border-color:var(--warn)}
+  .execard .farol.bad{color:var(--bad);border-color:var(--bad)}
+  .execard .blbl{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:8px}
+  .execard .bar{height:9px;background:var(--panel2);border-radius:6px;overflow:hidden;margin-top:4px}
+  .execard .bar i{display:block;height:100%;border-radius:6px;background:var(--accent);transition:width .5s var(--ease-out)}
+  .execard .furos{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px;margin-top:14px;line-height:1.75}
+  .execard .furos b{color:var(--txt)}
+  .execard .gbtn{margin-top:12px;width:100%}
   .tablecard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:24px}
   .tablecard h3{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
   .tablewrap{overflow:auto;max-height:460px;border-radius:8px}
@@ -137,6 +149,7 @@
   <!-- ABAS DE NAVEGAÇÃO -->
   <nav id="tabs" class="tabs hidden">
     <button class="tabbtn" data-t="ovr" onclick="showTab('ovr')">🎯 Orçado vs Real</button>
+    <button class="tabbtn" data-t="exec" onclick="showTab('exec')">📋 Execução por Área</button>
     <button class="tabbtn" data-t="ops" onclick="showTab('ops')">🚚 Operações & R$/KM</button>
     <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')">🔎 Pareto & Gargalos</button>
     <button class="tabbtn" data-t="dash" onclick="showTab('dash')">📈 Análise de Custos</button>
@@ -169,6 +182,16 @@
     </div>
     <div class="tablewrap"><table id="tabOVR"><thead></thead><tbody></tbody></table></div>
     <div class="note" id="ovrNote"></div>
+  </div>
+
+  <!-- EXECUÇÃO POR ÁREA (relatório p/ gestores) -->
+  <div id="exec" class="ovrbox hidden">
+    <div class="sectitle">📋 Execução Orçamentária por Área <span class="tag">quanto do orçamento cada área já usou — pronto p/ enviar ao gestor</span></div>
+    <div class="resumo" id="execResumo"></div>
+    <div class="tablewrap" style="margin-bottom:22px"><table id="tabExec"><thead></thead><tbody></tbody></table></div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn-ghost" onclick="exportarExecGeral()" title="Um Excel com o resumo geral + uma aba por área com o mês a mês e os maiores fornecedores.">⬇ Excel geral (todas as áreas)</button></div>
+    <div class="execgrid" id="execCards"></div>
+    <div class="note">Execução do período = realizado ÷ orçado dos meses já realizados. Consumo do ano = realizado ÷ orçado do ano inteiro (quanto do orçamento anual já foi queimado). Farol: 🟢 até 95% · 🟡 95–105% · 🔴 acima de 105%. O Excel de cada área traz mês a mês, maiores fornecedores e todos os lançamentos.</div>
   </div>
 
   <!-- OPERAÇÕES & R$/KM -->
@@ -272,7 +295,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v25 · revisão geral + fix rótulos de eixo · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v26 · aba Execução por Área (gestores) · 07/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -292,20 +315,20 @@ try{ if(window.ChartDataLabels){ Chart.register(window.ChartDataLabels); Chart.d
 // ---------- ABAS ----------
 let activeTab=localStorage.getItem('activeTab')||'ovr';
 let _has={ovr:false};
-function tabHasContent(id){ if(id==='ovr') return _has.ovr; return DADOS.length>0; }
+function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; return DADOS.length>0; }
 function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs();
   const el=document.getElementById(t); if(el){ el.classList.remove('tab-enter'); void el.offsetWidth; el.classList.add('tab-enter'); } }
 function applyTabs(){
   const nav=document.getElementById('tabs');
   const temDados=DADOS.length||ORCAMENTO.length||ORCKPI;
-  const avail=['ovr','ops','pareto','dash'].filter(tabHasContent);
+  const avail=['ovr','exec','ops','pareto','dash'].filter(tabHasContent);
   nav.classList.toggle('hidden', !temDados || !avail.length);
   if(!avail.includes(activeTab)) activeTab=avail[0]||'ovr';
   document.querySelectorAll('#tabs .tabbtn').forEach(b=>{
     b.style.display=avail.includes(b.dataset.t)?'':'none';
     b.classList.toggle('active', b.dataset.t===activeTab);
   });
-  ['ovr','ops','pareto','dash'].forEach(id=>{
+  ['ovr','exec','ops','pareto','dash'].forEach(id=>{
     document.getElementById(id).classList.toggle('hidden', !(id===activeTab && avail.includes(id)));
   });
 }
@@ -550,7 +573,7 @@ function atualizarUI(){
   if(!DADOS.length&&ORCAMENTO.length) badge.push('— carregue o realizado (KSB1) para ver o Orçado vs Real');
   document.getElementById('fileBadge').textContent=badge.join(' · ')||'nenhum arquivo carregado';
   if(DADOS.length){ montarFiltros(); render(); }
-  montarEscopoOVR(); renderOVR(); renderOps(); renderParetoTab();
+  montarEscopoOVR(); renderOVR(); renderOps(); renderParetoTab(); renderExec();
   applyTabs();
 }
 
@@ -966,7 +989,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharDrill(); });
 
 // ---------- ORÇADO vs REAL ----------
 function fatorPisCofins(){ const el=document.getElementById('pisCofins'); return (el&&el.checked)?(1-0.0925):1; }
-function recalcOrc(){ if(ORCAMENTO.length) renderOVR(); if(DADOS.length){ renderOpsCalc(); renderParetoTab(); } }
+function recalcOrc(){ if(ORCAMENTO.length) renderOVR(); if(DADOS.length){ renderOpsCalc(); renderParetoTab(); renderExec(); } }
 function montarEscopoOVR(){
   if(!ORCAMENTO.length) return;
   const tipos=uniq(ORCAMENTO.map(o=>o.tipo)).filter(Boolean).sort();
@@ -1040,6 +1063,102 @@ function renderOVR(){
             : `O escopo "${tipo}" não tem realizado na base atual (só Custos Variáveis foi carregado).`);
   renderWaterfall();
   applyTabs();
+}
+
+// ---------- EXECUÇÃO POR ÁREA (relatório p/ gestores) ----------
+const EXEC_ICO={combustivel:'⛽',manutencao:'🔧',pneus:'🛞',lubrificantes:'🛢️',transporte:'🚚',outros:'📦'};
+let EXEC_LAST=null;   // {A, mesesReal, keys} da última renderização, para os exports
+function execDados(){
+  const fPC=fatorPisCofins();
+  const mesesReal=uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
+  const setReal=new Set(mesesReal);
+  const A={};
+  const mk=k=>A[k]||(A[k]={real:0,orcPer:0,orcAno:0,realMes:{},orcMes:{},forn:{}});
+  DADOS.forEach(d=>{ const a=mk(catDeLinha(d)+'|'+d.loc);
+    a.real+=d.valor; a.realMes[d.mes]=(a.realMes[d.mes]||0)+d.valor; a.forn[d.forn]=(a.forn[d.forn]||0)+d.valor; });
+  ORCAMENTO.forEach(o=>{ if(!/variav/.test(norm(o.tipo))) return; const a=mk(o.cat+'|'+o.regiao); const v=o.valor*fPC;
+    a.orcAno+=v; a.orcMes[o.mes]=(a.orcMes[o.mes]||0)+v; if(setReal.has(o.mes)) a.orcPer+=v; });
+  return {A,mesesReal};
+}
+function execFarol(p){
+  if(p==null) return {ico:'⚪',cls:'',txt:'sem orçado'};
+  if(p<=95)  return {ico:'🟢',cls:'ok',txt:'dentro do orçado'};
+  if(p<=105) return {ico:'🟡',cls:'warn',txt:'no limite'};
+  return {ico:'🔴',cls:'bad',txt:'estourado'};
+}
+const execNome=k=>{const [c,l]=k.split('|');return (GRUPO_NOME[c]||c)+' · '+l;};
+function renderExec(){
+  if(!DADOS.length||!ORCAMENTO.length){ EXEC_LAST=null; return; }
+  const {A,mesesReal}=execDados();
+  const keys=Object.keys(A).filter(k=>A[k].real>0.005||A[k].orcAno>0.005).sort((a,b)=>A[b].real-A[a].real);
+  EXEC_LAST={A,mesesReal,keys};
+  const pct=(r,o)=>o>0?r/o*100:null;
+  // resumo do topo: total e áreas estouradas
+  const totR=keys.reduce((s,k)=>s+A[k].real,0), totOP=keys.reduce((s,k)=>s+A[k].orcPer,0), totOA=keys.reduce((s,k)=>s+A[k].orcAno,0);
+  const estouradas=keys.filter(k=>{const p=pct(A[k].real,A[k].orcPer);return p!=null&&p>105;}).map(execNome);
+  document.getElementById('execResumo').innerHTML=
+    `📌 Período <b>${mesesReal[0]||'—'}–${mesesReal[mesesReal.length-1]||'—'}</b>: realizado <b>${BRL.format(totR)}</b> vs orçado do período <b>${BRL.format(totOP)}</b> `+
+    `(execução <b>${totOP?(totR/totOP*100).toFixed(0):'—'}%</b>). Do orçamento anual (<b>${BRL.format(totOA)}</b>), já foram consumidos <b>${totOA?(totR/totOA*100).toFixed(0):'—'}%</b>.`+
+    (estouradas.length?`<br>🚨 Estourados no período: <b>${estouradas.join('</b> · <b>')}</b>.`:' ✅ Nenhuma área estourada no período.');
+  // tabela geral
+  document.querySelector('#tabExec thead').innerHTML='<tr><th class="txt">Área (gestor)</th><th>Orç. período</th><th>Realizado</th><th>Execução</th><th class="txt">Farol</th><th>Orç. ano</th><th>Consumo do ano</th><th>Saldo do ano</th></tr>';
+  document.querySelector('#tabExec tbody').innerHTML=keys.map(k=>{
+    const a=A[k],pe=pct(a.real,a.orcPer),pa=pct(a.real,a.orcAno),f=execFarol(pe);
+    const saldo=a.orcAno-a.real,cls=pe!=null&&pe>105?'pos':(pe!=null&&pe<=95?'neg':'');
+    return `<tr><td class="txt">${EXEC_ICO[k.split('|')[0]]||''} ${execNome(k)}</td><td>${BRL.format(a.orcPer)}</td><td><b>${BRL.format(a.real)}</b></td>`+
+      `<td class="${cls}">${pe==null?'—':pe.toFixed(0)+'%'}</td><td class="txt">${f.ico} ${f.txt}</td>`+
+      `<td>${BRL.format(a.orcAno)}</td><td>${pa==null?'—':pa.toFixed(0)+'%'}</td><td class="${saldo<0?'pos':''}">${BRL.format(saldo)}</td></tr>`;
+  }).join('');
+  // cards por área
+  document.getElementById('execCards').innerHTML=keys.map((k,i)=>{
+    const a=A[k],pe=pct(a.real,a.orcPer),pa=pct(a.real,a.orcAno),f=execFarol(pe);
+    const corBar=p=>p==null?'var(--line)':(p<=95?'var(--good)':(p<=105?'var(--warn)':'var(--bad)'));
+    // furos: pior mês (maior Δ acima do orçado) + top 3 fornecedores
+    let pior=null;
+    mesesReal.forEach(m=>{ const d=(a.realMes[m]||0)-(a.orcMes[m]||0); if(a.orcMes[m]&&(!pior||d>pior.d)) pior={m,d}; });
+    const topF=Object.entries(a.forn).sort((x,y)=>y[1]-x[1]).slice(0,3);
+    const furos=(pior&&pior.d>0?`Pior mês: <b>${pior.m}</b> (${BRL.format(pior.d)} acima do orçado).<br>`:'')+
+      (topF.length?`Maiores custos: ${topF.map(([n,v])=>`<b>${String(n).slice(0,22)}</b> (${kBRL(v)})`).join(' · ')}`:'');
+    return `<div class="card execard"><h3>${EXEC_ICO[k.split('|')[0]]||''} ${execNome(k)} <span class="farol ${f.cls}">${f.ico} ${f.txt}</span></h3>`+
+      `<div class="blbl"><span>Execução do período (real ÷ orçado ${mesesReal.length} ${mesesReal.length===1?'mês':'meses'})</span><b style="color:${corBar(pe)}">${pe==null?'—':pe.toFixed(0)+'%'}</b></div>`+
+      `<div class="bar"><i style="width:${pe==null?0:Math.min(pe,100)}%;background:${corBar(pe)}"></i></div>`+
+      `<div class="blbl"><span>Consumo do orçamento anual</span><b>${pa==null?'—':pa.toFixed(0)+'%'}</b></div>`+
+      `<div class="bar"><i style="width:${pa==null?0:Math.min(pa,100)}%;background:${corBar(pa==null?null:Math.min(pa,94))}"></i></div>`+
+      `<div class="blbl"><span>${BRL.format(a.real)} usados</span><span>saldo do ano ${BRL.format(a.orcAno-a.real)}</span></div>`+
+      (furos?`<div class="furos">${furos}</div>`:'')+
+      `<button class="btn-ghost gbtn" onclick="exportarExecArea(${i})" title="Excel com resumo mês a mês, maiores fornecedores e todos os lançamentos desta área — pronto para enviar ao gestor.">⬇ Excel do gestor</button></div>`;
+  }).join('');
+}
+function execAbaArea(k){
+  const {A,mesesReal}=EXEC_LAST; const a=A[k];
+  const aoa=[['Área',execNome(k)],[],['Mês','Orçado (R$)','Realizado (R$)','Δ (R$)','Execução %']];
+  mesesReal.forEach(m=>{ const o=a.orcMes[m]||0,r=a.realMes[m]||0;
+    aoa.push([m,o,r,r-o,o?Math.round(r/o*10000)/100:'']); });
+  aoa.push(['TOTAL PERÍODO',a.orcPer,a.real,a.real-a.orcPer,a.orcPer?Math.round(a.real/a.orcPer*10000)/100:'']);
+  aoa.push(['ORÇADO ANO',a.orcAno,'','','']);
+  aoa.push(['SALDO DO ANO',a.orcAno-a.real,'','','']);
+  aoa.push([],['Maiores fornecedores / itens','Valor (R$)']);
+  Object.entries(a.forn).sort((x,y)=>y[1]-x[1]).slice(0,10).forEach(([n,v])=>aoa.push([n,v]));
+  return aoa;
+}
+function exportarExecArea(i){
+  if(!EXEC_LAST){ alert('Carregue as bases primeiro.'); return; }
+  const k=EXEC_LAST.keys[i]; if(!k) return;
+  const [cat,loc]=k.split('|');
+  const h=['Mês','Localidade','Centro de custo','Classe de custo','Fornecedor','Material/Serviço','Objeto','Valor (R$)'];
+  const lan=DADOS.filter(d=>catDeLinha(d)===cat&&d.loc===loc).sort((x,y)=>y.valor-x.valor)
+    .map(d=>[d.mes,d.loc,d.centro||'',d.classe||'',d.forn||'',(d.material||''),(d.objeto||''),d.valor]);
+  baixarXlsx('Gestor_'+execNome(k),[{nome:'Resumo',aoa:execAbaArea(k)},{nome:'Lançamentos',aoa:[h,...lan]}]);
+}
+function exportarExecGeral(){
+  if(!EXEC_LAST){ alert('Carregue as bases primeiro.'); return; }
+  const {A,keys}=EXEC_LAST;
+  const g=[['Área','Orçado período (R$)','Realizado (R$)','Execução %','Orçado ano (R$)','Consumo ano %','Saldo do ano (R$)']];
+  keys.forEach(k=>{ const a=A[k];
+    g.push([execNome(k),a.orcPer,a.real,a.orcPer?Math.round(a.real/a.orcPer*10000)/100:'',a.orcAno,a.orcAno?Math.round(a.real/a.orcAno*10000)/100:'',a.orcAno-a.real]); });
+  const abas=[{nome:'Resumo Geral',aoa:g}];
+  keys.forEach(k=>abas.push({nome:execNome(k).slice(0,31),aoa:execAbaArea(k)}));
+  baixarXlsx('Execucao_por_Area',abas);
 }
 
 // ---------- CASCATA (waterfall) Orçado → Real, Custos Variáveis ----------
@@ -1126,10 +1245,7 @@ function exportarWaterfall(){
 
 function limpar(){
   DADOS=[];ORCAMENTO=[];ORCKPI=null;_has.ovr=false;Object.keys(charts).forEach(destroy);
-  document.getElementById('dash').classList.add('hidden');
-  document.getElementById('ovr').classList.add('hidden');
-  document.getElementById('ops').classList.add('hidden');
-  document.getElementById('tabs').classList.add('hidden');
+  ['dash','ovr','exec','ops','pareto','tabs'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('drop').classList.remove('hidden');
   document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
 }
