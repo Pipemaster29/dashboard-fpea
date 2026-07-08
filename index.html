@@ -179,8 +179,12 @@
     <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOVR','Orcado vs Real por mes')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOVR','Orcado vs Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button></div><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarWaterfallPPT()">📊 PPT</button><button class="xls png" onclick="exportarWaterfallPNG()">🖼️ Imagem</button><button class="xls" onclick="exportarWaterfall()">⬇ Excel</button></div>
-        <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Cascata Orçado → Real <span class="small">— Custos Variáveis (ponte por categoria, acumulado do período)</span>
-          <select id="wfLoc" onchange="renderWaterfall()" style="margin-left:auto;min-width:150px">
+        <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Cascata Orçado → Real <span class="small">— ponte por categoria + Não Recorrente (lançamentos "a mão" ficam de fora)</span>
+          <select id="wfNat" onchange="renderWaterfall()" style="margin-left:auto;min-width:140px">
+            <option value="variavel">Custos Variáveis</option>
+            <option value="fixo">Custos Fixos</option>
+          </select>
+          <select id="wfLoc" onchange="renderWaterfall()" style="min-width:150px">
             <option value="">Geral (AM + MA)</option>
             <option value="Amazonas">Amazonas</option>
             <option value="Maranhão">Maranhão</option>
@@ -307,7 +311,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v27 · Página KPI R$/km (slide do CA) · 07/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v28 · Custos Fixos (Pessoal + O&M) + NR/a mão · 08/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -372,7 +376,12 @@ function mesDe(v){
   return s||'—';
 }
 const mesOrd=m=>{const p=m.split('/');return p.length===2?+p[1]*100+ +p[0]:999999;};
-function origemDe(nome){const n=norm(nome);if(n.includes('servic'))return'Serviços';if(n.includes('material')||n.includes('materiais'))return'Materiais';return nome.replace(/\.(xlsx|xls|csv)$/i,'');}
+function origemDe(nome){const n=norm(nome);
+  if(n.includes('pessoal')||n.includes('folha'))return'Pessoal (Folha)';
+  if(/(^|[^a-z])cf([^a-z]|$)|custo.?fixo/.test(n))return'CF O&M';
+  if(n.includes('servic'))return'Serviços';
+  if(n.includes('material')||n.includes('materiais'))return'Materiais';
+  return nome.replace(/\.(xlsx|xls|csv)$/i,'');}
 // operação dividida em 2 regiões: Amazonas (centro de custo terminando em A) e Maranhão (demais)
 function localidadeDe(cc){const m=String(cc||'').match(/([A-Za-z])(?=[^A-Za-z]*$)/);if(!m)return'Maranhão';return m[1].toUpperCase()==='A'?'Amazonas':'Maranhão';}
 
@@ -501,7 +510,8 @@ function parseOrcamento(aoa){
     const cc=iCC2>=0?String(row[iCC2]||''):'';
     const descrLinha=iDescr>=0?String(row[iDescr]||''):'';
     const regiao=localidadeDe(cc);                                   // Amazonas / Maranhão pela letra do CC
-    const cat=classificarCusto(descrLinha+' '+nome, nome);           // mesma categorização do realizado
+    const nt=norm(tipo);   // o Tipo do orçamento já separa: "Custos Fixos - Pessoal" × "Custos Fixos - O&M"
+    const cat=/fix/.test(nt)?(/pessoal/.test(nt)?'pessoal':'om_fixo'):classificarCusto(descrLinha+' '+nome, nome);
     meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,mes,classeCod:cod,classeNome:nome,valor:v,regiao,cat}); });
   }
   return out;
@@ -525,12 +535,18 @@ function mapear(json,nome){
     const objeto=(kObjeto?String(row[kObjeto]):'')||'—';
     // categoria definida pelo texto (pneu, combustível, manutenção) — ver classificarCusto
     const blob=[material, kDescr?row[kDescr]:'', kPedido?row[kPedido]:'', objeto].join(' ');
+    const centro=kCentro?String(row[kCentro]):'—';
+    const nat=/m80of/i.test(centro)?'fixo':'variavel';   // centro M80OF* = custo fixo · M80OV* = variável
+    const nb=norm(blob);
     return {
       valor:num(row[kVal]),
-      classe, centro:kCentro?String(row[kCentro]):'—', objeto,
+      classe, centro, objeto,
       mes:mesDe(kData?row[kData]:''),
       material: material || (kDescr?String(row[kDescr]):''),
-      cat: classificarCusto(blob, classe),
+      nat,
+      nr:/nao recorrente/.test(nb)||undefined,                                        // marcado como não recorrente
+      mao:/lancad[oa] a mao|lancamento a mao|adicionado a mao/.test(nb)||undefined,   // lançamento manual p/ zerar os NR
+      cat: nat==='fixo'?classificarCustoFixo(classe):classificarCusto(blob, classe),
       forn: fornecedorDe(material, kDescr?String(row[kDescr]):'', kPedido?String(row[kPedido]):'', objeto),
       loc:localidadeDe(kCentro?row[kCentro]:''),
       origem
@@ -573,6 +589,15 @@ function classificarCusto(texto, classe){
      return 'manutencao';
   return 'outros';
 }
+
+// custo FIXO: separa Pessoal (folha) de O&M fixo pela classe de custo
+function classificarCustoFixo(classe){
+  const c=norm(classe);
+  if(/salari|ordenado|inss|fgts|feria|decimo|13o|hora extra|adicion|auxilio|alimentac|assistencia med|transporte de func|rescis|indeniz|estagi|previdenc|pericul|insalubr|sobreavis|noturn|premio|bonus|plr|encargo|folha|gratificac|vale.?transporte|vale.?refeic|seguro de vida|plano de saude|treinament/.test(c)) return 'pessoal';
+  return 'om_fixo';
+}
+// bases antigas (salvas na nuvem antes do custo fixo) não têm o campo — eram todas variáveis
+function natDe(d){ return d.nat||'variavel'; }
 
 function atualizarUI(){
   const temDados=DADOS.length||ORCAMENTO.length||ORCKPI;
@@ -704,8 +729,8 @@ function exportarBases(){
   if(!DADOS.length&&!ORCAMENTO.length){ alert('Nenhuma base carregada.'); return; }
   const abas=[];
   if(DADOS.length){
-    const h=['Mês','Localidade','Centro de custo','Classe de custo','Categoria','Fornecedor','Material/Objeto','Origem','Valor (R$)'];
-    const rows=DADOS.map(d=>[d.mes,d.loc,d.centro||'',d.classe||'',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.forn||'',(d.material||d.objeto||''),d.origem||'',d.valor]);
+    const h=['Mês','Localidade','Centro de custo','Classe de custo','Natureza','Categoria','Obs','Fornecedor','Material/Objeto','Origem','Valor (R$)'];
+    const rows=DADOS.map(d=>[d.mes,d.loc,d.centro||'',d.classe||'',natDe(d)==='fixo'?'Fixo':'Variável',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.forn||'',(d.material||d.objeto||''),d.origem||'',d.valor]);
     abas.push({nome:'Realizado (KSB1)',aoa:[h,...rows]});
   }
   if(ORCAMENTO.length){
@@ -977,12 +1002,12 @@ function exportarKpiPPT(){
 }
 
 // ---------- PARETO & GARGALOS ----------
-const GRUPO_NOME={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus',lubrificantes:'Lubrificantes',transporte:'Frete/Transporte',outros:'Outros'};
+const GRUPO_NOME={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus',lubrificantes:'Lubrificantes',transporte:'Frete/Transporte',outros:'Outros',pessoal:'Pessoal (Folha)',om_fixo:'O&M Fixo'};
 function catDeLinha(d){return d.cat||classificarCusto((d.material||'')+' '+(d.objeto||''),d.classe);}
-function orcadoGrupoLoc(){ // orçado por grupo x localidade, do ORÇAMENTO consolidado (Custos Variáveis), só meses com realizado
+function orcadoGrupoLoc(){ // orçado por grupo x localidade, do ORÇAMENTO consolidado (variáveis + fixos), só meses com realizado
   const out={}; if(!ORCAMENTO.length) return out; const fPC=fatorPisCofins();
   const mesesReal=new Set(DADOS.map(d=>d.mes));
-  ORCAMENTO.forEach(o=>{ if(!/variav/.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
+  ORCAMENTO.forEach(o=>{ if(!/variav|fix/.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
     out[o.cat]=out[o.cat]||{}; out[o.cat][o.regiao]=(out[o.cat][o.regiao]||0)+o.valor*fPC; });
   return out;
 }
@@ -990,7 +1015,7 @@ function renderParetoTab(){
   if(!DADOS.length) return;
   const real={};DADOS.forEach(d=>{const g=catDeLinha(d);real[g]=real[g]||{Amazonas:0,'Maranhão':0};real[g][d.loc]=(real[g][d.loc]||0)+d.valor;});
   const orc=orcadoGrupoLoc();const temOrc=ORCAMENTO.length>0;
-  const ordem=['combustivel','manutencao','pneus','lubrificantes','transporte','outros'].filter(g=>real[g]);
+  const ordem=['combustivel','manutencao','pneus','lubrificantes','transporte','outros','pessoal','om_fixo'].filter(g=>real[g]);
   const sel=document.getElementById('pareGrupo');const cur=sel.value;
   sel.innerHTML=ordem.map(g=>`<option value="${g}" ${g===cur?'selected':''}>${GRUPO_NOME[g]}</option>`).join('');
   const head=temOrc?['Grupo','Real AM','Real MA','Real Total','Orç AM','Orç MA','Orç Total','Δ R$','Δ %']:['Grupo','Real AM','Real MA','Real Total','% do total'];
@@ -1110,9 +1135,21 @@ function renderOVR(){
   document.getElementById('ovrTag').textContent=tipo||'Orçamento';
   const fPC=fatorPisCofins();
   const bm={}; ORCAMENTO.forEach(o=>{ if(!tipo||o.tipo===tipo) bm[o.mes]=(bm[o.mes]||0)+o.valor*fPC; });
-  // A base de realizado carregada é "Custos Variáveis" — só há realizado para esse escopo
-  const temReal = norm(tipo).includes('variavei');
-  const rm={}; if(temReal) DADOS.forEach(d=>{ rm[d.mes]=(rm[d.mes]||0)+d.valor; });
+  // realizado do escopo: variáveis → M80OV* · fixos O&M → M80OF*+om_fixo · fixos Pessoal → M80OF*+pessoal
+  const nt=norm(tipo);
+  let fReal=null;
+  if(/variav/.test(nt)) fReal=d=>natDe(d)==='variavel';
+  else if(/fix/.test(nt)&&/pessoal/.test(nt)) fReal=d=>natDe(d)==='fixo'&&catDeLinha(d)==='pessoal';
+  else if(/fix/.test(nt)) fReal=d=>natDe(d)==='fixo'&&catDeLinha(d)==='om_fixo';
+  const temReal = !!fReal && DADOS.some(fReal);
+  const rm={}; if(temReal) DADOS.forEach(d=>{ if(fReal(d)) rm[d.mes]=(rm[d.mes]||0)+d.valor; });
+  // folha orçada parece incompleta? (orçado de pessoal muito menor que o realizado)
+  let avisoFolha='';
+  if(/fix/.test(nt)&&/pessoal/.test(nt)&&temReal){
+    const realPes=DADOS.filter(fReal).reduce((s,d)=>s+d.valor,0);
+    const orcPes=ORCAMENTO.filter(o=>o.cat==='pessoal'&&/fix/.test(norm(o.tipo))).reduce((s,o)=>s+o.valor,0);
+    if(orcPes<realPes*0.3) avisoFolha=' ⚠️ O orçamento da folha (Pessoal) parece incompleto nesta base — carregue o orçado completo com as folhas por região quando tiver.';
+  }
   const meses=(temReal?Object.keys(bm).filter(m=>m in rm):Object.keys(bm)).sort((a,b)=>mesOrd(a)-mesOrd(b));
   if(!meses.length){ _has.ovr=false; applyTabs(); return; }
   _has.ovr=true;
@@ -1166,13 +1203,13 @@ function renderOVR(){
   document.getElementById('ovrNote').textContent=
     `Orçado ${fPC<1?'líquido de crédito PIS/Cofins (−9,25%)':'bruto (sem crédito PIS/Cofins)'}. `+
     (temReal? `Comparação no escopo "${tipo}", apenas meses com orçado e realizado. A abertura por conta não é comparada (códigos do orçamento ≠ SAP).`
-            : `O escopo "${tipo}" não tem realizado na base atual (só Custos Variáveis foi carregado).`);
+            : `O escopo "${tipo}" não tem realizado nas bases carregadas.`)+avisoFolha;
   renderWaterfall();
   applyTabs();
 }
 
 // ---------- EXECUÇÃO POR ÁREA (relatório p/ gestores) ----------
-const EXEC_ICO={combustivel:'⛽',manutencao:'🔧',pneus:'🛞',lubrificantes:'🛢️',transporte:'🚚',outros:'📦'};
+const EXEC_ICO={combustivel:'⛽',manutencao:'🔧',pneus:'🛞',lubrificantes:'🛢️',transporte:'🚚',outros:'📦',pessoal:'👥',om_fixo:'🏭'};
 let EXEC_LAST=null;   // {A, mesesReal, keys} da última renderização, para os exports
 function execDados(){
   const fPC=fatorPisCofins();
@@ -1182,7 +1219,7 @@ function execDados(){
   const mk=k=>A[k]||(A[k]={real:0,orcPer:0,orcAno:0,realMes:{},orcMes:{},forn:{}});
   DADOS.forEach(d=>{ const a=mk(catDeLinha(d)+'|'+d.loc);
     a.real+=d.valor; a.realMes[d.mes]=(a.realMes[d.mes]||0)+d.valor; a.forn[d.forn]=(a.forn[d.forn]||0)+d.valor; });
-  ORCAMENTO.forEach(o=>{ if(!/variav/.test(norm(o.tipo))) return; const a=mk(o.cat+'|'+o.regiao); const v=o.valor*fPC;
+  ORCAMENTO.forEach(o=>{ if(!/variav|fix/.test(norm(o.tipo))) return; const a=mk(o.cat+'|'+o.regiao); const v=o.valor*fPC;
     a.orcAno+=v; a.orcMes[o.mes]=(a.orcMes[o.mes]||0)+v; if(setReal.has(o.mes)) a.orcPer+=v; });
   return {A,mesesReal};
 }
@@ -1270,39 +1307,58 @@ function exportarExecGeral(){
 // ---------- CASCATA (waterfall) Orçado → Real, Custos Variáveis ----------
 let WF_LAST=null;   // guarda os dados da última cascata para exportar
 const WF_CATS=['combustivel','manutencao','pneus','lubrificantes','transporte','outros'];
-const WF_NOME={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros'};
+const WF_NOME={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros',pessoal:'Pessoal (Folha)',om_fixo:'O&M Fixo'};
 function wfLocSel(){ return (document.getElementById('wfLoc')||{}).value||''; }   // '' = Geral
-function wfDados(loc){
+function wfNatSel(){ return (document.getElementById('wfNat')||{}).value||'variavel'; }
+const WF_CATS_FIXO=['pessoal','om_fixo'];
+// Regras da cascata: lançamentos "a mão" (que só existem p/ zerar os NR) ficam FORA;
+// os "não recorrentes" saem das categorias e viram um degrau próprio (igual ao slide do CA).
+function wfDados(loc,natSel){
+  natSel=natSel||'variavel';
   const fPC=fatorPisCofins();
-  const mesesReal=new Set(DADOS.filter(d=>!loc||d.loc===loc).map(d=>d.mes));   // meses com realizado da operação
+  const cats=natSel==='fixo'?WF_CATS_FIXO:WF_CATS;
+  const rows=DADOS.filter(d=>natDe(d)===natSel&&(!loc||d.loc===loc));
+  const mesesReal=new Set(rows.map(d=>d.mes));
   const real={},orc={};
-  WF_CATS.forEach(c=>{real[c]=0;orc[c]=0;});
-  DADOS.forEach(d=>{ if(loc&&d.loc!==loc) return; const c=catDeLinha(d); if(real[c]!=null) real[c]+=d.valor;});
-  ORCAMENTO.forEach(o=>{ if(loc&&o.regiao!==loc) return; if(!/variav/.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
+  cats.forEach(c=>{real[c]=0;orc[c]=0;});
+  let nr=0;
+  rows.forEach(d=>{ if(d.mao) return;
+    if(d.nr){ nr+=d.valor; return; }
+    const c=catDeLinha(d); if(real[c]!=null) real[c]+=d.valor; });
+  const reTipo=natSel==='fixo'?/fix/:/variav/;
+  ORCAMENTO.forEach(o=>{ if(loc&&o.regiao!==loc) return; if(!reTipo.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
     if(orc[o.cat]!=null) orc[o.cat]+=o.valor*fPC; });
-  const orcTot=WF_CATS.reduce((s,c)=>s+orc[c],0);
-  const realTot=WF_CATS.reduce((s,c)=>s+real[c],0);
-  return {orc,real,orcTot,realTot};
+  const orcTot=cats.reduce((s,c)=>s+orc[c],0);
+  const realTot=cats.reduce((s,c)=>s+real[c],0)+nr;   // real da cascata = recorrente + NR (sem os "a mão")
+  return {cats,orc,real,nr,orcTot,realTot};
+}
+// monta os degraus da cascata (compartilhado entre gráfico e exports)
+function wfSteps(dd){
+  const steps=[];   // {nome, delta}
+  dd.cats.forEach(c=>{ const d=dd.real[c]-dd.orc[c];
+    if(Math.abs(d)<1 && dd.orc[c]===0 && dd.real[c]===0) return;
+    steps.push({nome:WF_NOME[c],delta:d}); });
+  if(Math.abs(dd.nr)>=1) steps.push({nome:'Não Recorrente',delta:dd.nr});
+  return steps;
 }
 function renderWaterfall(){
   destroy('chWf');
   if(!DADOS.length||!ORCAMENTO.length){ WF_LAST=null; return; }
-  const loc=wfLocSel();
-  const {orc,real,orcTot,realTot}=wfDados(loc);
+  const loc=wfLocSel(), nat=wfNatSel();
+  const dd=wfDados(loc,nat);
   const labels=['Orçado'], barras=[], cores=[], rotulos=[];
-  barras.push([0,orcTot]); cores.push('#02585C'); rotulos.push(orcTot);   // total inicial (teal escuro)
-  let cum=orcTot;
-  WF_CATS.forEach(c=>{
-    const d=real[c]-orc[c]; if(Math.abs(d)<1 && orc[c]===0 && real[c]===0) return;   // pula categoria vazia
-    labels.push(WF_NOME[c]);
-    const lo=Math.min(cum,cum+d), hi=Math.max(cum,cum+d);
+  barras.push([0,dd.orcTot]); cores.push('#02585C'); rotulos.push(dd.orcTot);   // total inicial (teal escuro)
+  let cum=dd.orcTot;
+  wfSteps(dd).forEach(st=>{
+    labels.push(st.nome);
+    const lo=Math.min(cum,cum+st.delta), hi=Math.max(cum,cum+st.delta);
     barras.push([lo,hi]);
-    cores.push(d>0?'#E4562E':'#00B050');   // acima do orçado = laranja (ruim) · abaixo = verde (economia)
-    rotulos.push(d);
-    cum+=d;
+    cores.push(st.delta>0?'#E4562E':'#00B050');   // acima do orçado = laranja (ruim) · abaixo = verde (economia)
+    rotulos.push(st.delta);
+    cum+=st.delta;
   });
-  labels.push('Real'); barras.push([0,realTot]); cores.push('#00A0A8'); rotulos.push(realTot);   // total final (teal)
-  WF_LAST={labels,rotulos:rotulos.slice(),loc};
+  labels.push('Real'); barras.push([0,dd.realTot]); cores.push('#00A0A8'); rotulos.push(dd.realTot);   // total final (teal)
+  WF_LAST={labels,rotulos:rotulos.slice(),loc,nat};
   charts.chWf=new Chart('chWf',{type:'bar',data:{labels,datasets:[{data:barras,backgroundColor:cores,borderWidth:0,borderRadius:2}]},
     options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},
       plugins:{legend:{display:false},
@@ -1316,16 +1372,17 @@ function renderWaterfall(){
 function exportarWaterfallPPT(){
   if(typeof PptxGenJS==='undefined'){ alert('A biblioteca de PowerPoint não carregou (precisa de internet).'); return; }
   if(!DADOS.length||!ORCAMENTO.length){ alert('Cascata ainda não gerada (carregue as bases e abra a aba Orçado vs Real).'); return; }
-  const loc=wfLocSel(), regTxt=loc||'Geral (AM + MA)';
-  const {orc,real,orcTot,realTot}=wfDados(loc);
-  const labels=['Orçado'],base=[0],eco=[0],aci=[0],tot=[orcTot];
-  let cum=orcTot;
-  WF_CATS.forEach(c=>{const d=real[c]-orc[c]; if(Math.abs(d)<1&&orc[c]===0&&real[c]===0) return;
-    labels.push(WF_NOME[c]);
+  const loc=wfLocSel(), nat=wfNatSel(), regTxt=loc||'Geral (AM + MA)';
+  const natTxt=nat==='fixo'?'Custos Fixos':'Custos Variáveis';
+  const dd=wfDados(loc,nat);
+  const labels=['Orçado'],base=[0],eco=[0],aci=[0],tot=[dd.orcTot];
+  let cum=dd.orcTot;
+  wfSteps(dd).forEach(st=>{const d=st.delta;
+    labels.push(st.nome);
     base.push(Math.min(cum,cum+d));
     if(d>0){aci.push(Math.abs(d));eco.push(0);} else {eco.push(Math.abs(d));aci.push(0);}
     tot.push(0); cum+=d;});
-  labels.push('Real'); base.push(0); eco.push(0); aci.push(0); tot.push(realTot);
+  labels.push('Real'); base.push(0); eco.push(0); aci.push(0); tot.push(dd.realTot);
   const data=[
     {name:'Base',labels,values:base},
     {name:'Abaixo do orçado',labels,values:eco},
@@ -1334,19 +1391,20 @@ function exportarWaterfallPPT(){
   ];
   const pptx=new PptxGenJS(); pptx.defineLayout({name:'W169',width:10,height:5.63}); pptx.layout='W169';
   const slide=pptx.addSlide(); slide.background={color:'1E293B'};
-  slide.addText('Cascata Orçado → Real · Custos Variáveis · '+regTxt,{x:0.4,y:0.22,w:9.2,h:0.6,fontSize:20,bold:true,color:'FFFFFF'});
+  slide.addText('Cascata Orçado → Real · '+natTxt+' · '+regTxt,{x:0.4,y:0.22,w:9.2,h:0.6,fontSize:20,bold:true,color:'FFFFFF'});
   slide.addChart(pptx.ChartType.bar,data,{x:0.4,y:0.95,w:9.2,h:4.45,barGrouping:'stacked',
     chartColors:['1E293B','00B050','E4562E','00A0A8'],showLegend:false,showValue:false,
     catAxisLabelColor:'94A3B8',valAxisLabelColor:'94A3B8',valAxisLabelFormatCode:'"R$ "#,##0,"k"',dataBorder:{pt:0,color:'1E293B'}});
-  pptx.writeFile({fileName:('Cascata_Orcado_Real_'+regTxt).replace(/[^\w-]+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.pptx'});
+  pptx.writeFile({fileName:('Cascata_'+natTxt+'_'+regTxt).replace(/[^\w-]+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.pptx'});
 }
-function exportarWaterfallPNG(){ exportarGraficoPNG('chWf','Cascata Orcado x Real '+(wfLocSel()||'Geral')); }
+function exportarWaterfallPNG(){ exportarGraficoPNG('chWf','Cascata '+(wfNatSel()==='fixo'?'Fixos':'Variaveis')+' '+(wfLocSel()||'Geral')); }
 function exportarWaterfall(){
   if(!WF_LAST){ alert('Cascata ainda não gerada (carregue as bases e abra a aba Orçado vs Real).'); return; }
-  const reg=WF_LAST.loc||'Geral';
+  const reg=WF_LAST.loc||'Geral', natTxt=WF_LAST.nat==='fixo'?'Fixos':'Variaveis';
   const aoa=[['Etapa','Valor (R$)','Tipo']];
-  WF_LAST.labels.forEach((l,i)=>{const tot=(i===0||i===WF_LAST.labels.length-1);aoa.push([l,WF_LAST.rotulos[i],tot?'Total':(WF_LAST.rotulos[i]>0?'Acima do orçado':'Abaixo do orçado')]);});
-  baixarXlsx('Cascata_Orcado_Real_'+reg,[{nome:'Cascata',aoa}]);
+  WF_LAST.labels.forEach((l,i)=>{const tot=(i===0||i===WF_LAST.labels.length-1);aoa.push([l,WF_LAST.rotulos[i],tot?'Total':(l==='Não Recorrente'?'Não recorrente':(WF_LAST.rotulos[i]>0?'Acima do orçado':'Abaixo do orçado'))]);});
+  aoa.push([],['Obs.: lançamentos "a mão" (usados só para zerar os não recorrentes) ficam fora da cascata.']);
+  baixarXlsx('Cascata_'+natTxt+'_'+reg,[{nome:'Cascata',aoa}]);
 }
 
 function limpar(){
