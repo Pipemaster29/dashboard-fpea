@@ -330,7 +330,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v29 · Blocos da DRE (fixo) por código de conta · 08/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v30 · Insumo Diesel sempre variável · 08/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -557,9 +557,11 @@ function mapear(json,nome){
     // categoria definida pelo texto (pneu, combustível, manutenção) — ver classificarCusto
     const blob=[material, kDescr?row[kDescr]:'', kPedido?row[kPedido]:'', objeto].join(' ');
     const centro=kCentro?String(row[kCentro]):'—';
-    const nat=/m80of/i.test(centro)?'fixo':'variavel';   // centro M80OF* = custo fixo · M80OV* = variável
-    const nb=norm(blob);
     const ccod=kCod?String(row[kCod]).trim():'';
+    // centro M80OF* = custo fixo · M80OV* = variável · exceção: Insumo Diesel (4024*) é SEMPRE variável/combustível
+    const ehDiesel=ccod.startsWith('4024')||/insumo diesel/.test(norm(classe));
+    const nat=(/m80of/i.test(centro)&&!ehDiesel)?'fixo':'variavel';
+    const nb=norm(blob);
     const bloco=nat==='fixo'?blocoFixoDe(ccod,classe):undefined;   // bloco da DRE (pessoal, serviços, materiais…)
     return {
       valor:num(row[kVal]),
@@ -646,7 +648,12 @@ function blocoPorNome(n){
 function blocoDe(d){ return d.bloco||blocoFixoDe(d.ccod,d.classe); }
 // bases antigas na nuvem: deriva bloco/categoria dos fixos que vieram sem os campos novos
 function migrarDados(){
-  DADOS.forEach(d=>{ if(natDe(d)==='fixo'){ d.bloco=d.bloco||blocoFixoDe(d.ccod,d.classe); d.cat=d.bloco==='pessoal'?'pessoal':'om_fixo'; } });
+  DADOS.forEach(d=>{
+    if(natDe(d)==='fixo'&&(String(d.ccod||'').startsWith('4024')||/insumo diesel/.test(norm(d.classe)))){
+      d.nat='variavel'; d.bloco=undefined; d.cat='combustivel'; return;   // Insumo Diesel em centro fixo → variável/combustível
+    }
+    if(natDe(d)==='fixo'){ d.bloco=d.bloco||blocoFixoDe(d.ccod,d.classe); d.cat=d.bloco==='pessoal'?'pessoal':'om_fixo'; }
+  });
   ORCAMENTO.forEach(o=>{ if(/fix/.test(norm(o.tipo))&&!o.bloco) o.bloco=blocoFixoDe(o.classeCod,o.classeNome); });
 }
 // bases antigas (salvas na nuvem antes do custo fixo) não têm o campo — eram todas variáveis
