@@ -158,6 +158,7 @@
   <nav id="tabs" class="tabs hidden">
     <button class="tabbtn" data-t="ovr" onclick="showTab('ovr')">🎯 Orçado vs Real</button>
     <button class="tabbtn" data-t="exec" onclick="showTab('exec')">📋 Execução por Área</button>
+    <button class="tabbtn" data-t="fixo" onclick="showTab('fixo')">🏢 Custos Fixos (Blocos)</button>
     <button class="tabbtn" data-t="ops" onclick="showTab('ops')">🚚 Operações & R$/KM</button>
     <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')">🔎 Pareto & Gargalos</button>
     <button class="tabbtn" data-t="dash" onclick="showTab('dash')">📈 Análise de Custos</button>
@@ -204,6 +205,24 @@
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn-ghost" onclick="exportarExecGeral()" title="Um Excel com o resumo geral + uma aba por área com o mês a mês e os maiores fornecedores.">⬇ Excel geral (todas as áreas)</button></div>
     <div class="execgrid" id="execCards"></div>
     <div class="note">Execução do período = realizado ÷ orçado dos meses já realizados. Consumo do ano = realizado ÷ orçado do ano inteiro (quanto do orçamento anual já foi queimado). Farol: 🟢 até 95% · 🟡 95–105% · 🔴 acima de 105%. O Excel de cada área traz mês a mês, maiores fornecedores e todos os lançamentos.</div>
+  </div>
+
+  <!-- CUSTOS FIXOS POR BLOCO DA DRE -->
+  <div id="fixo" class="ovrbox hidden">
+    <div class="sectitle">🏢 Custos Fixos por Bloco <span class="tag">divisão da DRE — Pessoal, Serviços, Materiais, Viagens, Seguros, Aluguéis, Outros O&M</span></div>
+    <div class="scope">
+      <label>Localidade</label>
+      <select id="fixoLoc" onchange="renderFixo()"><option value="">Geral (AM + MA)</option><option>Amazonas</option><option>Maranhão</option></select>
+      <span class="small">Real inclui não recorrentes e lançamentos a mão (que se zeram). Clique num bloco para ver os lançamentos.</span>
+      <button class="btn-ghost" style="margin-left:auto" onclick="exportarFixoXls()" title="Excel com o resumo dos blocos + uma aba por bloco com o mês a mês e as maiores contas.">⬇ Excel dos blocos</button>
+    </div>
+    <div class="resumo" id="fixoResumo"></div>
+    <div class="kpis" id="fixoKpis"></div>
+    <div class="grid">
+      <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chBlocos','Custos Fixos por Bloco')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chBlocos','Custos Fixos por Bloco')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chBlocos','Custos Fixos por Bloco')">⬇ Excel</button></div><h3>Orçado × Realizado por bloco <span class="small">(acumulado dos meses realizados)</span></h3><div class="wrap" style="height:340px"><canvas id="chBlocos"></canvas></div></div>
+    </div>
+    <div class="tablewrap"><table id="tabFixo"><thead></thead><tbody></tbody></table></div>
+    <div class="note">Blocos pela divisão de contas da DRE: 4001* = Pessoal · 4007* = Materiais · 4011*/4013010001 = Viagens · 4022010001 = Seguros · contas com "aluguel" no nome = Aluguéis · listas específicas p/ Serviços Prestados e Outros O&M. Orçado = tipos "Custos Fixos" do orçamento, mesmos blocos, meses com realizado, com crédito PIS/Cofins se marcado.</div>
   </div>
 
   <!-- OPERAÇÕES & R$/KM -->
@@ -311,7 +330,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v28 · Custos Fixos (Pessoal + O&M) + NR/a mão · 08/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v29 · Blocos da DRE (fixo) por código de conta · 08/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -331,20 +350,20 @@ try{ if(window.ChartDataLabels){ Chart.register(window.ChartDataLabels); Chart.d
 // ---------- ABAS ----------
 let activeTab=localStorage.getItem('activeTab')||'ovr';
 let _has={ovr:false};
-function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; return DADOS.length>0; }
+function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; if(id==='fixo') return DADOS.some(d=>natDe(d)==='fixo'); return DADOS.length>0; }
 function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs();
   const el=document.getElementById(t); if(el){ el.classList.remove('tab-enter'); void el.offsetWidth; el.classList.add('tab-enter'); } }
 function applyTabs(){
   const nav=document.getElementById('tabs');
   const temDados=DADOS.length||ORCAMENTO.length||ORCKPI;
-  const avail=['ovr','exec','ops','pareto','dash'].filter(tabHasContent);
+  const avail=['ovr','exec','fixo','ops','pareto','dash'].filter(tabHasContent);
   nav.classList.toggle('hidden', !temDados || !avail.length);
   if(!avail.includes(activeTab)) activeTab=avail[0]||'ovr';
   document.querySelectorAll('#tabs .tabbtn').forEach(b=>{
     b.style.display=avail.includes(b.dataset.t)?'':'none';
     b.classList.toggle('active', b.dataset.t===activeTab);
   });
-  ['ovr','exec','ops','pareto','dash'].forEach(id=>{
+  ['ovr','exec','fixo','ops','pareto','dash'].forEach(id=>{
     document.getElementById(id).classList.toggle('hidden', !(id===activeTab && avail.includes(id)));
   });
 }
@@ -512,7 +531,8 @@ function parseOrcamento(aoa){
     const regiao=localidadeDe(cc);                                   // Amazonas / Maranhão pela letra do CC
     const nt=norm(tipo);   // o Tipo do orçamento já separa: "Custos Fixos - Pessoal" × "Custos Fixos - O&M"
     const cat=/fix/.test(nt)?(/pessoal/.test(nt)?'pessoal':'om_fixo'):classificarCusto(descrLinha+' '+nome, nome);
-    meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,mes,classeCod:cod,classeNome:nome,valor:v,regiao,cat}); });
+    const bloco=/fix/.test(nt)?blocoFixoDe(cod,nome):undefined;
+    meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,mes,classeCod:cod,classeNome:nome,valor:v,regiao,cat,bloco}); });
   }
   return out;
 }
@@ -522,6 +542,7 @@ function mapear(json,nome){
   const find=cands=>{ for(const c of cands){ const k=keys.find(k=>norm(k).includes(c)); if(k) return k; } return undefined; };
   const kVal=find(['valor variavel','valor/mobj','valor mobj','valor','montante','vlr']);
   const kClasse=find(['denom.classe','denominacao classe','denom classe','classe de custo','classe custo']);
+  const kCod=keys.find(k=>norm(k)==='classe de custo');   // código da conta (4001…), além do nome
   const kCentro=find(['centro custo','centro de custo','centro']);
   const kObjeto=find(['denominacao objeto','denom objeto','objeto']);
   const kData=find(['data de lancamento','data lancamento','data do documento','data documento','competencia','periodo','mes','data']);
@@ -538,15 +559,17 @@ function mapear(json,nome){
     const centro=kCentro?String(row[kCentro]):'—';
     const nat=/m80of/i.test(centro)?'fixo':'variavel';   // centro M80OF* = custo fixo · M80OV* = variável
     const nb=norm(blob);
+    const ccod=kCod?String(row[kCod]).trim():'';
+    const bloco=nat==='fixo'?blocoFixoDe(ccod,classe):undefined;   // bloco da DRE (pessoal, serviços, materiais…)
     return {
       valor:num(row[kVal]),
-      classe, centro, objeto,
+      classe, ccod, centro, objeto,
       mes:mesDe(kData?row[kData]:''),
       material: material || (kDescr?String(row[kDescr]):''),
-      nat,
+      nat, bloco,
       nr:/nao recorrente/.test(nb)||undefined,                                        // marcado como não recorrente
       mao:/lancad[oa] a mao|lancamento a mao|adicionado a mao/.test(nb)||undefined,   // lançamento manual p/ zerar os NR
-      cat: nat==='fixo'?classificarCustoFixo(classe):classificarCusto(blob, classe),
+      cat: nat==='fixo'?(bloco==='pessoal'?'pessoal':'om_fixo'):classificarCusto(blob, classe),
       forn: fornecedorDe(material, kDescr?String(row[kDescr]):'', kPedido?String(row[kPedido]):'', objeto),
       loc:localidadeDe(kCentro?row[kCentro]:''),
       origem
@@ -590,11 +613,41 @@ function classificarCusto(texto, classe){
   return 'outros';
 }
 
-// custo FIXO: separa Pessoal (folha) de O&M fixo pela classe de custo
-function classificarCustoFixo(classe){
-  const c=norm(classe);
-  if(/salari|ordenado|inss|fgts|feria|decimo|13o|hora extra|adicion|auxilio|alimentac|assistencia med|transporte de func|rescis|indeniz|estagi|previdenc|pericul|insalubr|sobreavis|noturn|premio|bonus|plr|encargo|folha|gratificac|vale.?transporte|vale.?refeic|seguro de vida|plano de saude|treinament/.test(c)) return 'pessoal';
-  return 'om_fixo';
+// ---------- BLOCOS DO CUSTO FIXO (divisão de contas da DRE, passada pelo usuário) ----------
+const BLOCO_NOME={pessoal:'Pessoal',servicos:'Serviços Prestados – CF',materiais:'Materiais – CF',viagens:'Viagens',seguros:'Seguros',alugueis:'Aluguéis',outros_om:'Outros O&M'};
+const BLOCO_ICO={pessoal:'👥',servicos:'🛠️',materiais:'📦',viagens:'✈️',seguros:'🛡️',alugueis:'🏠',outros_om:'🧾'};
+const BLOCOS_ORDEM=['pessoal','servicos','materiais','viagens','seguros','alugueis','outros_om'];
+const BL_SERV=new Set(['4002010004','4002010006','4002010015','4002010024','4002010063','4002010077','4002019999','4002020001','4002020003','4003010001','4003010003','4003010004','4003010007','4004010003','4004010004','4004019999','4006010019','4008010001','4008010004','4008010005','4008010007','4008010008','4008010009','4008010010']);
+const BL_OUTOM=new Set(['4012010007','4017010009','4017010010','4019010001','4019010002','4019010003','4022010002','4022010003','4022019999','4009010002','4017010006','4017010008','4017019999','4012010003','4023020002']);
+const BL_VIAG=new Set(['4011010001','4011010002','4011010003','4011010004','4011010006','4013010001']);
+function blocoFixoDe(cod,nome){
+  cod=String(cod||'').trim(); const n=norm(nome);
+  if(/alug/.test(n)) return 'alugueis';                       // aluguéis: qualquer conta com "aluguel" no nome
+  if(cod==='4022010001') return 'seguros';
+  if(cod.startsWith('4001')) return 'pessoal';                // folha + benefícios + EPI/SSO/uniformes (4001*)
+  if(cod.startsWith('4007')) return 'materiais';
+  if(BL_VIAG.has(cod)||cod.startsWith('4011')) return 'viagens';
+  if(BL_SERV.has(cod)) return 'servicos';
+  if(BL_OUTOM.has(cod)) return 'outros_om';
+  if(/^(4002|4003|4004|4006|4008)/.test(cod)) return 'servicos';
+  if(/^(4012|4013|4017|4019|4022|4009|4023)/.test(cod)) return 'outros_om';
+  return cod?'outros_om':blocoPorNome(n);
+}
+// fallback pelo NOME da classe — só para bases antigas salvas na nuvem sem o código (recarregue as bases p/ precisão)
+function blocoPorNome(n){
+  if(/alug/.test(n))return 'alugueis';
+  if(/^seguros?$/.test(n))return 'seguros';
+  if(/hospedag|passagen|viagen|eventos e confrat/.test(n))return 'viagens';
+  if(/sobressalent|tubulacao|produtos quimic|materia|combustive|lubrific/.test(n))return 'materiais';
+  if(/calibrac|inspec|grafic|engenharia|tecnic|servico|assessoria|legais|aereo|terrestre|armazenag|portuar|manutencao|predial|suporte|transmissao|radio|telefonia|licenca|informatica/.test(n))return 'servicos';
+  if(/salari|ordenado|pro.?labore|bolsa|noturn|pericul|sobreavis|hora|dsr|gratificac|feria|decimo|inss|fgts|assistencia|auxilio|refeitorio|seguro de vida|vale|transporte de func|treinament|ajuda de custo|equipamentos de prot|saude e seguranca|indeniz|uniform|infracoe|plr|bonus|sindical|educacao/.test(n))return 'pessoal';
+  return 'outros_om';
+}
+function blocoDe(d){ return d.bloco||blocoFixoDe(d.ccod,d.classe); }
+// bases antigas na nuvem: deriva bloco/categoria dos fixos que vieram sem os campos novos
+function migrarDados(){
+  DADOS.forEach(d=>{ if(natDe(d)==='fixo'){ d.bloco=d.bloco||blocoFixoDe(d.ccod,d.classe); d.cat=d.bloco==='pessoal'?'pessoal':'om_fixo'; } });
+  ORCAMENTO.forEach(o=>{ if(/fix/.test(norm(o.tipo))&&!o.bloco) o.bloco=blocoFixoDe(o.classeCod,o.classeNome); });
 }
 // bases antigas (salvas na nuvem antes do custo fixo) não têm o campo — eram todas variáveis
 function natDe(d){ return d.nat||'variavel'; }
@@ -610,7 +663,7 @@ function atualizarUI(){
   if(!DADOS.length&&ORCAMENTO.length) badge.push('— carregue o realizado (KSB1) para ver o Orçado vs Real');
   document.getElementById('fileBadge').textContent=badge.join(' · ')||'nenhum arquivo carregado';
   if(DADOS.length){ montarFiltros(); render(); }
-  montarEscopoOVR(); renderOVR(); renderOps(); renderParetoTab(); renderExec();
+  montarEscopoOVR(); renderOVR(); renderOps(); renderParetoTab(); renderExec(); renderFixo();
   applyTabs();
 }
 
@@ -1120,7 +1173,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharDrill(); });
 
 // ---------- ORÇADO vs REAL ----------
 function fatorPisCofins(){ const el=document.getElementById('pisCofins'); return (el&&el.checked)?(1-0.0925):1; }
-function recalcOrc(){ if(ORCAMENTO.length) renderOVR(); if(DADOS.length){ renderOpsCalc(); renderParetoTab(); renderExec(); } }
+function recalcOrc(){ if(ORCAMENTO.length) renderOVR(); if(DADOS.length){ renderOpsCalc(); renderParetoTab(); renderExec(); renderFixo(); } }
 function montarEscopoOVR(){
   if(!ORCAMENTO.length) return;
   const tipos=uniq(ORCAMENTO.map(o=>o.tipo)).filter(Boolean).sort();
@@ -1304,6 +1357,87 @@ function exportarExecGeral(){
   baixarXlsx('Execucao_por_Area',abas);
 }
 
+// ---------- CUSTOS FIXOS POR BLOCO (DRE) ----------
+let FIXO_LAST=null;
+function fixoDados(loc){
+  const fPC=fatorPisCofins();
+  const rows=DADOS.filter(d=>natDe(d)==='fixo'&&(!loc||d.loc===loc));
+  const mesesReal=uniq(rows.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
+  const setReal=new Set(mesesReal);
+  const B={}; BLOCOS_ORDEM.forEach(b=>B[b]={real:0,orc:0,nr:0,mao:0,realMes:{},orcMes:{},contas:{}});
+  rows.forEach(d=>{ const b=B[blocoDe(d)]||B.outros_om;
+    b.real+=d.valor; b.realMes[d.mes]=(b.realMes[d.mes]||0)+d.valor;
+    b.contas[d.classe]=(b.contas[d.classe]||0)+d.valor;
+    if(d.mao) b.mao+=d.valor; else if(d.nr) b.nr+=d.valor; });
+  ORCAMENTO.forEach(o=>{ if(!/fix/.test(norm(o.tipo))) return; if(loc&&o.regiao!==loc) return; if(setReal.size&&!setReal.has(o.mes)) return;
+    const b=B[o.bloco||blocoFixoDe(o.classeCod,o.classeNome)]||B.outros_om; const v=o.valor*fPC;
+    b.orc+=v; b.orcMes[o.mes]=(b.orcMes[o.mes]||0)+v; });
+  return {B,mesesReal};
+}
+function renderFixo(){
+  if(!DADOS.some(d=>natDe(d)==='fixo')){ FIXO_LAST=null; return; }
+  const loc=(document.getElementById('fixoLoc')||{}).value||'';
+  const {B,mesesReal}=fixoDados(loc);
+  FIXO_LAST={B,mesesReal,loc};
+  const blocos=BLOCOS_ORDEM.filter(b=>Math.abs(B[b].real)>0.005||Math.abs(B[b].orc)>0.005);
+  const totR=blocos.reduce((s,b)=>s+B[b].real,0), totO=blocos.reduce((s,b)=>s+B[b].orc,0);
+  const totNR=blocos.reduce((s,b)=>s+B[b].nr,0), totMao=blocos.reduce((s,b)=>s+B[b].mao,0);
+  const dv=totR-totO, dp=totO?dv/totO*100:0;
+  document.getElementById('fixoResumo').innerHTML=
+    `📌 <b>Custos Fixos${loc?' · '+loc:''}</b> (${mesesReal[0]||'—'}–${mesesReal[mesesReal.length-1]||'—'}): realizado <b>${BRL.format(totR)}</b> vs orçado <b>${BRL.format(totO)}</b> (<b>${PCT(dp)}</b>). `+
+    `Não recorrentes: <b>${BRL.format(totNR)}</b>${Math.abs(totMao)>1?` · lançamentos a mão: <b>${BRL.format(totMao)}</b> (se compensam no total)`:''}.`;
+  const kpis=[
+    {lbl:'Orçado (período)',val:BRL.format(totO)},
+    {lbl:'Realizado',val:BRL.format(totR)},
+    {lbl:'Variação',val:(dv>=0?'+':'')+BRL.format(dv),cls:dv>0?'pos':'neg',sub:PCT(dp)},
+    {lbl:'Não Recorrente',val:BRL.format(totNR),sub:Math.abs(totMao)>1?'a mão: '+BRL.format(totMao):''}
+  ];
+  document.getElementById('fixoKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
+  destroy('chBlocos');
+  charts.chBlocos=new Chart('chBlocos',{type:'bar',data:{labels:blocos.map(b=>BLOCO_NOME[b]),datasets:[
+    {label:'Orçado',data:blocos.map(b=>B[b].orc),backgroundColor:'#FCB316'},
+    {label:'Realizado',data:blocos.map(b=>B[b].real),backgroundColor:'#00A0A8'}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+  document.querySelector('#tabFixo thead').innerHTML='<tr><th class="txt">Bloco <span class="small">(clique p/ ver lançamentos)</span></th><th>Orçado</th><th>Realizado</th><th>Δ R$</th><th>Δ %</th><th class="txt">Farol</th><th>NR incluso</th></tr>';
+  document.querySelector('#tabFixo tbody').innerHTML=blocos.map(b=>{
+    const x=B[b],d=x.real-x.orc,p=x.orc?d/x.orc*100:null;
+    const farol=execFarol(x.orc?x.real/x.orc*100:null);
+    const cls=d>0?'pos':'neg';
+    return `<tr style="cursor:pointer" onclick="abrirDrillBloco('${b}')"><td class="txt">${BLOCO_ICO[b]} ${BLOCO_NOME[b]}</td><td>${BRL.format(x.orc)}</td><td><b>${BRL.format(x.real)}</b></td>`+
+      `<td class="${cls}">${(d>=0?'+':'')+BRL.format(d)}</td><td class="${cls}">${x.orc?PCT(p):'—'}</td><td class="txt">${farol.ico} ${farol.txt}</td><td>${Math.abs(x.nr)>1?BRL.format(x.nr):'—'}</td></tr>`;
+  }).join('')+`<tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt">TOTAL</td><td>${BRL.format(totO)}</td><td>${BRL.format(totR)}</td><td class="${dv>0?'pos':'neg'}">${(dv>=0?'+':'')+BRL.format(dv)}</td><td class="${dv>0?'pos':'neg'}">${totO?PCT(dp):'—'}</td><td></td><td>${BRL.format(totNR)}</td></tr>`;
+}
+function abrirDrillBloco(b){
+  const loc=(document.getElementById('fixoLoc')||{}).value||'';
+  const linhas=DADOS.filter(d=>natDe(d)==='fixo'&&blocoDe(d)===b&&(!loc||d.loc===loc)).sort((x,y)=>y.valor-x.valor);
+  if(!linhas.length) return;
+  const tot=linhas.reduce((s,d)=>s+d.valor,0);
+  DRILL_LAST={linhas,nome:'Fixo '+BLOCO_NOME[b]+(loc?' '+loc:'')};
+  document.getElementById('drillTit').innerHTML=`<b>${BLOCO_ICO[b]} ${BLOCO_NOME[b]}</b>${loc?' · '+loc:''} · ${INT.format(linhas.length)} lançamentos · ${BRL.format(tot)}`;
+  document.querySelector('#tabDrill thead').innerHTML='<tr><th class="txt">Mês</th><th class="txt">Local</th><th class="txt">Conta</th><th class="txt">Classe</th><th class="txt">Material / Serviço</th><th class="txt">Obs</th><th>Valor</th></tr>';
+  document.querySelector('#tabDrill tbody').innerHTML=linhas.slice(0,1000).map(d=>`<tr><td class="txt">${d.mes}</td><td class="txt">${d.loc}</td><td class="txt">${d.ccod||'—'}</td><td class="txt">${(d.classe||'').slice(0,24)}</td><td class="txt" title="${String(d.material||'').replace(/"/g,'')}">${String(d.material||'—').slice(0,42)}</td><td class="txt">${d.mao?'A MÃO':(d.nr?'NR':'')}</td><td>${BRL.format(d.valor)}</td></tr>`).join('')
+    +(linhas.length>1000?`<tr><td colspan="7" class="small txt">… mostrando 1.000 de ${INT.format(linhas.length)}</td></tr>`:'');
+  document.getElementById('drillModal').classList.add('show');
+}
+function exportarFixoXls(){
+  if(!FIXO_LAST){ alert('Carregue as bases de custo fixo primeiro.'); return; }
+  const {B,mesesReal,loc}=FIXO_LAST;
+  const blocos=BLOCOS_ORDEM.filter(b=>Math.abs(B[b].real)>0.005||Math.abs(B[b].orc)>0.005);
+  const g=[['Bloco','Orçado período (R$)','Realizado (R$)','Δ (R$)','Δ %','NR incluso (R$)','A mão (R$)']];
+  blocos.forEach(b=>{const x=B[b];g.push([BLOCO_NOME[b],x.orc,x.real,x.real-x.orc,x.orc?Math.round((x.real-x.orc)/x.orc*10000)/100:'',x.nr,x.mao]);});
+  const abas=[{nome:'Resumo Blocos',aoa:g}];
+  blocos.forEach(b=>{const x=B[b];
+    const aoa=[['Bloco',BLOCO_NOME[b]+(loc?' · '+loc:'')],[],['Mês','Orçado (R$)','Realizado (R$)','Δ (R$)']];
+    mesesReal.forEach(m=>aoa.push([m,x.orcMes[m]||0,x.realMes[m]||0,(x.realMes[m]||0)-(x.orcMes[m]||0)]));
+    aoa.push(['TOTAL',x.orc,x.real,x.real-x.orc]);
+    aoa.push([],['Maiores contas','Valor (R$)']);
+    Object.entries(x.contas).sort((p,q)=>Math.abs(q[1])-Math.abs(p[1])).slice(0,12).forEach(([n,v])=>aoa.push([n,v]));
+    abas.push({nome:BLOCO_NOME[b].replace(/[–\/]/g,'-').slice(0,31),aoa});});
+  baixarXlsx('Custos_Fixos_Blocos'+(loc?'_'+loc:''),abas);
+}
+
 // ---------- CASCATA (waterfall) Orçado → Real, Custos Variáveis ----------
 let WF_LAST=null;   // guarda os dados da última cascata para exportar
 const WF_CATS=['combustivel','manutencao','pneus','lubrificantes','transporte','outros'];
@@ -1409,7 +1543,7 @@ function exportarWaterfall(){
 
 function limpar(){
   DADOS=[];ORCAMENTO=[];ORCKPI=null;_has.ovr=false;Object.keys(charts).forEach(destroy);
-  ['dash','ovr','exec','ops','pareto','tabs'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  ['dash','ovr','exec','fixo','ops','pareto','tabs'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('drop').classList.remove('hidden');
   document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
 }
@@ -1431,6 +1565,7 @@ async function carregarDaNuvem(){
     if(data&&data.payload){
       const obj=descomprimir(data.payload);
       DADOS=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null;
+      migrarDados();   // bases salvas antes dos blocos do fixo ganham bloco/categoria corretos
       atualizarUI(); marcarAtualizado(data.updated_at);
     }else{
       atualizarUI();
