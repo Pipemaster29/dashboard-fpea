@@ -330,7 +330,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v30 · Insumo Diesel sempre variável · 08/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v31 · região por Projeto + linha dif. na frente/eixo 2º · 08/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -517,6 +517,7 @@ function parseOrcamento(aoa){
   const iC4=idx(['conta 4']);
   const iD4=idx(['descricao conta 4','denominacao conta 4']);
   const iCC=hdr.findIndex(h=>norm(h)==='cc'); const iCC2=iCC>=0?iCC:idx(['centro custo','centro']);
+  const iProj=hdr.findIndex(h=>norm(h)==='projeto');   // região oficial da linha (Amazonas/Maranhão)
   const iDescr=hdr.findIndex((h,i)=>norm(h)==='descricao'&&i!==iD4);
   const meses=[]; hdr.forEach((h,i)=>{ if(h instanceof Date) meses.push({i,mes:mesDe(h)}); });
   const out=[];
@@ -528,10 +529,12 @@ function parseOrcamento(aoa){
     if(!tipo&&!cod) continue;
     const cc=iCC2>=0?String(row[iCC2]||''):'';
     const descrLinha=iDescr>=0?String(row[iDescr]||''):'';
-    const regiao=localidadeDe(cc);                                   // Amazonas / Maranhão pela letra do CC
+    // região: coluna Projeto (oficial); senão a letra do CC (folha nova vem sem CC, com Projeto = Amazonas/Maranhão)
+    const proj=iProj>=0?norm(row[iProj]):'';
+    const regiao=proj.includes('amazon')?'Amazonas':(proj.includes('maranh')?'Maranhão':localidadeDe(cc));
     const nt=norm(tipo);   // o Tipo do orçamento já separa: "Custos Fixos - Pessoal" × "Custos Fixos - O&M"
     const cat=/fix/.test(nt)?(/pessoal/.test(nt)?'pessoal':'om_fixo'):classificarCusto(descrLinha+' '+nome, nome);
-    const bloco=/fix/.test(nt)?blocoFixoDe(cod,nome):undefined;
+    const bloco=/fix/.test(nt)?((!cod&&/pessoal/.test(nt))?'pessoal':blocoFixoDe(cod,nome)):undefined;   // folha agregada (sem conta) → Pessoal
     meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,mes,classeCod:cod,classeNome:nome,valor:v,regiao,cat,bloco}); });
   }
   return out;
@@ -984,17 +987,20 @@ function kpiChart(id,meses,s){
   const rkm2=v=>v==null?'':v.toFixed(2).replace('.',',');
   const lblBar=cor=>({display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,anchor:'end',align:'top',color:cor,font:{weight:'700',size:10},formatter:v=>rkm2(v)});
   const rDif=v=>Math.round(v*100)/100;   // evita "-0,00" e decide a cor pelo valor exibido
+  // order: 1 = desenhado por cima (linha), 2/3 = barras (e define a posição orçado à esquerda)
   charts[id]=new Chart(id,{data:{labels:meses.map(mesCurto),datasets:[
-    {type:'bar',label:'Orçado',data:s.orc,backgroundColor:'#02585C',datalabels:lblBar('#6CBDC4')},
-    {type:'bar',label:'Realizado',data:s.real,backgroundColor:'#00A0A8',datalabels:lblBar('#e2e8f0')},
-    {type:'line',label:'Diferença',data:s.dif,borderColor:'#FCB316',backgroundColor:'#FCB316',pointBackgroundColor:'#FCB316',tension:.3,pointRadius:4,
+    {type:'bar',label:'Orçado',data:s.orc,backgroundColor:'#02585C',order:2,datalabels:lblBar('#6CBDC4')},
+    {type:'bar',label:'Realizado',data:s.real,backgroundColor:'#00A0A8',order:3,datalabels:lblBar('#e2e8f0')},
+    {type:'line',label:'Diferença',data:s.dif,yAxisID:'y2',order:1,borderColor:'#FCB316',backgroundColor:'#FCB316',pointBackgroundColor:'#FCB316',tension:.3,pointRadius:4,
       datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,align:'bottom',offset:6,
         color:ctx=>rDif(ctx.dataset.data[ctx.dataIndex])>=0?'#00B050':'#E4562E',
         backgroundColor:'rgba(15,23,42,.85)',borderColor:ctx=>rDif(ctx.dataset.data[ctx.dataIndex])>=0?'#00B050':'#E4562E',borderWidth:1,borderRadius:5,padding:{top:2,bottom:2,left:5,right:5},
         font:{weight:'700',size:10},formatter:v=>{if(v==null)return '';const r=rDif(v);return (r>0?'+':'')+rkm2(r);}}}
   ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20,bottom:4}},
     plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':BRL.format(c.parsed.y)+'/km')}}},
-    scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',font:{size:10},callback:v=>v.toFixed(2).replace('.',',')}}}}});
+    scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},
+      y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',font:{size:10},callback:v=>v.toFixed(2).replace('.',',')}},
+      y2:{position:'right',grid:{display:false},title:{display:true,text:'Diferença',color:'#FCB316',font:{size:9}},ticks:{color:'#FCB316',font:{size:9},callback:v=>(v>=0?'+':'')+v.toFixed(2).replace('.',',')}}}}});
 }
 function renderKpiPage(){
   const el=document.getElementById('kpiPage'); if(!el) return;
@@ -1053,7 +1059,7 @@ function exportarKpiPPT(){
       ];
       s.addChart(combo,{x:1.55+c*4.3,y,w:3.9,h:1.48,showLegend:r===0,legendPos:'t',legendFontSize:8,legendColor:'404040',
         catAxisLabelColor:'575757',catAxisLabelFontSize:8,dataBorder:{pt:0,color:'FFFFFF'},
-        valAxes:[{valAxisLabelColor:'575757',valAxisLabelFontSize:8},{valAxisHidden:true,valAxisLabelFontSize:8,valAxisLabelColor:'FCB316'}],
+        valAxes:[{valAxisLabelColor:'575757',valAxisLabelFontSize:8},{valAxisLabelFontSize:8,valAxisLabelColor:'FCB316'}],   // 2º eixo (Diferença) visível em âmbar
         catAxes:[{catAxisLabelColor:'575757',catAxisLabelFontSize:8},{catAxisHidden:true}]});
     });
   });
