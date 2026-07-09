@@ -172,7 +172,7 @@
       <select id="ovrTipo" onchange="renderOVR()"></select>
       <label style="display:flex;align-items:center;gap:7px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt);margin-left:8px">
         <input type="checkbox" id="pisCofins" checked onchange="recalcOrc()" style="width:16px;height:16px;cursor:pointer">
-        Aplicar crédito PIS/Cofins (−9,25%) no orçado
+        Aplicar crédito PIS/Cofins (−9,25%) no orçado <b>variável</b> — fixos e SG&amp;A são sempre brutos
       </label>
     </div>
     <div class="resumo" id="ovrResumo"></div>
@@ -222,7 +222,7 @@
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chBlocos','Custos Fixos por Bloco')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chBlocos','Custos Fixos por Bloco')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chBlocos','Custos Fixos por Bloco')">⬇ Excel</button></div><h3>Orçado × Realizado por bloco <span class="small">(acumulado dos meses realizados)</span></h3><div class="wrap" style="height:340px"><canvas id="chBlocos"></canvas></div></div>
     </div>
     <div class="tablewrap"><table id="tabFixo"><thead></thead><tbody></tbody></table></div>
-    <div class="note">Blocos pela divisão de contas da DRE: 4001* = Pessoal · 4007* = Materiais · 4011*/4013010001 = Viagens · 4022010001 = Seguros · contas com "aluguel" no nome = Aluguéis · listas específicas p/ Serviços Prestados e Outros O&M. Orçado = tipos "Custos Fixos" do orçamento, mesmos blocos, meses com realizado, com crédito PIS/Cofins se marcado.</div>
+    <div class="note">Blocos pela divisão de contas da DRE: 4001* = Pessoal · 4007* = Materiais · 4011*/4013010001 = Viagens · 4022010001 = Seguros · contas com "aluguel" no nome = Aluguéis · listas específicas p/ Serviços Prestados e Outros O&M. Orçado = tipos "Custos Fixos" do orçamento, mesmos blocos, meses com realizado, sempre BRUTO (crédito PIS/Cofins não se aplica ao fixo — igual à análise do EBITDA).</div>
   </div>
 
   <!-- OPERAÇÕES & R$/KM -->
@@ -330,7 +330,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v32 · clique em qualquer gráfico → lançamentos · 08/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v33 · PIS/Cofins só no variável (auditado c/ EBITDA) · 09/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -962,7 +962,7 @@ function renderOpsCalc(){
   // realizado direto do KSB1 (a base já vem líquida de crédito PIS/Cofins)
   const costReal={};DADOS.forEach(d=>{if(inc.has(catDeLinha(d))){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
   // orçado do ORÇAMENTO consolidado (Custos Variáveis) por categoria×região×mês, com crédito PIS/Cofins (-9,25%)
-  const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+o.valor*fPC;}});
+  const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+orcVal(o);}});
   opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcCost),tipo,{id:'chOpsAM',loc:'Amazonas',inc,catName:GRUPO_NOME[cat]});
   opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcCost),tipo,{id:'chOpsMA',loc:'Maranhão',inc,catName:GRUPO_NOME[cat]});
   document.getElementById('opsTag').textContent=GRUPO_NOME[cat]+' · R$/km por região';
@@ -1001,7 +1001,7 @@ function kpiSeries(cat){ // custo por região|mês da categoria (manutenção in
   const fPC=fatorPisCofins();
   const inc=new Set(cat==='manutencao'?['manutencao','lubrificantes']:[cat]);
   const costReal={};DADOS.forEach(d=>{if(inc.has(catDeLinha(d))){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
-  const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+o.valor*fPC;}});
+  const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+orcVal(o);}});
   return {costReal,orcCost};
 }
 function kpiChart(id,meses,s,ctx){
@@ -1098,7 +1098,7 @@ function orcadoGrupoLoc(){ // orçado por grupo x localidade, do ORÇAMENTO cons
   const out={}; if(!ORCAMENTO.length) return out; const fPC=fatorPisCofins();
   const mesesReal=new Set(DADOS.map(d=>d.mes));
   ORCAMENTO.forEach(o=>{ if(!/variav|fix/.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
-    out[o.cat]=out[o.cat]||{}; out[o.cat][o.regiao]=(out[o.cat][o.regiao]||0)+o.valor*fPC; });
+    out[o.cat]=out[o.cat]||{}; out[o.cat][o.regiao]=(out[o.cat][o.regiao]||0)+orcVal(o); });
   return out;
 }
 function renderParetoTab(){
@@ -1221,12 +1221,12 @@ function drillOrcam(nome, rows){
   const fPC=fatorPisCofins();
   rows=[...rows].sort((a,b)=>Math.abs(b.valor)-Math.abs(a.valor));
   if(!rows.length){ flash('Sem linhas de orçamento para "'+nome+'".'); return; }
-  const tot=rows.reduce((s,o)=>s+o.valor*fPC,0);
+  const tot=rows.reduce((s,o)=>s+orcVal(o),0);
   const catBloco=o=>(o.bloco?BLOCO_NOME[o.bloco]:GRUPO_NOME[o.cat])||'—';
-  DRILL_LAST={nome,aoa:[['Tipo','Mês','Região','Conta','Classe','Cat/Bloco','Valor'+(fPC<1?' (c/ crédito PIS-Cofins)':'')+' (R$)']].concat(rows.map(o=>[o.tipo,o.mes,o.regiao,o.classeCod||'',o.classeNome||'',catBloco(o),o.valor*fPC]))};
+  DRILL_LAST={nome,aoa:[['Tipo','Mês','Região','Conta','Classe','Cat/Bloco','Valor'+(fPC<1?' (variável c/ crédito PIS-Cofins; fixo bruto)':'')+' (R$)']].concat(rows.map(o=>[o.tipo,o.mes,o.regiao,o.classeCod||'',o.classeNome||'',catBloco(o),orcVal(o)]))};
   document.getElementById('drillTit').innerHTML=`<b>${nome}</b> · ${INT.format(rows.length)} linhas de orçamento · ${BRL.format(tot)}`;
   document.querySelector('#tabDrill thead').innerHTML='<tr><th class="txt">Tipo</th><th class="txt">Mês</th><th class="txt">Região</th><th class="txt">Conta</th><th class="txt">Classe</th><th class="txt">Cat/Bloco</th><th>Valor</th></tr>';
-  document.querySelector('#tabDrill tbody').innerHTML=rows.slice(0,1000).map(o=>`<tr><td class="txt">${o.tipo}</td><td class="txt">${o.mes}</td><td class="txt">${o.regiao}</td><td class="txt">${o.classeCod||'—'}</td><td class="txt">${(o.classeNome||'—').slice(0,26)}</td><td class="txt">${catBloco(o)}</td><td class="${o.valor<0?'neg':''}">${BRL.format(o.valor*fPC)}</td></tr>`).join('')+(rows.length>1000?'<tr><td colspan="7" class="small txt">… mostrando 1.000 (o Excel traz todas)</td></tr>':'');
+  document.querySelector('#tabDrill tbody').innerHTML=rows.slice(0,1000).map(o=>`<tr><td class="txt">${o.tipo}</td><td class="txt">${o.mes}</td><td class="txt">${o.regiao}</td><td class="txt">${o.classeCod||'—'}</td><td class="txt">${(o.classeNome||'—').slice(0,26)}</td><td class="txt">${catBloco(o)}</td><td class="${o.valor<0?'neg':''}">${BRL.format(orcVal(o))}</td></tr>`).join('')+(rows.length>1000?'<tr><td colspan="7" class="small txt">… mostrando 1.000 (o Excel traz todas)</td></tr>':'');
   document.getElementById('drillModal').classList.add('show');
 }
 function fecharDrill(){ document.getElementById('drillModal').classList.remove('show'); }
@@ -1234,6 +1234,8 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharDrill(); });
 
 // ---------- ORÇADO vs REAL ----------
 function fatorPisCofins(){ const el=document.getElementById('pisCofins'); return (el&&el.checked)?(1-0.0925):1; }
+// valor de uma linha do ORÇAMENTO: crédito PIS/Cofins só existe no VARIÁVEL — fixo e SG&A são sempre brutos (igual ao EBITDA)
+function orcVal(o){ return o.valor*(/variav/.test(norm(o.tipo))?fatorPisCofins():1); }
 function recalcOrc(){ if(ORCAMENTO.length) renderOVR(); if(DADOS.length){ renderOpsCalc(); renderParetoTab(); renderExec(); renderFixo(); } }
 function montarEscopoOVR(){
   if(!ORCAMENTO.length) return;
@@ -1248,7 +1250,7 @@ function renderOVR(){
   const tipo=document.getElementById('ovrTipo').value;
   document.getElementById('ovrTag').textContent=tipo||'Orçamento';
   const fPC=fatorPisCofins();
-  const bm={}; ORCAMENTO.forEach(o=>{ if(!tipo||o.tipo===tipo) bm[o.mes]=(bm[o.mes]||0)+o.valor*fPC; });
+  const bm={}; ORCAMENTO.forEach(o=>{ if(!tipo||o.tipo===tipo) bm[o.mes]=(bm[o.mes]||0)+orcVal(o); });
   // realizado do escopo: variáveis → M80OV* · fixos O&M → M80OF*+om_fixo · fixos Pessoal → M80OF*+pessoal
   const nt=norm(tipo);
   let fReal=null;
@@ -1318,7 +1320,8 @@ function renderOVR(){
   document.querySelector('#tabOVR tbody').innerHTML=body;
 
   document.getElementById('ovrNote').textContent=
-    `Orçado ${fPC<1?'líquido de crédito PIS/Cofins (−9,25%)':'bruto (sem crédito PIS/Cofins)'}. `+
+    (/fix/.test(nt)? 'Orçado fixo BRUTO — o crédito PIS/Cofins não se aplica ao fixo (igual à análise do EBITDA). '
+      : `Orçado ${fPC<1?'líquido de crédito PIS/Cofins (−9,25%)':'bruto (sem crédito PIS/Cofins)'}. `)+
     (temReal? `Comparação no escopo "${tipo}", apenas meses com orçado e realizado. A abertura por conta não é comparada (códigos do orçamento ≠ SAP).`
             : `O escopo "${tipo}" não tem realizado nas bases carregadas.`)+avisoFolha;
   renderWaterfall();
@@ -1336,7 +1339,7 @@ function execDados(){
   const mk=k=>A[k]||(A[k]={real:0,orcPer:0,orcAno:0,realMes:{},orcMes:{},forn:{}});
   DADOS.forEach(d=>{ const a=mk(catDeLinha(d)+'|'+d.loc);
     a.real+=d.valor; a.realMes[d.mes]=(a.realMes[d.mes]||0)+d.valor; a.forn[d.forn]=(a.forn[d.forn]||0)+d.valor; });
-  ORCAMENTO.forEach(o=>{ if(!/variav|fix/.test(norm(o.tipo))) return; const a=mk(o.cat+'|'+o.regiao); const v=o.valor*fPC;
+  ORCAMENTO.forEach(o=>{ if(!/variav|fix/.test(norm(o.tipo))) return; const a=mk(o.cat+'|'+o.regiao); const v=orcVal(o);
     a.orcAno+=v; a.orcMes[o.mes]=(a.orcMes[o.mes]||0)+v; if(setReal.has(o.mes)) a.orcPer+=v; });
   return {A,mesesReal};
 }
@@ -1434,7 +1437,7 @@ function fixoDados(loc){
     b.contas[d.classe]=(b.contas[d.classe]||0)+d.valor;
     if(d.mao) b.mao+=d.valor; else if(d.nr) b.nr+=d.valor; });
   ORCAMENTO.forEach(o=>{ if(!/fix/.test(norm(o.tipo))) return; if(loc&&o.regiao!==loc) return; if(setReal.size&&!setReal.has(o.mes)) return;
-    const b=B[o.bloco||blocoFixoDe(o.classeCod,o.classeNome)]||B.outros_om; const v=o.valor*fPC;
+    const b=B[o.bloco||blocoFixoDe(o.classeCod,o.classeNome)]||B.outros_om; const v=orcVal(o);
     b.orc+=v; b.orcMes[o.mes]=(b.orcMes[o.mes]||0)+v; });
   return {B,mesesReal};
 }
@@ -1528,7 +1531,7 @@ function wfDados(loc,natSel){
     const c=catDeLinha(d); if(real[c]!=null) real[c]+=d.valor; });
   const reTipo=natSel==='fixo'?/fix/:/variav/;
   ORCAMENTO.forEach(o=>{ if(loc&&o.regiao!==loc) return; if(!reTipo.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
-    if(orc[o.cat]!=null) orc[o.cat]+=o.valor*fPC; });
+    if(orc[o.cat]!=null) orc[o.cat]+=orcVal(o); });
   const orcTot=cats.reduce((s,c)=>s+orc[c],0);
   const realTot=cats.reduce((s,c)=>s+real[c],0)+nr;   // real da cascata = recorrente + NR (sem os "a mão")
   return {cats,orc,real,nr,orcTot,realTot};
