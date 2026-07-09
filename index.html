@@ -330,7 +330,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v31 · região por Projeto + linha dif. na frente/eixo 2º · 08/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v32 · clique em qualquer gráfico → lançamentos · 08/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -346,6 +346,8 @@ let sortState={col:'valor',dir:1};
 
 // rótulos de dados desativados por padrão; ligados por dataset onde interessa
 try{ if(window.ChartDataLabels){ Chart.register(window.ChartDataLabels); Chart.defaults.plugins.datalabels={display:false}; } }catch(e){}
+// todos os gráficos são clicáveis (drill-down) — cursor de mão em cima de barra/fatia/ponto
+try{ Chart.defaults.onHover=(e,els)=>{ const t=e.native&&e.native.target; if(t) t.style.cursor=(els&&els.length)?'pointer':'default'; }; }catch(e){}
 
 // ---------- ABAS ----------
 let activeTab=localStorage.getItem('activeTab')||'ovr';
@@ -833,23 +835,31 @@ function renderCharts(rows){
     if(horiz) o.scales.x.ticks.callback=v=>kBRL(v); else o.scales.y.ticks.callback=v=>kBRL(v);
     return o;
   };
+  // clique em qualquer barra/fatia → lançamentos que compõem o valor (respeitando os filtros ativos)
+  const clickDim=(campo,keys,nomePref)=>(e,els)=>{ if(!els.length) return; const k=keys[els[0].index];
+    drillReal((nomePref||'')+String(k), rows.filter(d=>String(d[campo])===String(k))); };
   const cl=topN(aggSoma(rows,'classe'),12);destroy('chClasse');
   const totCl=rows.reduce((s,d)=>s+d.valor,0);
   const optCl=opts(true);
   optCl.plugins.tooltip.callbacks.label=c=>BRL.format(c.parsed.x)+'  ('+(totCl?(c.parsed.x/totCl*100):0).toFixed(1).replace('.',',')+'% do total)';
+  optCl.onClick=clickDim('classe',cl.map(x=>x[0]),'Classe ');
   charts.chClasse=new Chart('chClasse',{type:'bar',data:{labels:cl.map(x=>x[0]),datasets:[{data:cl.map(x=>x[1]),backgroundColor:'#00A0A8'}]},options:optCl});
   const ce=topN(aggSoma(rows,'centro'),12);destroy('chCentro');
-  charts.chCentro=new Chart('chCentro',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:'#FCB316'}]},options:opts(true)});
+  const optCe=opts(true); optCe.onClick=clickDim('centro',ce.map(x=>x[0]),'Centro ');
+  charts.chCentro=new Chart('chCentro',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:'#FCB316'}]},options:optCe});
   const pm=aggSoma(rows,'mes');const meses=Object.keys(pm).sort((a,b)=>mesOrd(a)-mesOrd(b));destroy('chMes');
-  charts.chMes=new Chart('chMes',{type:'bar',data:{labels:meses,datasets:[{data:meses.map(m=>pm[m]),backgroundColor:'#00A0A8'}]},options:opts(false)});
+  const optM=opts(false); optM.onClick=clickDim('mes',meses,'Mês ');
+  charts.chMes=new Chart('chMes',{type:'bar',data:{labels:meses,datasets:[{data:meses.map(m=>pm[m]),backgroundColor:'#00A0A8'}]},options:optM});
   const ob=topN(aggSoma(rows,'objeto'),10);destroy('chObjeto');
   charts.chObjeto=new Chart('chObjeto',{type:'doughnut',data:{labels:ob.map(x=>x[0]),datasets:[{data:ob.map(x=>Math.abs(x[1])),backgroundColor:COLORS,borderColor:'#1e293b',borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>c.label+': '+BRL.format(c.parsed)}}}}});
+    options:{responsive:true,maintainAspectRatio:false,onClick:clickDim('objeto',ob.map(x=>x[0]),'Objeto '),
+      plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>c.label+': '+BRL.format(c.parsed)}}}}});
 
   // Custo por Localidade
   const lo=aggSoma(rows,'loc');const loKeys=Object.keys(lo).sort((a,b)=>lo[b]-lo[a]);const totLo=loKeys.reduce((s,k)=>s+Math.abs(lo[k]),0);destroy('chLoc');
   charts.chLoc=new Chart('chLoc',{type:'doughnut',data:{labels:loKeys,datasets:[{data:loKeys.map(k=>Math.abs(lo[k])),backgroundColor:['#00A0A8','#FCB316','#02585C','#E4562E'],borderColor:'#1e293b',borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:12},boxWidth:12}},
+    options:{responsive:true,maintainAspectRatio:false,onClick:clickDim('loc',loKeys,''),
+      plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:12},boxWidth:12}},
       tooltip:{callbacks:{label:c=>c.label+': '+BRL.format(c.parsed)+' ('+(totLo?(c.parsed/totLo*100):0).toFixed(1).replace('.',',')+'%)'}}}}});
 
   renderPareto(rows);
@@ -868,6 +878,10 @@ function renderPareto(rows){
     {type:'bar',label:'Custo',data:items.map(x=>x[1]),backgroundColor:'#00A0A8',yAxisID:'y',order:2},
     {type:'line',label:'% acumulado',data:cum,borderColor:'#FCB316',backgroundColor:'#FCB316',yAxisID:'y2',tension:.2,pointRadius:3,order:1}
   ]},options:{responsive:true,maintainAspectRatio:false,
+    onClick:(e,els)=>{ if(!els.length) return; const k=items[els[0].index][0];
+      const topSet=new Set(items.map(x=>x[0]));
+      if(k==='Outros') drillReal('Pareto · Outros (fora do top 15)', rows.filter(d=>!topSet.has(String(d[dim]))&&agg[String(d[dim])]>0));
+      else drillReal('Pareto · '+k, rows.filter(d=>String(d[dim])===String(k))); },
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.type==='line'?'Acumulado: '+c.parsed.y.toFixed(1).replace('.',',')+'%':BRL.format(c.parsed.y)+' ('+(tot?c.parsed.y/tot*100:0).toFixed(1).replace('.',',')+'%)'}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:55,minRotation:30,font:{size:10}}},
       y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},
@@ -912,7 +926,14 @@ function opsSerie(loc,meses,costReal,orcCost){
   const dif=meses.map((m,i)=>(real[i]!=null&&orc[i]!=null)?real[i]-orc[i]:null);
   return {real,orc,dif};
 }
-function opsChart(id,meses,s,tipo){
+// clique numa barra/ponto: abre os lançamentos (real) ou as linhas do orçamento (orçado) daquele mês
+function opsClick(ctx,meses){
+  return (e,els)=>{ if(!els.length||!ctx) return;
+    const ch=e.chart||charts[ctx.id]; const lbl=ch.data.datasets[els[0].datasetIndex].label; const m=meses[els[0].index];
+    if(lbl==='Orçado') drillOrcam(ctx.catName+' · Orçado · '+ctx.loc+' · '+m, ORCAMENTO.filter(o=>ctx.inc.has(o.cat)&&/variav/.test(norm(o.tipo))&&o.regiao===ctx.loc&&o.mes===m));
+    else drillReal(ctx.catName+' · Realizado · '+ctx.loc+' · '+m, DADOS.filter(d=>ctx.inc.has(catDeLinha(d))&&d.loc===ctx.loc&&d.mes===m)); };
+}
+function opsChart(id,meses,s,tipo,ctx){
   destroy(id);
   const rkm2=v=>v==null?'':v.toFixed(2).replace('.',',');
   const barOrc={type:'bar',label:'Orçado',data:s.orc,backgroundColor:'#FCB316',order:3,datalabels:{display:false}};
@@ -924,6 +945,7 @@ function opsChart(id,meses,s,tipo){
   let ds; if(tipo==='linhas') ds=[linOrc,linReal,linDif]; else if(tipo==='barras') ds=[barOrc,barReal]; else ds=[barOrc,barReal,linDif];
   const temDif=tipo!=='barras';
   charts[id]=new Chart(id,{data:{labels:meses,datasets:ds},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},
+    onClick:opsClick(ctx,meses),
     plugins:{legend:{labels:{color:'#e2e8f0',font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':BRL.format(c.parsed.y)+'/km')}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},
       y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>BRL.format(v)}},
@@ -941,8 +963,8 @@ function renderOpsCalc(){
   const costReal={};DADOS.forEach(d=>{if(inc.has(catDeLinha(d))){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
   // orçado do ORÇAMENTO consolidado (Custos Variáveis) por categoria×região×mês, com crédito PIS/Cofins (-9,25%)
   const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+o.valor*fPC;}});
-  opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcCost),tipo);
-  opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcCost),tipo);
+  opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcCost),tipo,{id:'chOpsAM',loc:'Amazonas',inc,catName:GRUPO_NOME[cat]});
+  opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcCost),tipo,{id:'chOpsMA',loc:'Maranhão',inc,catName:GRUPO_NOME[cat]});
   document.getElementById('opsTag').textContent=GRUPO_NOME[cat]+' · R$/km por região';
   const agg=loc=>{let c=0,kmR=0,cOrc=0,kmO=0;meses.forEach(m=>{const km=kmGet(loc,m,'km');if(km){c+=costReal[loc+'|'+m]||0;kmR+=km;}const kmo=kmGet(loc,m,'kmOrc');const oc=orcCost[loc+'|'+m];if(kmo&&oc){cOrc+=oc;kmO+=kmo;}});return{c,kmR,cOrc,kmO};};
   const A=agg('Amazonas'),M=agg('Maranhão');
@@ -982,7 +1004,7 @@ function kpiSeries(cat){ // custo por região|mês da categoria (manutenção in
   const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+o.valor*fPC;}});
   return {costReal,orcCost};
 }
-function kpiChart(id,meses,s){
+function kpiChart(id,meses,s,ctx){
   destroy(id);
   const rkm2=v=>v==null?'':v.toFixed(2).replace('.',',');
   const lblBar=cor=>({display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,anchor:'end',align:'top',color:cor,font:{weight:'700',size:10},formatter:v=>rkm2(v)});
@@ -997,6 +1019,7 @@ function kpiChart(id,meses,s){
         backgroundColor:'rgba(15,23,42,.85)',borderColor:ctx=>rDif(ctx.dataset.data[ctx.dataIndex])>=0?'#00B050':'#E4562E',borderWidth:1,borderRadius:5,padding:{top:2,bottom:2,left:5,right:5},
         font:{weight:'700',size:10},formatter:v=>{if(v==null)return '';const r=rDif(v);return (r>0?'+':'')+rkm2(r);}}}
   ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20,bottom:4}},
+    onClick:opsClick(ctx,meses),
     plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':BRL.format(c.parsed.y)+'/km')}}},
     scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},
       y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',font:{size:10},callback:v=>v.toFixed(2).replace('.',',')}},
@@ -1011,7 +1034,8 @@ function renderKpiPage(){
     html+=`<div class="cell"><h4>${ico} ${nome} <span class="small">Orçado × Real × Dif.</span></h4><div class="wrapk"><canvas id="kpi_${cat}_${loc==='Amazonas'?'AM':'MA'}"></canvas></div></div>`; }); });
   el.innerHTML=html;
   KPI_CATS.forEach(([cat])=>{ const {costReal,orcCost}=kpiSeries(cat);
-    ['Amazonas','Maranhão'].forEach(loc=>{ kpiChart('kpi_'+cat+'_'+(loc==='Amazonas'?'AM':'MA'),meses,opsSerie(loc,meses,costReal,orcCost)); }); });
+    const inc=new Set(cat==='manutencao'?['manutencao','lubrificantes']:[cat]);
+    ['Amazonas','Maranhão'].forEach(loc=>{ const id='kpi_'+cat+'_'+(loc==='Amazonas'?'AM':'MA'); kpiChart(id,meses,opsSerie(loc,meses,costReal,orcCost),{id,loc,inc,catName:GRUPO_NOME[cat]}); }); });
 }
 // imagem única da página KPI (título + 6 gráficos compostos num canvas só)
 function exportarKpiPNG(){
@@ -1174,12 +1198,36 @@ function abrirDrill(idx){
   document.getElementById('drillModal').classList.add('show');
 }
 function exportarDrill(){
-  if(!DRILL_LAST||!DRILL_LAST.linhas.length){ alert('Abra um item do Pareto primeiro.'); return; }
-  const h=['Mês','Localidade','Centro de custo','Classe de custo','Categoria','Fornecedor','Material/Serviço','Objeto','Origem','Valor (R$)'];
-  const rows=DRILL_LAST.linhas.map(d=>[d.mes,d.loc,d.centro||'',d.classe||'',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.forn||'',(d.material||''),(d.objeto||''),d.origem||'',d.valor]);
+  if(!DRILL_LAST){ alert('Abra um detalhamento primeiro (clique num valor de um gráfico ou tabela).'); return; }
+  if(DRILL_LAST.aoa){ baixarXlsx('Orcamento_'+DRILL_LAST.nome.slice(0,40),[{nome:'Orçamento',aoa:DRILL_LAST.aoa}]); return; }
+  const h=['Mês','Localidade','Centro de custo','Conta','Classe de custo','Categoria','Obs','Fornecedor','Material/Serviço','Objeto','Origem','Valor (R$)'];
+  const rows=DRILL_LAST.linhas.map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.forn||'',(d.material||''),(d.objeto||''),d.origem||'',d.valor]);
   const tot=DRILL_LAST.linhas.reduce((s,d)=>s+d.valor,0);
-  rows.push(['','','','','','','','','TOTAL',tot]);
+  rows.push(['','','','','','','','','','','TOTAL',tot]);
   baixarXlsx('Lancamentos_'+DRILL_LAST.nome.slice(0,40),[{nome:'Lançamentos',aoa:[h,...rows]}]);
+}
+// ---------- DRILL GENÉRICO: clique em QUALQUER gráfico e veja o que compõe o valor ----------
+function drillReal(nome, linhas){
+  linhas=[...linhas].sort((a,b)=>Math.abs(b.valor)-Math.abs(a.valor));
+  if(!linhas.length){ flash('Sem lançamentos para "'+nome+'".'); return; }
+  const tot=linhas.reduce((s,d)=>s+d.valor,0);
+  DRILL_LAST={linhas,nome};
+  document.getElementById('drillTit').innerHTML=`<b>${nome}</b> · ${INT.format(linhas.length)} lançamentos · ${BRL.format(tot)}`;
+  document.querySelector('#tabDrill thead').innerHTML='<tr><th class="txt">Mês</th><th class="txt">Local</th><th class="txt">Centro</th><th class="txt">Conta</th><th class="txt">Classe</th><th class="txt">Material / Serviço</th><th class="txt">Obs</th><th>Valor</th></tr>';
+  document.querySelector('#tabDrill tbody').innerHTML=linhas.slice(0,1000).map(d=>`<tr><td class="txt">${d.mes}</td><td class="txt">${d.loc}</td><td class="txt">${d.centro||'—'}</td><td class="txt">${d.ccod||'—'}</td><td class="txt">${(d.classe||'').slice(0,22)}</td><td class="txt" title="${String(d.material||'').replace(/"/g,'')}">${String(d.material||'—').slice(0,40)}</td><td class="txt">${d.mao?'A MÃO':(d.nr?'NR':'')}</td><td class="${d.valor<0?'neg':''}">${BRL.format(d.valor)}</td></tr>`).join('')+(linhas.length>1000?`<tr><td colspan="8" class="small txt">… mostrando 1.000 de ${INT.format(linhas.length)} (o Excel traz todos)</td></tr>`:'');
+  document.getElementById('drillModal').classList.add('show');
+}
+function drillOrcam(nome, rows){
+  const fPC=fatorPisCofins();
+  rows=[...rows].sort((a,b)=>Math.abs(b.valor)-Math.abs(a.valor));
+  if(!rows.length){ flash('Sem linhas de orçamento para "'+nome+'".'); return; }
+  const tot=rows.reduce((s,o)=>s+o.valor*fPC,0);
+  const catBloco=o=>(o.bloco?BLOCO_NOME[o.bloco]:GRUPO_NOME[o.cat])||'—';
+  DRILL_LAST={nome,aoa:[['Tipo','Mês','Região','Conta','Classe','Cat/Bloco','Valor'+(fPC<1?' (c/ crédito PIS-Cofins)':'')+' (R$)']].concat(rows.map(o=>[o.tipo,o.mes,o.regiao,o.classeCod||'',o.classeNome||'',catBloco(o),o.valor*fPC]))};
+  document.getElementById('drillTit').innerHTML=`<b>${nome}</b> · ${INT.format(rows.length)} linhas de orçamento · ${BRL.format(tot)}`;
+  document.querySelector('#tabDrill thead').innerHTML='<tr><th class="txt">Tipo</th><th class="txt">Mês</th><th class="txt">Região</th><th class="txt">Conta</th><th class="txt">Classe</th><th class="txt">Cat/Bloco</th><th>Valor</th></tr>';
+  document.querySelector('#tabDrill tbody').innerHTML=rows.slice(0,1000).map(o=>`<tr><td class="txt">${o.tipo}</td><td class="txt">${o.mes}</td><td class="txt">${o.regiao}</td><td class="txt">${o.classeCod||'—'}</td><td class="txt">${(o.classeNome||'—').slice(0,26)}</td><td class="txt">${catBloco(o)}</td><td class="${o.valor<0?'neg':''}">${BRL.format(o.valor*fPC)}</td></tr>`).join('')+(rows.length>1000?'<tr><td colspan="7" class="small txt">… mostrando 1.000 (o Excel traz todas)</td></tr>':'');
+  document.getElementById('drillModal').classList.add('show');
 }
 function fecharDrill(){ document.getElementById('drillModal').classList.remove('show'); }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharDrill(); });
@@ -1251,6 +1299,9 @@ function renderOVR(){
   const dsOVR=[{label:'Orçado',data:meses.map(m=>bm[m]),backgroundColor:'#FCB316'}];
   if(temReal) dsOVR.push({label:'Realizado',data:meses.map(m=>rm[m]||0),backgroundColor:'#00A0A8'});
   charts.chOVR=new Chart('chOVR',{type:'bar',data:{labels:meses,datasets:dsOVR},options:{responsive:true,maintainAspectRatio:false,
+    onClick:(e,els)=>{ if(!els.length) return; const m=meses[els[0].index];
+      if(dsOVR[els[0].datasetIndex].label==='Realizado'&&fReal) drillReal('Realizado · '+tipo+' · '+m, DADOS.filter(d=>fReal(d)&&d.mes===m));
+      else drillOrcam('Orçado · '+tipo+' · '+m, ORCAMENTO.filter(o=>(!tipo||o.tipo===tipo)&&o.mes===m)); },
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
 
@@ -1411,6 +1462,9 @@ function renderFixo(){
     {label:'Orçado',data:blocos.map(b=>B[b].orc),backgroundColor:'#FCB316'},
     {label:'Realizado',data:blocos.map(b=>B[b].real),backgroundColor:'#00A0A8'}]},
     options:{responsive:true,maintainAspectRatio:false,
+      onClick:(e,els)=>{ if(!els.length) return; const b=blocos[els[0].index];
+        if(els[0].datasetIndex===1) abrirDrillBloco(b);
+        else { const setReal=new Set(mesesReal); drillOrcam('Orçado '+BLOCO_NOME[b]+(loc?' · '+loc:''), ORCAMENTO.filter(o=>/fix/.test(norm(o.tipo))&&(o.bloco||blocoFixoDe(o.classeCod,o.classeNome))===b&&(!loc||o.regiao===loc)&&(!setReal.size||setReal.has(o.mes)))); } },
       plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:11}}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
   document.querySelector('#tabFixo thead').innerHTML='<tr><th class="txt">Bloco <span class="small">(clique p/ ver lançamentos)</span></th><th>Orçado</th><th>Realizado</th><th>Δ R$</th><th>Δ %</th><th class="txt">Farol</th><th>NR incluso</th></tr>';
@@ -1481,11 +1535,11 @@ function wfDados(loc,natSel){
 }
 // monta os degraus da cascata (compartilhado entre gráfico e exports)
 function wfSteps(dd){
-  const steps=[];   // {nome, delta}
+  const steps=[];   // {nome, delta, key}
   dd.cats.forEach(c=>{ const d=dd.real[c]-dd.orc[c];
     if(Math.abs(d)<1 && dd.orc[c]===0 && dd.real[c]===0) return;
-    steps.push({nome:WF_NOME[c],delta:d}); });
-  if(Math.abs(dd.nr)>=1) steps.push({nome:'Não Recorrente',delta:dd.nr});
+    steps.push({nome:WF_NOME[c],delta:d,key:c}); });
+  if(Math.abs(dd.nr)>=1) steps.push({nome:'Não Recorrente',delta:dd.nr,key:'__nr'});
   return steps;
 }
 function renderWaterfall(){
@@ -1493,21 +1547,30 @@ function renderWaterfall(){
   if(!DADOS.length||!ORCAMENTO.length){ WF_LAST=null; return; }
   const loc=wfLocSel(), nat=wfNatSel();
   const dd=wfDados(loc,nat);
-  const labels=['Orçado'], barras=[], cores=[], rotulos=[];
+  const labels=['Orçado'], barras=[], cores=[], rotulos=[], passos=['__orc'];
   barras.push([0,dd.orcTot]); cores.push('#02585C'); rotulos.push(dd.orcTot);   // total inicial (teal escuro)
   let cum=dd.orcTot;
   wfSteps(dd).forEach(st=>{
-    labels.push(st.nome);
+    labels.push(st.nome); passos.push(st.key);
     const lo=Math.min(cum,cum+st.delta), hi=Math.max(cum,cum+st.delta);
     barras.push([lo,hi]);
     cores.push(st.delta>0?'#E4562E':'#00B050');   // acima do orçado = laranja (ruim) · abaixo = verde (economia)
     rotulos.push(st.delta);
     cum+=st.delta;
   });
-  labels.push('Real'); barras.push([0,dd.realTot]); cores.push('#00A0A8'); rotulos.push(dd.realTot);   // total final (teal)
+  labels.push('Real'); barras.push([0,dd.realTot]); cores.push('#00A0A8'); rotulos.push(dd.realTot); passos.push('__real');   // total final (teal)
   WF_LAST={labels,rotulos:rotulos.slice(),loc,nat};
+  const natTxt=nat==='fixo'?'Fixos':'Variáveis', locTxt=loc?' · '+loc:'';
   charts.chWf=new Chart('chWf',{type:'bar',data:{labels,datasets:[{data:barras,backgroundColor:cores,borderWidth:0,borderRadius:2}]},
     options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},
+      onClick:(e,els)=>{ if(!els.length) return; const key=passos[els[0].index];
+        const rowsNat=DADOS.filter(d=>natDe(d)===nat&&(!loc||d.loc===loc));
+        const mesesSet=new Set(rowsNat.map(d=>d.mes));
+        const reTipo=nat==='fixo'?/fix/:/variav/;
+        if(key==='__orc') drillOrcam('Cascata · Orçado '+natTxt+locTxt, ORCAMENTO.filter(o=>reTipo.test(norm(o.tipo))&&(!loc||o.regiao===loc)&&(!mesesSet.size||mesesSet.has(o.mes))));
+        else if(key==='__real') drillReal('Cascata · Real '+natTxt+locTxt+' (sem lançamentos a mão)', rowsNat.filter(d=>!d.mao));
+        else if(key==='__nr') drillReal('Não Recorrente '+natTxt+locTxt, rowsNat.filter(d=>d.nr&&!d.mao));
+        else drillReal(WF_NOME[key]+locTxt+' · recorrente (sem NR / a mão)', rowsNat.filter(d=>!d.mao&&!d.nr&&catDeLinha(d)===key)); },
       plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>{const v=rotulos[c.dataIndex];return (c.dataIndex===0||c.dataIndex===labels.length-1?'Total: ':'Δ ')+(v>=0&&c.dataIndex!==0&&c.dataIndex!==labels.length-1?'+':'')+BRL.format(v);}}},
         datalabels:{anchor:'end',align:'end',color:'#e2e8f0',font:{weight:'700',size:10},
