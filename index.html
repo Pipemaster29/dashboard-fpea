@@ -44,7 +44,10 @@
   .ovrbox{background:linear-gradient(180deg,#16233b,#1e293b);border:1px solid var(--accent2);border-radius:14px;padding:20px;margin-bottom:30px}
   .resumo{background:rgba(0,160,168,.10);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
   .resumo b{color:#fff}
-  .tabs{display:flex;gap:6px;margin-bottom:24px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tabs{display:flex;gap:6px;margin-bottom:24px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+  .ytdbox{margin-left:auto;display:flex;align-items:center;gap:8px;padding-bottom:6px}
+  .ytdbox label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .ytdbox select{min-width:150px;padding:6px 10px;border-color:var(--accent)}
   .tabbtn{background:transparent;color:var(--muted);border:none;border-bottom:2px solid transparent;border-radius:0;padding:11px 18px;font-size:14px;font-weight:600;transition:color .16s var(--ease-out),border-color .16s var(--ease-out)}
   @media(hover:hover){.tabbtn:hover{color:var(--txt)}}
   .tabbtn:active{transform:none}
@@ -162,6 +165,7 @@
     <button class="tabbtn" data-t="ops" onclick="showTab('ops')">🚚 Operações & R$/KM</button>
     <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')">🔎 Pareto & Gargalos</button>
     <button class="tabbtn" data-t="dash" onclick="showTab('dash')">📈 Análise de Custos</button>
+    <span class="ytdbox"><label>Período (YTD)</label><select id="ytdAte" onchange="aplicarPeriodo()" title="Acumulado de janeiro até o mês escolhido — vale para TODAS as análises, drills e exports. Na nuvem fica sempre a base completa."></select></span>
   </nav>
 
   <!-- ORÇADO vs REAL -->
@@ -330,7 +334,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v34 · NR/a mão lidos de mais colunas · 10/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v35 · Período YTD (jan até o mês que escolher) · 10/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -338,7 +342,8 @@ const INT=new Intl.NumberFormat('pt-BR');
 const PCT=n=>(n>=0?'+':'')+n.toFixed(1).replace('.',',')+'%';
 const kBRL=v=>Math.abs(v)>=1000?'R$ '+(v/1000).toLocaleString('pt-BR',{maximumFractionDigits:0})+'k':'R$ '+v.toFixed(0);
 
-let DADOS=[];        // realizado
+let DADOS_RAW=[];    // realizado completo (tudo que foi carregado — é isso que vai pra nuvem)
+let DADOS=[];        // realizado da VISÃO atual (cortado pelo seletor "Período: até mês") — todas as análises leem daqui
 let ORCAMENTO=[];    // {tipo, mes, classeCod, classeNome, valor}
 let ORCKPI=null;     // {localidade:{mes:{km, custo:{manut,pneu,lubrif,comb,total}}}}  (OBZ R$/km)
 let charts={};
@@ -368,6 +373,22 @@ function applyTabs(){
   ['ovr','exec','fixo','ops','pareto','dash'].forEach(id=>{
     document.getElementById(id).classList.toggle('hidden', !(id===activeTab && avail.includes(id)));
   });
+}
+
+// ---------- PERÍODO YTD (acumulado até o mês escolhido — vale para todas as análises) ----------
+function montarYtd(){
+  const sel=document.getElementById('ytdAte'); if(!sel) return;
+  const cur=sel.value;
+  const meses=uniq(DADOS_RAW.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
+  sel.innerHTML='<option value="">jan – '+(meses.length?mesCurto(meses[meses.length-1]):'—')+' (tudo)</option>'+
+    meses.slice(0,-1).map(m=>`<option value="${m}">jan – ${mesCurto(m)}/${m.slice(3)}</option>`).join('');
+  if(cur&&meses.includes(cur)) sel.value=cur;
+}
+function aplicarPeriodo(){
+  const sel=document.getElementById('ytdAte');
+  const cut=sel?sel.value:'';
+  DADOS=cut?DADOS_RAW.filter(d=>mesOrd(d.mes)<=mesOrd(cut)):DADOS_RAW.slice();
+  atualizarUI();
 }
 
 // aviso visual rápido (não-bloqueante)
@@ -436,12 +457,12 @@ function lerArquivo(file){
         const novos=mapear(json,file.name);
         if(!novos.length){ alert('Não consegui identificar as colunas de "'+file.name+'".'); return; }
         const org=novos[0].origem;
-        const antes=DADOS.filter(d=>d.origem===org).length;
-        DADOS=DADOS.filter(d=>d.origem!==org).concat(novos); // substitui a base "org" (não soma)
+        const antes=DADOS_RAW.filter(d=>d.origem===org).length;
+        DADOS_RAW=DADOS_RAW.filter(d=>d.origem!==org).concat(novos); // substitui a base "org" (não soma)
         flash(antes?`🔄 "${org}" atualizado: ${INT.format(antes)} → ${INT.format(novos.length)} lançamentos (substituí a versão anterior).`
                    :`➕ "${org}" carregado: ${INT.format(novos.length)} lançamentos.`);
       }
-      atualizarUI();
+      aplicarPeriodo();
       agendarSalvamento();   // salva na nuvem automaticamente após atualizar
     }catch(err){ alert('Erro ao ler "'+file.name+'": '+err.message); }
   };
@@ -657,7 +678,7 @@ function blocoPorNome(n){
 function blocoDe(d){ return d.bloco||blocoFixoDe(d.ccod,d.classe); }
 // bases antigas na nuvem: deriva bloco/categoria dos fixos que vieram sem os campos novos
 function migrarDados(){
-  DADOS.forEach(d=>{
+  DADOS_RAW.forEach(d=>{
     if(natDe(d)==='fixo'&&(String(d.ccod||'').startsWith('4024')||/insumo diesel/.test(norm(d.classe)))){
       d.nat='variavel'; d.bloco=undefined; d.cat='combustivel'; return;   // Insumo Diesel em centro fixo → variável/combustível
     }
@@ -669,6 +690,7 @@ function migrarDados(){
 function natDe(d){ return d.nat||'variavel'; }
 
 function atualizarUI(){
+  montarYtd();
   const temDados=DADOS.length||ORCAMENTO.length||ORCKPI;
   document.getElementById('drop').classList.toggle('hidden', !!temDados);
   const origens=[...new Set(DADOS.map(d=>d.origem))];
@@ -1625,7 +1647,7 @@ function exportarWaterfall(){
 }
 
 function limpar(){
-  DADOS=[];ORCAMENTO=[];ORCKPI=null;_has.ovr=false;Object.keys(charts).forEach(destroy);
+  DADOS_RAW=[];DADOS=[];ORCAMENTO=[];ORCKPI=null;_has.ovr=false;Object.keys(charts).forEach(destroy);
   ['dash','ovr','exec','fixo','ops','pareto','tabs'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('drop').classList.remove('hidden');
   document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
@@ -1647,9 +1669,9 @@ async function carregarDaNuvem(){
     }
     if(data&&data.payload){
       const obj=descomprimir(data.payload);
-      DADOS=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null;
+      DADOS_RAW=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null;
       migrarDados();   // bases salvas antes dos blocos do fixo ganham bloco/categoria corretos
-      atualizarUI(); marcarAtualizado(data.updated_at);
+      aplicarPeriodo(); marcarAtualizado(data.updated_at);
     }else{
       atualizarUI();
       if(!document.getElementById('cloudInfo').textContent)
@@ -1659,10 +1681,10 @@ async function carregarDaNuvem(){
 }
 
 async function salvarNaNuvem(auto){
-  if(!DADOS.length&&!ORCAMENTO.length&&!ORCKPI){ if(!auto)alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
+  if(!DADOS_RAW.length&&!ORCAMENTO.length&&!ORCKPI){ if(!auto)alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
   const info=document.getElementById('cloudInfo'); info.innerHTML='<span class="spin"></span> salvando…';
   try{
-    const payload=comprimir({DADOS,ORCAMENTO,ORCKPI});
+    const payload=comprimir({DADOS:DADOS_RAW,ORCAMENTO,ORCKPI});   // sempre a base COMPLETA (o seletor de período é só visão)
     const {error}=await sb.from('dataset').upsert({id:'atual',payload,updated_at:new Date().toISOString()});
     if(error){ info.textContent=''; (auto?flash('⚠️ Erro ao salvar na nuvem: '+error.message):alert('Erro ao salvar na nuvem: '+error.message)); return; }
     marcarAtualizado(new Date().toISOString());
