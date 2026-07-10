@@ -94,6 +94,15 @@
   .kpipage .cell h4 .small{margin-left:auto}
   .kpipage .wrapk{position:relative;height:200px}
   @media(max-width:900px){.kpipage{grid-template-columns:1fr}}
+  /* quadro DRE (estilo do CA: cabeçalho teal, totais em faixa, subtotais indentados) */
+  .dreq th{background:#5bb7bd;color:#fff;text-transform:none;font-size:12px;letter-spacing:0;position:static}
+  .dreq thead tr:first-child th{background:#00A0A8;font-size:13px;font-weight:700}
+  .dreq td{font-variant-numeric:tabular-nums}
+  .dreq tr.dre-forte td{background:rgba(0,160,168,.10);font-weight:700}
+  .dreq tr.dre-ebit td{background:#0a6b71;color:#fff;font-weight:700}
+  .dreq tr.dre-mg td{font-style:italic;color:var(--muted)}
+  .dreq tr.dre-sub td:first-child{padding-left:26px}
+  .dreq tr.dre-sub2 td:first-child{padding-left:44px}
   .execgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px;margin-bottom:10px}
   .execard h3{display:flex;align-items:center;gap:8px;padding-right:0!important}
   .execard h3 .farol{margin-left:auto;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--panel2);border:1px solid var(--line)}
@@ -227,17 +236,19 @@
     <div class="scope">
       <label>Região</label>
       <select id="dreLoc" onchange="renderDre()"><option value="">Geral (AM + MA)</option><option>Amazonas</option><option>Maranhão</option></select>
-      <label>Visão mensal</label>
-      <select id="dreVis" onchange="renderDre()"><option value="real">Realizado por mês</option><option value="orc">Orçado por mês</option></select>
-      <span class="small">YTD segue o Período selecionado lá em cima. Tax = 9,25% sobre a receita bruta.</span>
+      <label>Mês do quadro</label>
+      <select id="dreMes" onchange="renderDre()"></select>
+      <label>Matriz mensal</label>
+      <select id="dreVis" onchange="renderDre()"><option value="real">Realizado</option><option value="orc">Orçado</option></select>
+      <span class="small">Valores em R$ mil. YTD segue o Período lá em cima. EBITDA Ajustado = recorrente (sem NR e sem lançamentos a mão); (+/−) Não Recorrente entra depois.</span>
     </div>
     <div class="resumo" id="dreResumo"></div>
     <div class="kpis" id="dreKpis"></div>
     <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chEbitda','EBITDA Orcado x Real')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chEbitda','EBITDA Orcado x Real')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chEbitda','EBITDA Orcado x Real')">⬇ Excel</button></div><h3>EBITDA por mês <span class="small">— orçado × real</span></h3><div class="wrap"><canvas id="chEbitda"></canvas></div></div>
     </div>
-    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">DRE acumulada do período <span class="small">(YTD selecionado)</span> <button class="btn-ghost" style="margin-left:12px;padding:5px 12px" onclick="exportarDreXls()">⬇ Excel da DRE</button></h3>
-    <div class="tablewrap" style="margin-bottom:20px"><table id="tabDre"><thead></thead><tbody></tbody></table></div>
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">DRE — Mês × YTD <span class="small">(R$ mil · igual ao quadro do CA)</span> <button class="btn-ghost" style="margin-left:12px;padding:5px 12px" onclick="exportarDreXls()">⬇ Excel da DRE</button></h3>
+    <div class="tablewrap dreq" style="margin-bottom:20px"><table id="tabDre"><thead></thead><tbody></tbody></table></div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Mês a mês <span class="small" id="dreVisLbl"></span></h3>
     <div class="tablewrap"><table id="tabDreMes"><thead></thead><tbody></tbody></table></div>
     <div class="note" id="dreNote"></div>
@@ -376,7 +387,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v37 · Receita & Viagens + DRE/EBITDA · 10/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v38 · Quadro DRE Mês×YTD + EBITDA Ajustado/NR · 10/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -627,10 +638,12 @@ function parseReceita(aoa){
     const conta=String(row[iCt]||'').trim();
     const contrato=contratoCanon(row[iCon]);
     const mes=String(row[iMes]||'').padStart(2,'0')+'/'+String(row[iAno]||'');
+    const qRaw=row[iViag];                               // a coluna traz o nº de viagens OU a marcação "NÃO RECORRENTE"
     out.push({mes, conta, contrato, regiao:regiaoContrato(contrato),
       tipo:conta==='3101020003'?'variavel':'fixa',      // 3101030002 e 3101020001 somam na parcela FIXA
       valor:-v,                                          // receita vem negativa (crédito) → positiva na análise
-      viag:+row[iViag]||0, texto:String(row[iTxt]||'').slice(0,60)});
+      nr:/nao recorrente/.test(norm(qRaw))||undefined,
+      viag:+qRaw||0, texto:String(row[iTxt]||'').slice(0,60)});
   }
   return out;
 }
@@ -1664,7 +1677,8 @@ function renderReceita(){
   if(!RECEITA.length) return;
   const loc=(document.getElementById('recLoc')||{}).value||'';
   const meses=recMeses(), setM=new Set(meses);
-  const R=RECEITA.filter(d=>!loc||d.regiao===loc);
+  const R=RECEITA.filter(d=>(!loc||d.regiao===loc)&&!d.nr);   // esta aba é a receita RECORRENTE — NRs vão pra DRE
+  const RNR=RECEITA.filter(d=>(!loc||d.regiao===loc)&&d.nr);
   const O=ORCREC.filter(o=>setM.has(o.mes)&&(!loc||o.regiao===loc));
   const sum=(a,f)=>a.reduce((s,x)=>s+(f?f(x):x.valor),0);
   const realF=sum(R.filter(d=>d.tipo==='fixa')), realV=sum(R.filter(d=>d.tipo==='variavel')), realT=realF+realV;
@@ -1674,9 +1688,10 @@ function renderReceita(){
   const dv=realT-orcT, dp=orcT?dv/orcT*100:0;
   document.getElementById('recTag').textContent=(loc||'Geral')+' · '+ (meses[0]||'')+'–'+(meses[meses.length-1]||'');
   document.getElementById('recResumo').innerHTML=
-    `📌 Receita bruta <b>${BRL.format(realT)}</b> vs orçado <b>${BRL.format(orcT)}</b> (<b>${PCT(dp)}</b>). `+
+    `📌 Receita bruta recorrente <b>${BRL.format(realT)}</b> vs orçado <b>${BRL.format(orcT)}</b> (<b>${PCT(dp)}</b>). `+
     `Fixa ${BRL.format(realF)} (${PCT(orcF?(realF-orcF)/orcF*100:0)}) · Variável ${BRL.format(realV)} (${PCT(orcV?(realV-orcV)/orcV*100:0)}). `+
-    `Viagens: <b>${INT.format(viagR)}</b> vs ${INT.format(Math.round(viagO))} orçadas.`;
+    `Viagens: <b>${INT.format(viagR)}</b> vs ${INT.format(Math.round(viagO))} orçadas.`+
+    (RNR.length?`<br>⚠️ <b>${INT.format(RNR.length)}</b> lançamentos de receita marcados NÃO RECORRENTE (${BRL.format(RNR.reduce((s,d)=>s+d.valor,0))}) — fora destes números, entram na linha (+/−) Não Recorrente da DRE.`:'');
   const kpis=[
     {lbl:'Receita bruta',val:BRL.format(realT),sub:'orçado '+BRL.format(orcT)},
     {lbl:'Δ vs orçado',val:(dv>=0?'+':'')+BRL.format(dv),cls:dv>=0?'neg':'pos',sub:PCT(dp)},
@@ -1742,39 +1757,59 @@ function drillOrcRec(nome,rows){
   document.getElementById('drillModal').classList.add('show');
 }
 
-// ---------- DRE / EBITDA ----------
+// ---------- DRE / EBITDA (quadro do CA: Mês × YTD, EBITDA Ajustado + Não Recorrente) ----------
 let DRE_LAST=null;
 function dreDados(loc){
   const meses=recMeses(), setM=new Set(meses), tax=taxaTax();
-  const L={};const mk=k=>L[k]||(L[k]={});
-  const add=(linha,mes,col,v)=>{ const o=mk(linha); o[mes]=o[mes]||{r:0,o:0}; o[mes][col]+=v; };
-  // Receita
-  RECEITA.forEach(d=>{ if(loc&&d.regiao!==loc) return; add('recF',d.mes,'r',d.valor*(d.tipo==='fixa'?1:0)); add('recV',d.mes,'r',d.valor*(d.tipo==='variavel'?1:0)); });
+  const L={};
+  const add=(k,mes,col,v)=>{ const o=L[k]||(L[k]={}); o[mes]=o[mes]||{r:0,o:0}; o[mes][col]+=v; };
+  // RECEITA: recorrente (sem NR) por parcela; NR vai pra linha própria
+  RECEITA.forEach(d=>{ if(loc&&d.regiao!==loc) return;
+    if(d.nr) add('recNR',d.mes,'r',d.valor);
+    else add(d.tipo==='fixa'?'recF':'recV',d.mes,'r',d.valor); });
   ORCREC.forEach(o=>{ if(!setM.has(o.mes)) return; if(loc&&o.regiao!==loc) return;
     if(o.tipo==='fixa') add('recF',o.mes,'o',o.valor); if(o.tipo==='variavel') add('recV',o.mes,'o',o.valor); });
-  // Custos (variável líquido de crédito: real KSB1 já é líquido; orçado ×0,9075 se marcado — orcVal cuida)
-  DADOS.forEach(d=>{ if(loc&&d.loc!==loc) return; add(natDe(d)==='fixo'?'cf':'cv',d.mes,'r',d.valor); });
+  // CUSTOS: recorrente sem NR e sem lançamentos a mão; NR de custo vai pra linha própria
+  DADOS.forEach(d=>{ if(loc&&d.loc!==loc) return; if(d.mao) return;
+    if(d.nr){ add('cNR',d.mes,'r',d.valor); return; }
+    if(natDe(d)==='fixo') add(catDeLinha(d)==='pessoal'?'cfPes':'cfOM',d.mes,'r',d.valor);
+    else add('cv',d.mes,'r',d.valor); });
   ORCAMENTO.forEach(o=>{ if(!setM.has(o.mes)) return; if(loc&&o.regiao!==loc) return; const t=norm(o.tipo);
     if(/variav/.test(t)) add('cv',o.mes,'o',orcVal(o));
-    else if(/fix/.test(t)) add('cf',o.mes,'o',orcVal(o));
+    else if(/fix/.test(t)) add(/pessoal/.test(t)?'cfPes':'cfOM',o.mes,'o',orcVal(o));
     else if(/sg/.test(t)) add('sga',o.mes,'o',orcVal(o)); });
   return {L,meses,tax};
 }
 function dreLinhas(dd){
-  const g=(k,mes,col)=>((dd.L[k]||{})[mes]||{r:0,o:0})[col]||0;
-  const linha=(nome,fn,sinal)=>({nome,fn,sinal});
+  const g=(k,m,c)=>((dd.L[k]||{})[m]||{r:0,o:0})[c]||0;
+  const bruta=(m,c)=>g('recF',m,c)+g('recV',m,c);
+  const liq=(m,c)=>bruta(m,c)*(1-dd.tax);
+  const custos=(m,c)=>g('cv',m,c)+g('cfPes',m,c)+g('cfOM',m,c);
+  const sga=(m,c)=>g('sga',m,'o');                                   // SG&A real ainda sem base — orçado nas duas colunas
+  const ebAj=(m,c)=>liq(m,c)-custos(m,c)-sga(m,c);
+  const nr=(m,c)=>c==='r'?(g('recNR',m,'r')-g('cNR',m,'r')):0;        // receita NR entra, custo NR (negativo=estorno) vira benefício
+  const eb=(m,c)=>ebAj(m,c)+nr(m,c);
   return [
-    linha('Receita Fixa',(m,c)=>g('recF',m,c),+1),
-    linha('Receita Variável',(m,c)=>g('recV',m,c),+1),
-    linha('(=) Receita Bruta',(m,c)=>g('recF',m,c)+g('recV',m,c),+1),
-    linha('(−) Tax ('+(dd.tax*100).toFixed(2).replace('.',',')+'%)',(m,c)=>-(g('recF',m,c)+g('recV',m,c))*dd.tax,-1),
-    linha('(=) Receita Líquida',(m,c)=>(g('recF',m,c)+g('recV',m,c))*(1-dd.tax),+1),
-    linha('(−) Custo Variável',(m,c)=>-g('cv',m,c),-1),
-    linha('(−) Custos Fixos',(m,c)=>-g('cf',m,c),-1),
-    linha('(−) SG&A (orçado)',(m,c)=>-g('sga',m,'o'),-1),   // real de SG&A ainda não carregado — usa orçado nas duas colunas
-    linha('(=) EBITDA',(m,c)=>(g('recF',m,c)+g('recV',m,c))*(1-dd.tax)-g('cv',m,c)-g('cf',m,c)-g('sga',m,'o'),+1)
+    {n:'(+) Receita Operacional Bruta',f:bruta,k:'forte'},
+    {n:'Fixa',f:(m,c)=>g('recF',m,c),k:'sub'},
+    {n:'Variável',f:(m,c)=>g('recV',m,c),k:'sub'},
+    {n:'(−) Deduções de Receita ('+(dd.tax*100).toFixed(2).replace('.',',')+'%)',f:(m,c)=>-bruta(m,c)*dd.tax},
+    {n:'(=) Receita Operacional Líquida',f:liq,k:'forte'},
+    {n:'(−) Custos Operacionais',f:(m,c)=>-custos(m,c),k:'forte'},
+    {n:'(−) Variáveis',f:(m,c)=>-g('cv',m,c),k:'sub'},
+    {n:'(−) Custos Fixos',f:(m,c)=>-(g('cfPes',m,c)+g('cfOM',m,c)),k:'sub'},
+    {n:'Pessoal',f:(m,c)=>-g('cfPes',m,c),k:'sub2'},
+    {n:'O&M — Materiais e Serviços',f:(m,c)=>-g('cfOM',m,c),k:'sub2'},
+    {n:'(−) SG&A (orçado)',f:(m,c)=>-sga(m,c)},
+    {n:'(=) EBITDA — Ajustado',f:ebAj,k:'ebit'},
+    {n:'Mg EBITDA — Ajustado',f:(m,c)=>{const l=liq(m,c);return l?ebAj(m,c)/l*100:0;},k:'mg'},
+    {n:'(+/−) Não Recorrente',f:nr},
+    {n:'(=) EBITDA',f:eb,k:'ebit'},
+    {n:'Mg EBITDA',f:(m,c)=>{const l=liq(m,c);return l?eb(m,c)/l*100:0;},k:'mg'}
   ];
 }
+const fmtMil=v=>{const x=Math.round(v/1000);const s=INT.format(Math.abs(x));return x<0?'('+s+')':s;};
+const fmtMg=v=>v.toFixed(0)+'%';
 function renderDre(){
   if(!RECEITA.length||!DADOS.length) return;
   const loc=(document.getElementById('dreLoc')||{}).value||'';
@@ -1782,56 +1817,87 @@ function renderDre(){
   const dd=dreDados(loc); DRE_LAST={dd,loc};
   const linhas=dreLinhas(dd);
   const meses=dd.meses;
+  // seletor de mês do quadro (default: último)
+  const selM=document.getElementById('dreMes');
+  if(selM){ const cur=selM.value;
+    selM.innerHTML=meses.map(m=>'<option value="'+m+'">'+m+'</option>').join('');
+    selM.value=meses.includes(cur)?cur:meses[meses.length-1]; }
+  const mesQ=selM?selM.value:meses[meses.length-1];
   const ytd=(fn,c)=>meses.reduce((s,m)=>s+fn(m,c),0);
-  const ebL=linhas[linhas.length-1], rlL=linhas[4];
-  const ebR=ytd(ebL.fn,'r'), ebO=ytd(ebL.fn,'o');
-  const rlR=ytd(rlL.fn,'r'), rlO=ytd(rlL.fn,'o');
-  const mgR=rlR?ebR/rlR*100:0, mgO=rlO?ebO/rlO*100:0;
+  const ytdMg=(l,c)=>{ // margens no YTD são recalculadas (não somadas)
+    const liqL=linhas[4], base=ytd(liqL.f,c);
+    const ebL=l.n.includes('Ajustado')?linhas[11]:linhas[14];
+    return base?ytd(ebL.f,c)/base*100:0; };
+  const ebAjL=linhas[11], nrL=linhas[13], ebL=linhas[14], liqL=linhas[4];
+  const ebAjR=ytd(ebAjL.f,'r'), ebAjO=ytd(ebAjL.f,'o');
+  const nrR=ytd(nrL.f,'r');
+  const ebR=ytd(ebL.f,'r'), ebO=ytd(ebL.f,'o');
+  const liqR=ytd(liqL.f,'r'), liqO=ytd(liqL.f,'o');
   document.getElementById('dreTag').textContent=(loc||'Geral')+' · '+(meses[0]||'')+'–'+(meses[meses.length-1]||'');
   document.getElementById('dreResumo').innerHTML=
-    `📌 EBITDA <b>${BRL.format(ebR)}</b> vs orçado <b>${BRL.format(ebO)}</b> (<b>${PCT(ebO?(ebR-ebO)/ebO*100:0)}</b>). `+
-    `Margem: <b>${mgR.toFixed(1).replace('.',',')}%</b> real × ${mgO.toFixed(1).replace('.',',')}% orçada.`;
+    '📌 EBITDA Ajustado <b>'+BRL.format(ebAjR)+'</b> vs orçado <b>'+BRL.format(ebAjO)+'</b> ('+PCT(ebAjO?(ebAjR-ebAjO)/ebAjO*100:0)+'). '+
+    'Não recorrentes: <b>'+BRL.format(nrR)+'</b> → EBITDA <b>'+BRL.format(ebR)+'</b> ('+(liqR?(ebR/liqR*100).toFixed(1).replace('.',','):0)+'% da líquida).';
   const kpis=[
+    {lbl:'EBITDA Ajustado (YTD)',val:BRL.format(ebAjR),sub:'orçado '+BRL.format(ebAjO)},
+    {lbl:'(+/−) Não Recorrente',val:(nrR>=0?'+':'')+BRL.format(nrR),cls:nrR>=0?'neg':'pos',sub:'receita NR − custos NR'},
     {lbl:'EBITDA (YTD)',val:BRL.format(ebR),sub:'orçado '+BRL.format(ebO)},
-    {lbl:'Δ EBITDA',val:(ebR-ebO>=0?'+':'')+BRL.format(ebR-ebO),cls:ebR-ebO>=0?'neg':'pos',sub:PCT(ebO?(ebR-ebO)/ebO*100:0)},
-    {lbl:'Margem EBITDA',val:mgR.toFixed(1).replace('.',',')+'%',sub:'orçada '+mgO.toFixed(1).replace('.',',')+'%'},
-    {lbl:'Receita Líquida (YTD)',val:BRL.format(rlR),sub:'orçado '+BRL.format(rlO)}
+    {lbl:'Margem EBITDA',val:(liqR?ebR/liqR*100:0).toFixed(1).replace('.',',')+'%',sub:'orçada '+(liqO?ebO/liqO*100:0).toFixed(1).replace('.',',')+'%'}
   ];
-  document.getElementById('dreKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
+  document.getElementById('dreKpis').innerHTML=kpis.map(c=>'<div class="kpi glass"><div class="lbl">'+c.lbl+'</div><div class="val '+(c.cls||'')+'">'+c.val+'</div>'+(c.sub?'<div class="sub">'+c.sub+'</div>':'')+'</div>').join('');
   destroy('chEbitda');
   charts.chEbitda=new Chart('chEbitda',{type:'bar',data:{labels:meses,datasets:[
-    {label:'Orçado',data:meses.map(m=>ebL.fn(m,'o')),backgroundColor:'#FCB316'},
-    {label:'Realizado',data:meses.map(m=>ebL.fn(m,'r')),backgroundColor:'#00A0A8'}]},
+    {label:'Orçado',data:meses.map(m=>ebL.f(m,'o')),backgroundColor:'#FCB316'},
+    {label:'Realizado (c/ NR)',data:meses.map(m=>ebL.f(m,'r')),backgroundColor:'#00A0A8'},
+    {type:'line',label:'Ajustado (recorrente)',data:meses.map(m=>ebAjL.f(m,'r')),borderColor:'#E4562E',backgroundColor:'#E4562E',tension:.25,pointRadius:4,order:0,datalabels:{display:false}}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
-  // tabela YTD
-  document.querySelector('#tabDre thead').innerHTML='<tr><th class="txt">Linha</th><th>Real (YTD)</th><th>Orçado (YTD)</th><th>Δ R$</th><th>Δ %</th></tr>';
-  document.querySelector('#tabDre tbody').innerHTML=linhas.map(l=>{
-    const r=ytd(l.fn,'r'), o=ytd(l.fn,'o'), d=r-o, p=o?d/o*100:null;
-    const bom=(l.sinal>0?d>=0:d>=0); // Δ positivo = melhor (receita maior / custo menor em valor com sinal)
-    const forte=l.nome.startsWith('(=)');
-    return `<tr${forte?' style="font-weight:700"':''}><td class="txt">${l.nome}</td><td>${BRL.format(r)}</td><td>${BRL.format(o)}</td><td class="${bom?'neg':'pos'}">${(d>=0?'+':'')+BRL.format(d)}</td><td class="${bom?'neg':'pos'}">${p==null?'—':PCT(p)}</td></tr>`;}).join('')
-    +`<tr><td class="txt">Margem EBITDA</td><td>${mgR.toFixed(1).replace('.',',')}%</td><td>${mgO.toFixed(1).replace('.',',')}%</td><td colspan="2"></td></tr>`;
-  // matriz mensal
+  // QUADRO: Mês × YTD (R$ mil)
+  document.querySelector('#tabDre thead').innerHTML=
+    '<tr><th class="txt" rowspan="2" style="vertical-align:middle">DRE'+(loc?' · '+loc:'')+'</th><th colspan="3">Mês — '+mesQ+'</th><th colspan="4">YTD — '+meses[meses.length-1]+'</th></tr>'+
+    '<tr><th>Orçado</th><th>Real</th><th>Δ</th><th>Orçado</th><th>Real</th><th>Δ</th><th>Δ %</th></tr>';
+  document.querySelector('#tabDre tbody').innerHTML=linhas.map((l,ix)=>{
+    const eMg=l.k==='mg';
+    const mo=l.f(mesQ,'o'), mr=l.f(mesQ,'r');
+    const yo=eMg?ytdMg(l,'o'):ytd(l.f,'o'), yr=eMg?ytdMg(l,'r'):ytd(l.f,'r');
+    const f=eMg?fmtMg:fmtMil;
+    const dM=eMg?'':fmtMil(mr-mo), dY=eMg?'':fmtMil(yr-yo);
+    const dp=(!eMg&&yo)?PCT((yr-yo)/Math.abs(yo)*100):'';
+    return '<tr class="dre-'+(l.k||'norm')+'"><td class="txt">'+l.n+'</td><td>'+f(mo)+'</td><td>'+f(mr)+'</td><td>'+dM+'</td><td>'+f(yo)+'</td><td>'+f(yr)+'</td><td>'+dY+'</td><td>'+dp+'</td></tr>';
+  }).join('');
+  // matriz mês a mês
   const col=vis==='real'?'r':'o';
-  document.getElementById('dreVisLbl').textContent='— '+(vis==='real'?'Realizado':'Orçado');
-  document.querySelector('#tabDreMes thead').innerHTML='<tr><th class="txt">Linha</th>'+meses.map(m=>`<th>${m}</th>`).join('')+'<th>YTD</th></tr>';
+  document.getElementById('dreVisLbl').textContent='— '+(vis==='real'?'Realizado':'Orçado')+' (R$ mil)';
+  document.querySelector('#tabDreMes thead').innerHTML='<tr><th class="txt">Linha</th>'+meses.map(m=>'<th>'+m+'</th>').join('')+'<th>YTD</th></tr>';
   document.querySelector('#tabDreMes tbody').innerHTML=linhas.map(l=>{
-    const forte=l.nome.startsWith('(=)');
-    return `<tr${forte?' style="font-weight:700"':''}><td class="txt">${l.nome}</td>`+meses.map(m=>`<td>${kBRL(l.fn(m,col))}</td>`).join('')+`<td><b>${kBRL(ytd(l.fn,col))}</b></td></tr>`;}).join('');
-  const semCF=meses.filter(m=>{ const cf=(dd.L.cf||{})[m]||{r:0,o:0}; return !cf.r&&cf.o>0; });
+    const eMg=l.k==='mg', f=eMg?fmtMg:fmtMil;
+    const y=eMg?ytdMg(l,col):ytd(l.f,col);
+    return '<tr class="dre-'+(l.k||'norm')+'"><td class="txt">'+l.n+'</td>'+meses.map(m=>'<td>'+f(l.f(m,col))+'</td>').join('')+'<td><b>'+f(y)+'</b></td></tr>';
+  }).join('');
+  const semCF=meses.filter(m=>{ const g=k=>((dd.L[k]||{})[m]||{r:0,o:0}); return !(g('cfPes').r+g('cfOM').r)&&(g('cfPes').o+g('cfOM').o)>0; });
   document.getElementById('dreNote').textContent=
-    (semCF.length?`⚠️ ${semCF.join(', ')} sem custos fixos REALIZADOS carregados — o EBITDA real desses meses fica superestimado (carregue as bases Pessoal/CF atualizadas). `:'')+
-    'Receita e Tax da base de receita (real) e do orçamento de receita. Custo variável: real KSB1 (já líquido de crédito PIS/Cofins), orçado com crédito se marcado. Custos fixos: brutos. SG&A: sem base de realizado — o ORÇADO entra nas duas colunas (Δ SG&A = 0); se o SG&A do orçamento consolidado estiver incompleto, o EBITDA aqui fica maior que o oficial. NR e lançamentos a mão inclusos (se compensam).';
+    (semCF.length?'⚠️ '+semCF.join(', ')+' sem custos fixos REALIZADOS carregados — EBITDA desses meses superestimado. ':'')+
+    'Valores em R$ mil, negativos entre parênteses. Recorrente = sem NÃO RECORRENTES e sem lançamentos a mão. (+/−) Não Recorrente = receita NR − custos NR (estornos viram benefício). SG&A: sem base de realizado — o ORÇADO entra nas duas colunas; se estiver incompleto no consolidado, o EBITDA fica maior que o oficial. Deduções = '+(dd.tax*100).toFixed(2).replace('.',',')+'% sobre a receita bruta recorrente.';
 }
 function exportarDreXls(){
   if(!DRE_LAST){ alert('Carregue receita + custos primeiro.'); return; }
   const {dd,loc}=DRE_LAST; const linhas=dreLinhas(dd); const meses=dd.meses;
-  const abas=[];
-  for(const [nome,col] of [['DRE Real','r'],['DRE Orçado','o']]){
+  const mesQ=(document.getElementById('dreMes')||{}).value||meses[meses.length-1];
+  const ytd=(fn,c)=>meses.reduce((s,m)=>s+fn(m,c),0);
+  const q=[['DRE'+(loc?' · '+loc:''),'Mês '+mesQ+' Orçado','Mês Real','Δ','YTD Orçado','YTD Real','Δ','Δ %']];
+  const liqL=linhas[4];
+  const mgY=(ebL,c)=>{ const b=ytd(liqL.f,c); return b?ytd(ebL.f,c)/b:0; };
+  linhas.forEach((l,ix)=>{
+    if(l.k==='mg'){ const ebL=linhas[ix-1];   // a linha de margem vem logo após o respectivo EBITDA
+      q.push([l.n,l.f(mesQ,'o')/100,l.f(mesQ,'r')/100,'',mgY(ebL,'o'),mgY(ebL,'r'),'','']); return; }
+    const mo=l.f(mesQ,'o'), mr=l.f(mesQ,'r'), yo=ytd(l.f,'o'), yr=ytd(l.f,'r');
+    q.push([l.n,mo,mr,mr-mo,yo,yr,yr-yo,yo?Math.round((yr-yo)/Math.abs(yo)*10000)/100:'' ]);
+  });
+  const abas=[{nome:'Quadro Mês x YTD',aoa:q}];
+  for(const [nome,col] of [['Mensal Real','r'],['Mensal Orçado','o']]){
     const aoa=[['Linha',...meses,'YTD']];
-    linhas.forEach(l=>aoa.push([l.nome,...meses.map(m=>+l.fn(m,col).toFixed(2)),+meses.reduce((s,m)=>s+l.fn(m,col),0).toFixed(2)]));
+    linhas.forEach(l=>{ if(l.k==='mg') return;
+      aoa.push([l.n,...meses.map(m=>+l.f(m,col).toFixed(2)),+ytd(l.f,col).toFixed(2)]); });
     abas.push({nome,aoa});
   }
   baixarXlsx('DRE_EBITDA'+(loc?'_'+loc:''),abas);
