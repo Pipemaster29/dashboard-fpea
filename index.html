@@ -330,7 +330,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v33 · PIS/Cofins só no variável (auditado c/ EBITDA) · 09/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v34 · NR/a mão lidos de mais colunas · 10/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -554,6 +554,9 @@ function mapear(json,nome){
   const kMat=find(['texto breve material','material']);
   const kDescr=find(['descricao']);
   const kPedido=find(['texto do pedido','texto pedido']);
+  const kCab=find(['texto cab']);                                    // Texto cab.documento
+  const kRef=keys.find(k=>norm(k)==='referencia');
+  const kDen=keys.find(k=>norm(k)==='denominacao');
   const origem=origemDe(nome);
   return json.map(row=>{
     const classe=(kClasse?String(row[kClasse]):'')||'Sem classe';
@@ -566,7 +569,8 @@ function mapear(json,nome){
     // centro M80OF* = custo fixo · M80OV* = variável · exceção: Insumo Diesel (4024*) é SEMPRE variável/combustível
     const ehDiesel=ccod.startsWith('4024')||/insumo diesel/.test(norm(classe));
     const nat=(/m80of/i.test(centro)&&!ehDiesel)?'fixo':'variavel';
-    const nb=norm(blob);
+    // flags NR / a mão: além do blob de classificação, olha Texto cab.documento, Referência e Denominação
+    const nb=norm(blob+' '+(kCab?row[kCab]:'')+' '+(kRef?row[kRef]:'')+' '+(kDen?row[kDen]:''));
     const bloco=nat==='fixo'?blocoFixoDe(ccod,classe):undefined;   // bloco da DRE (pessoal, serviços, materiais…)
     return {
       valor:num(row[kVal]),
