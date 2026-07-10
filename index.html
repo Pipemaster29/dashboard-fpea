@@ -334,7 +334,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v35 · Período YTD (jan até o mês que escolher) · 10/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v36 · reconhece Orçamento de Receita · 10/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -346,6 +346,7 @@ let DADOS_RAW=[];    // realizado completo (tudo que foi carregado — é isso q
 let DADOS=[];        // realizado da VISÃO atual (cortado pelo seletor "Período: até mês") — todas as análises leem daqui
 let ORCAMENTO=[];    // {tipo, mes, classeCod, classeNome, valor}
 let ORCKPI=null;     // {localidade:{mes:{km, custo:{manut,pneu,lubrif,comb,total}}}}  (OBZ R$/km)
+let ORCREC=[];       // orçamento de RECEITA: {tipo(fixa|variavel|viagens|cte|km|tax), contrato, regiao, mes, valor}
 let charts={};
 let sortState={col:'valor',dir:1};
 
@@ -362,7 +363,7 @@ function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch
   const el=document.getElementById(t); if(el){ el.classList.remove('tab-enter'); void el.offsetWidth; el.classList.add('tab-enter'); } }
 function applyTabs(){
   const nav=document.getElementById('tabs');
-  const temDados=DADOS.length||ORCAMENTO.length||ORCKPI;
+  const temDados=DADOS.length||ORCAMENTO.length||ORCKPI||ORCREC.length;
   const avail=['ovr','exec','fixo','ops','pareto','dash'].filter(tabHasContent);
   nav.classList.toggle('hidden', !temDados || !avail.length);
   if(!avail.includes(activeTab)) activeTab=avail[0]||'ovr';
@@ -441,7 +442,12 @@ function lerArquivo(file){
       const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
       const ws=wb.Sheets[ escolherAba(wb) ];
       const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,cellDates:true,defval:''});
-      if(ehOBZ(aoa)){
+      if(ehOrcReceita(aoa)){
+        const novos=parseOrcReceita(aoa);
+        if(!novos.length){ alert('Reconheci "'+file.name+'" como Orçamento de Receita, mas não achei valores.'); return; }
+        const antes=ORCREC.length; ORCREC=novos;
+        flash(antes?`🔄 Orçamento de Receita atualizado (${INT.format(novos.length)} linhas).`:`➕ Orçamento de Receita carregado (${INT.format(novos.length)} linhas).`);
+      }else if(ehOBZ(aoa)){
         const obz=parseOBZ(aoa);
         if(!Object.keys(obz).length){ alert('Reconheci "'+file.name+'" como Orçamento KPIs (OBZ), mas não consegui extrair o R$/km.'); return; }
         const tinha=!!ORCKPI; ORCKPI=obz;
@@ -521,6 +527,23 @@ function parseOBZ(aoa){
   return out;
 }
 
+// ----- Orçamento de RECEITA (base gerada: Tipo | Contrato | Região | Unidade | meses…) -----
+function ehOrcReceita(aoa){
+  const h=(aoa[0]||[]).map(norm);
+  return h.includes('tipo')&&h.includes('contrato')&&h.includes('regiao')&&(aoa[0]||[]).some(c=>c instanceof Date);
+}
+function parseOrcReceita(aoa){
+  const hdr=aoa[0];
+  const meses=[]; hdr.forEach((h,i)=>{ if(h instanceof Date) meses.push({i,mes:mesDe(h)}); });
+  const T={'receita fixa':'fixa','receita variavel':'variavel','viagens orcadas':'viagens','valor por cte':'cte','km ida e volta':'km','premissa tax':'tax'};
+  const out=[];
+  for(let r=1;r<aoa.length;r++){ const row=aoa[r]; if(!row) continue;
+    const tipo=T[norm(row[0])]; if(!tipo) continue;
+    const contrato=String(row[1]||'').trim(), regiao=String(row[2]||'').trim();
+    meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,contrato,regiao,mes,valor:v}); });
+  }
+  return out;
+}
 function ehOrcamento(aoa){
   for(let i=0;i<Math.min(aoa.length,15);i++){
     const row=aoa[i]||[];
@@ -691,13 +714,14 @@ function natDe(d){ return d.nat||'variavel'; }
 
 function atualizarUI(){
   montarYtd();
-  const temDados=DADOS.length||ORCAMENTO.length||ORCKPI;
+  const temDados=DADOS.length||ORCAMENTO.length||ORCKPI||ORCREC.length;
   document.getElementById('drop').classList.toggle('hidden', !!temDados);
   const origens=[...new Set(DADOS.map(d=>d.origem))];
   let badge=[];
   if(DADOS.length) badge.push('Realizado: '+origens.join(' + ')+' ('+INT.format(DADOS.length)+')');
   if(ORCAMENTO.length) badge.push('Orçamento ✓');
   if(ORCKPI) badge.push('Orçado R$/km ✓');
+  if(ORCREC.length) badge.push('Orçamento Receita ✓');
   if(!DADOS.length&&ORCAMENTO.length) badge.push('— carregue o realizado (KSB1) para ver o Orçado vs Real');
   document.getElementById('fileBadge').textContent=badge.join(' · ')||'nenhum arquivo carregado';
   if(DADOS.length){ montarFiltros(); render(); }
@@ -1647,7 +1671,7 @@ function exportarWaterfall(){
 }
 
 function limpar(){
-  DADOS_RAW=[];DADOS=[];ORCAMENTO=[];ORCKPI=null;_has.ovr=false;Object.keys(charts).forEach(destroy);
+  DADOS_RAW=[];DADOS=[];ORCAMENTO=[];ORCKPI=null;ORCREC=[];_has.ovr=false;Object.keys(charts).forEach(destroy);
   ['dash','ovr','exec','fixo','ops','pareto','tabs'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('drop').classList.remove('hidden');
   document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
@@ -1669,7 +1693,7 @@ async function carregarDaNuvem(){
     }
     if(data&&data.payload){
       const obj=descomprimir(data.payload);
-      DADOS_RAW=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null;
+      DADOS_RAW=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null; ORCREC=obj.ORCREC||[];
       migrarDados();   // bases salvas antes dos blocos do fixo ganham bloco/categoria corretos
       aplicarPeriodo(); marcarAtualizado(data.updated_at);
     }else{
@@ -1681,10 +1705,10 @@ async function carregarDaNuvem(){
 }
 
 async function salvarNaNuvem(auto){
-  if(!DADOS_RAW.length&&!ORCAMENTO.length&&!ORCKPI){ if(!auto)alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
+  if(!DADOS_RAW.length&&!ORCAMENTO.length&&!ORCKPI&&!ORCREC.length){ if(!auto)alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
   const info=document.getElementById('cloudInfo'); info.innerHTML='<span class="spin"></span> salvando…';
   try{
-    const payload=comprimir({DADOS:DADOS_RAW,ORCAMENTO,ORCKPI});   // sempre a base COMPLETA (o seletor de período é só visão)
+    const payload=comprimir({DADOS:DADOS_RAW,ORCAMENTO,ORCKPI,ORCREC});   // sempre a base COMPLETA (o seletor de período é só visão)
     const {error}=await sb.from('dataset').upsert({id:'atual',payload,updated_at:new Date().toISOString()});
     if(error){ info.textContent=''; (auto?flash('⚠️ Erro ao salvar na nuvem: '+error.message):alert('Erro ao salvar na nuvem: '+error.message)); return; }
     marcarAtualizado(new Date().toISOString());
