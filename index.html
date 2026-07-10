@@ -247,7 +247,9 @@
     <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chEbitda','EBITDA Orcado x Real')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chEbitda','EBITDA Orcado x Real')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chEbitda','EBITDA Orcado x Real')">⬇ Excel</button></div><h3>EBITDA por mês <span class="small">— orçado × real</span></h3><div class="wrap"><canvas id="chEbitda"></canvas></div></div>
     </div>
-    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">DRE — Mês × YTD <span class="small">(R$ mil · igual ao quadro do CA)</span> <button class="btn-ghost" style="margin-left:12px;padding:5px 12px" onclick="exportarDreXls()">⬇ Excel da DRE</button></h3>
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">DRE — Mês × YTD <span class="small">(R$ mil · igual ao quadro do CA)</span>
+      <button class="btn-primary" style="margin-left:12px;padding:5px 12px" onclick="exportarDrePPT()" title="Gera um slide de PowerPoint com o quadro DRE (tabela nativa editável, paleta GNL).">📊 PPT do quadro</button>
+      <button class="btn-ghost" style="margin-left:6px;padding:5px 12px" onclick="exportarDreXls()">⬇ Excel da DRE</button></h3>
     <div class="tablewrap dreq" style="margin-bottom:20px"><table id="tabDre"><thead></thead><tbody></tbody></table></div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Mês a mês <span class="small" id="dreVisLbl"></span></h3>
     <div class="tablewrap"><table id="tabDreMes"><thead></thead><tbody></tbody></table></div>
@@ -387,7 +389,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v38 · Quadro DRE Mês×YTD + EBITDA Ajustado/NR · 10/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v39 · PPT do quadro DRE + gráfico limpo · 10/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1847,8 +1849,7 @@ function renderDre(){
   destroy('chEbitda');
   charts.chEbitda=new Chart('chEbitda',{type:'bar',data:{labels:meses,datasets:[
     {label:'Orçado',data:meses.map(m=>ebL.f(m,'o')),backgroundColor:'#FCB316'},
-    {label:'Realizado (c/ NR)',data:meses.map(m=>ebL.f(m,'r')),backgroundColor:'#00A0A8'},
-    {type:'line',label:'Ajustado (recorrente)',data:meses.map(m=>ebAjL.f(m,'r')),borderColor:'#E4562E',backgroundColor:'#E4562E',tension:.25,pointRadius:4,order:0,datalabels:{display:false}}]},
+    {label:'Realizado',data:meses.map(m=>ebL.f(m,'r')),backgroundColor:'#00A0A8'}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
@@ -1901,6 +1902,45 @@ function exportarDreXls(){
     abas.push({nome,aoa});
   }
   baixarXlsx('DRE_EBITDA'+(loc?'_'+loc:''),abas);
+}
+
+// PPT do quadro DRE: tabela NATIVA editável no slide, paleta GNL (teal)
+function exportarDrePPT(){
+  if(typeof PptxGenJS==='undefined'){ alert('A biblioteca de PowerPoint não carregou (precisa de internet).'); return; }
+  if(!DRE_LAST){ alert('Carregue receita + custos primeiro.'); return; }
+  const {dd,loc}=DRE_LAST; const linhas=dreLinhas(dd); const meses=dd.meses;
+  const mesQ=(document.getElementById('dreMes')||{}).value||meses[meses.length-1];
+  const ytd=(fn,c)=>meses.reduce((s,m)=>s+fn(m,c),0);
+  const liqL=linhas[4];
+  const mgY=(ebL,c)=>{ const b=ytd(liqL.f,c); return b?ytd(ebL.f,c)/b*100:0; };
+  const C={hd:'00A0A8',hd2:'5BB7BD',forte:'D8ECEE',ebit:'00A0A8',txt:'404040',mut:'707070',br:'FFFFFF'};
+  const cell=(t,o)=>({text:String(t),options:Object.assign({fontSize:9,color:C.txt,align:'right',valign:'middle'},o)});
+  const rows=[];
+  rows.push([cell('DRE'+(loc?' · '+loc:''),{align:'left',bold:true,color:C.br,fill:C.hd,fontSize:10,rowspan:2}),
+    cell('Mês — '+mesQ,{colspan:3,align:'center',bold:true,color:C.br,fill:C.hd,fontSize:10}),
+    cell('YTD — '+meses[meses.length-1],{colspan:4,align:'center',bold:true,color:C.br,fill:C.hd,fontSize:10})]);
+  rows.push(['Orçado','Real','Δ','Orçado','Real','Δ','Δ %'].map(h=>cell(h,{bold:true,color:C.br,fill:C.hd2})));
+  linhas.forEach((l,ix)=>{
+    const eMg=l.k==='mg';
+    const mo=l.f(mesQ,'o'), mr=l.f(mesQ,'r');
+    const yo=eMg?mgY(linhas[ix-1],'o'):ytd(l.f,'o'), yr=eMg?mgY(linhas[ix-1],'r'):ytd(l.f,'r');
+    const f=eMg?fmtMg:fmtMil;
+    const dM=eMg?'':fmtMil(mr-mo), dY=eMg?'':fmtMil(yr-yo);
+    const dp=(!eMg&&yo)?PCT((yr-yo)/Math.abs(yo)*100):'';
+    let st={};
+    if(l.k==='ebit') st={fill:C.ebit,color:C.br,bold:true};
+    else if(l.k==='forte') st={fill:C.forte,bold:true,color:'1a3c3e'};
+    else if(eMg) st={italic:true,color:C.mut};
+    const ind=l.k==='sub'?'    ':(l.k==='sub2'?'        ':'');
+    rows.push([cell(ind+l.n,Object.assign({align:'left'},st)),
+      cell(f(mo),st),cell(f(mr),st),cell(dM,st),
+      cell(f(yo),st),cell(f(yr),st),cell(dY,st),cell(dp,st)]);
+  });
+  const pptx=new PptxGenJS(); pptx.defineLayout({name:'W169',width:10,height:5.63}); pptx.layout='W169';
+  const s=pptx.addSlide(); s.background={color:'FFFFFF'};
+  s.addText('DRE até o EBITDA — '+(loc||'GNL Brasil')+' · R$ mil',{x:0.35,y:0.14,w:9.3,h:0.38,fontSize:16,bold:true,color:'02585C'});
+  s.addTable(rows,{x:0.35,y:0.58,w:9.3,colW:[3.35,0.86,0.86,0.72,0.96,0.96,0.78,0.66],border:{pt:0.5,color:'DDDDDD'},rowH:0.225});
+  pptx.writeFile({fileName:('DRE_EBITDA'+(loc?'_'+loc:'')+'_'+mesQ.replace('/','-'))+'.pptx'});
 }
 
 // ---------- CASCATA (waterfall) Orçado → Real, Custos Variáveis ----------
