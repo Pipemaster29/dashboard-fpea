@@ -16,7 +16,7 @@
     --accent:#00A0A8;--accent2:#0a6b71;--good:#00B050;--bad:#E4562E;--warn:#FCB316;
     --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-in-out:cubic-bezier(0.77,0,0.175,1);}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.4}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.4}
   header{background:linear-gradient(90deg,#02585C 0%,#00A0A8 100%);border-bottom:1px solid #013b3e;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
   header h1{font-size:20px;font-weight:600;display:flex;align-items:center;gap:12px;color:#fff}
   header .brand{display:flex;align-items:center;background:#fff;border-radius:10px;padding:6px 10px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
@@ -41,17 +41,26 @@
   .hidden{display:none!important}
   .sectitle{font-size:16px;font-weight:700;margin:6px 0 16px;display:flex;align-items:center;gap:10px}
   .sectitle .tag{font-size:11px;font-weight:600;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 11px;color:var(--muted)}
-  .ovrbox{background:linear-gradient(180deg,#16233b,#1e293b);border:1px solid var(--accent2);border-radius:14px;padding:20px;margin-bottom:30px}
+  .ovrbox{background:transparent;border:none;border-radius:0;padding:0;margin-bottom:30px}
   .resumo{background:rgba(0,160,168,.10);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
   .resumo b{color:#fff}
-  .tabs{display:flex;gap:6px;margin-bottom:24px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
-  .ytdbox{margin-left:auto;display:flex;align-items:center;gap:8px;padding-bottom:6px}
+  .tabs{display:flex;gap:8px;margin:0 -28px 22px;padding:10px 28px;flex-wrap:wrap;align-items:center;
+    position:sticky;top:0;z-index:60;background:rgba(15,23,42,.82);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);border-bottom:1px solid rgba(51,65,85,.6)}
+  .ytdbox{margin-left:auto;display:flex;align-items:center;gap:8px}
   .ytdbox label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-  .ytdbox select{min-width:150px;padding:6px 10px;border-color:var(--accent)}
-  .tabbtn{background:transparent;color:var(--muted);border:none;border-bottom:2px solid transparent;border-radius:0;padding:11px 18px;font-size:14px;font-weight:600;transition:color .16s var(--ease-out),border-color .16s var(--ease-out)}
-  @media(hover:hover){.tabbtn:hover{color:var(--txt)}}
-  .tabbtn:active{transform:none}
-  .tabbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .ytdbox select{min-width:150px;padding:6px 10px;border-color:var(--accent);border-radius:20px}
+  .tabbtn{background:var(--panel);color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:8px 15px;font-size:13px;font-weight:600;transition:background-color .16s var(--ease-out),color .16s var(--ease-out),border-color .16s var(--ease-out)}
+  @media(hover:hover){.tabbtn:hover{color:var(--txt);border-color:#46587a}}
+  .tabbtn:active{transform:scale(.97)}
+  .tabbtn.active{background:var(--accent);color:#04252a;border-color:var(--accent);box-shadow:0 2px 10px rgba(0,160,168,.35)}
+  /* subnav — "páginas dentro da página" (segmented control) */
+  .subnav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:4px;margin-bottom:18px;width:max-content;max-width:100%;overflow-x:auto;scrollbar-width:none}
+  .subnav::-webkit-scrollbar{display:none}
+  .subnav button{background:transparent;color:var(--muted);border:none;border-radius:9px;padding:8px 16px;font-size:13px;font-weight:600;white-space:nowrap;flex:none}
+  .subnav button.active{background:var(--accent);color:#04252a;box-shadow:0 2px 8px rgba(0,160,168,.3)}
+  @media(hover:hover){.subnav button:not(.active):hover{color:var(--txt)}}
+  .sp{display:none}
+  .sp.active{display:block;animation:tabEnter .22s var(--ease-out)}
   @keyframes tabEnter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   .tab-enter{animation:tabEnter .24s var(--ease-out)}
   .scope{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
@@ -69,14 +78,14 @@
   #tabKm input:focus{outline:none;border-color:var(--accent)}
   .delbtn{background:transparent;color:var(--bad);border:1px solid var(--line);padding:3px 9px;border-radius:6px;font-size:14px;font-weight:700}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:22px}
-  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;transition:border-color .18s var(--ease-out),box-shadow .18s var(--ease-out)}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;transition:border-color .18s var(--ease-out),box-shadow .18s var(--ease-out);box-shadow:0 1px 2px rgba(0,0,0,.25)}
   .kpi.glass{background:rgba(255,255,255,.04)}
   @media(hover:hover){.kpi:hover{border-color:#3f5170}}
   .kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
   .kpi .val{font-size:22px;font-weight:700;overflow-wrap:anywhere}
   .kpi .sub{font-size:12px;margin-top:5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:24px}
-  .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;transition:border-color .18s var(--ease-out);min-width:0}
+  .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;transition:border-color .18s var(--ease-out);min-width:0;box-shadow:0 1px 2px rgba(0,0,0,.25)}
   .kpi{min-width:0}
   .tablewrap{max-width:100%}
   .card.full{grid-column:1/-1}
@@ -170,7 +179,9 @@
     .kpi .sub{white-space:normal}
     select{min-width:120px}
     .ytdbox{margin-left:0;width:100%;justify-content:flex-start}
-    .tabbtn{padding:9px 12px;font-size:13px}
+    .tabbtn{padding:8px 12px;font-size:12.5px}
+    .tabs{margin:0 -12px 16px;padding:8px 12px}
+    .subnav button{padding:7px 12px;font-size:12.5px}
     .sectitle{flex-wrap:wrap}
     th,td{padding:7px 8px;font-size:12px}
     .execgrid{grid-template-columns:1fr}
@@ -276,14 +287,30 @@
       <select id="dreVis" onchange="renderDre()"><option value="real">Realizado</option><option value="orc">Orçado</option></select>
       <span class="small">Valores em R$ mil. YTD segue o Período lá em cima. EBITDA Ajustado = recorrente (sem NR e sem lançamentos a mão); (+/−) Não Recorrente entra depois.</span>
     </div>
+    <div class="subnav">
+      <button class="active" data-sp="visao" onclick="showSub('dre','visao')">📌 Visão geral</button>
+      <button data-sp="pontes" onclick="showSub('dre','pontes')">🌉 Pontes do EBITDA</button>
+      <button data-sp="proj" onclick="showSub('dre','proj')">📈 Projeção & Operações</button>
+      <button data-sp="quadro" onclick="showSub('dre','quadro')">📋 Quadro DRE</button>
+      <button data-sp="resexe" onclick="showSub('dre','resexe')">📄 Resumo Executivo</button>
+    </div>
+    <div class="sp active" data-sp="visao">
     <div class="resumo" id="dreResumo"></div>
     <div class="kpis" id="dreKpis"></div>
     <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chEbitda','EBITDA Orcado x Real')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chEbitda','EBITDA Orcado x Real')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chEbitda','EBITDA Orcado x Real')">⬇ Excel</button></div><h3>EBITDA por mês <span class="small">— orçado × real</span></h3><div class="wrap"><canvas id="chEbitda"></canvas></div></div>
+    </div>
+    </div>
+    <div class="sp" data-sp="pontes">
+    <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarPontePPT()" title="Slide com as DUAS pontes (Mês + YTD) + manchete automática — igual à análise do CA.">📊 PPT (Mês+YTD)</button><button class="xls png" onclick="exportarGraficoPNG('chPonteM','Ponte EBITDA Mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPonteM','Ponte EBITDA Mes')">⬇ Excel</button></div>
         <h3>Ponte do EBITDA — Mês <span class="small" id="ponteMLbl"></span></h3><div class="wrap" style="height:300px"><canvas id="chPonteM"></canvas></div></div>
       <div class="card full"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chPonteY','Ponte EBITDA YTD')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPonteY','Ponte EBITDA YTD')">⬇ Excel</button></div>
         <h3>Ponte do EBITDA — YTD <span class="small" id="ponteYLbl"></span></h3><div class="wrap" style="height:300px"><canvas id="chPonteY"></canvas></div></div>
+    </div>
+    </div>
+    <div class="sp" data-sp="proj">
+    <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chForecast','Projecao EBITDA ano')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chForecast','Projecao EBITDA ano')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chForecast','Projecao EBITDA ano')">⬇ Excel</button></div>
         <h3>Projeção de fechamento do ano <span class="small" id="fcLbl"></span></h3>
         <div class="kpis" id="fcCards" style="margin-bottom:10px"></div>
@@ -295,19 +322,24 @@
           <div class="tablewrap" style="max-height:320px"><table id="tabOpsComp"><thead></thead><tbody></tbody></table></div>
         </div></div>
     </div>
+    </div>
+    <div class="sp" data-sp="quadro">
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">DRE — Mês × YTD <span class="small">(R$ mil · igual ao quadro do CA)</span>
       <button class="btn-primary" style="margin-left:12px;padding:5px 12px" onclick="exportarDrePPT()" title="Gera um slide de PowerPoint com o quadro DRE (tabela nativa editável, paleta GNL).">📊 PPT do quadro</button>
       <button class="btn-ghost" style="margin-left:6px;padding:5px 12px" onclick="exportarDreXls()">⬇ Excel da DRE</button></h3>
     <div class="tablewrap dreq" style="margin-bottom:20px"><table id="tabDre"><thead></thead><tbody></tbody></table></div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Mês a mês <span class="small" id="dreVisLbl"></span></h3>
     <div class="tablewrap"><table id="tabDreMes"><thead></thead><tbody></tbody></table></div>
-    <h3 style="font-size:14px;font-weight:600;margin:18px 0 10px">📄 Resumo Executivo <span class="small">— Resultados Financeiros YTD (igual ao slide do CA)</span>
+    </div>
+    <div class="sp" data-sp="resexe">
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">📄 Resumo Executivo <span class="small">— Resultados Financeiros YTD (igual ao slide do CA)</span>
       <button class="btn-primary" style="margin-left:12px;padding:5px 12px" onclick="exportarResumoPPT()" title="Gera o slide 'Resultados Financeiros — YTD' com os cards, viagens por cliente e KPIs R$/km.">📊 PPT do resumo</button></h3>
     <div class="kpis" id="resKpis"></div>
     <div class="kpis" id="resDesvios"></div>
     <div class="grid">
       <div class="card"><h3>Receita Variável — Viagens (CTEs) <span class="small">real × orçado</span></h3><div class="tablewrap" style="max-height:280px"><table id="tabResViag"><thead></thead><tbody></tbody></table></div></div>
       <div class="card"><h3>KPIs Orçamento — Custo por km médio <span class="small">(YTD · usa o KM da aba Operações)</span></h3><div class="tablewrap" style="max-height:280px"><table id="tabResKm"><thead></thead><tbody></tbody></table></div></div>
+    </div>
     </div>
     <div class="note" id="dreNote"></div>
   </div>
@@ -359,26 +391,44 @@
       </select>
       <span class="small">Digite o <b>KM realizado</b> e o <b>KM orçado</b> por mês na tabela abaixo. R$/km = custo da categoria ÷ KM.</span>
     </div>
+    <div class="subnav">
+      <button class="active" data-sp="rkm" onclick="showSub('ops','rkm')">📊 R$/km por região</button>
+      <button data-sp="kpi" onclick="showSub('ops','kpi')">📑 Página KPI</button>
+      <button data-sp="km" onclick="showSub('ops','km')">✏️ KM por mês</button>
+    </div>
+    <div class="sp active" data-sp="rkm">
     <div class="resumo" id="opsResumo" style="display:none"></div>
     <div class="kpis" id="opsKpis"></div>
     <div class="grid">
       <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOpsAM','Amazonas R$ por km')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOpsAM','Amazonas R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsAM','Amazonas R$ por km')">⬇ Excel</button></div><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
       <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOpsMA','Maranhao R$ por km')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOpsMA','Maranhao R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsMA','Maranhao R$ por km')">⬇ Excel</button></div><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
     </div>
+    </div>
+    <div class="sp" data-sp="kpi">
     <div class="card full" style="margin-bottom:24px"><div class="expbar"><button class="xls ppt" onclick="exportarKpiPPT()">📊 PPT</button><button class="xls png" onclick="exportarKpiPNG()">🖼️ Imagem</button></div>
       <h3>📑 Página KPI — R$/km <span class="small">— Combustível, Manutenção e Pneus × Amazonas e Maranhão (formato do slide do CA)</span></h3>
       <div class="kpipage" id="kpiPage"></div>
     </div>
+    </div>
+    <div class="sp" data-sp="km">
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem por mês <span class="small">(preencha à mão — realizado e orçado, por região)</span></h3>
     <div class="tablewrap"><table id="tabKm"><thead></thead><tbody></tbody></table></div>
+    </div>
     <div class="note">R$/km realizado = custo SAP da categoria (por região e mês) ÷ KM realizado. R$/km orçado = custo do orçamento ÷ KM orçado. Diferença = realizado − orçado. O KM fica salvo no navegador.</div>
   </div>
 
   <!-- PARETO & GARGALOS -->
   <div id="pareto" class="ovrbox hidden">
     <div class="sectitle">🔎 Pareto & Gargalos <span class="tag" id="pareTag">onde o custo se concentra</span></div>
+    <div class="subnav">
+      <button class="active" data-sp="grupos" onclick="showSub('pareto','grupos')">📋 Resumo por grupo</button>
+      <button data-sp="detalhe" onclick="showSub('pareto','detalhe')">🔎 Pareto detalhado</button>
+    </div>
+    <div class="sp active" data-sp="grupos">
     <div class="resumo" id="pareResumo"></div>
     <div class="tablewrap" style="margin-bottom:22px"><table id="tabResumo"><thead></thead><tbody></tbody></table></div>
+    </div>
+    <div class="sp" data-sp="detalhe">
     <div class="scope">
       <label>Grupo (gargalo)</label>
       <select id="pareGrupo" onchange="renderPareto2()"></select>
@@ -396,6 +446,7 @@
     <div class="kpis" id="pareKpis"></div>
     <div class="grid"><div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chPareto2','Pareto')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chPareto2','Pareto')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPareto2','Pareto')">⬇ Excel</button></div><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
     <div class="tablewrap"><table id="tabPareto2"><thead></thead><tbody></tbody></table></div>
+    </div>
     <div class="note">Cada valor é a soma dos lançamentos SAP (KSB1) daquele grupo/localidade. Ordenado do maior para o menor, com % do grupo e % acumulado — os poucos itens que somam ~80% são o gargalo a atacar.</div>
   </div>
 
@@ -445,7 +496,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v44 · Forecast com linha Ajustado (sem NR) · 11/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v45 · Nova navegação: subpáginas + pills estilo iOS · 11/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -470,10 +521,24 @@ try{ Chart.defaults.onHover=(e,els)=>{ const t=e.native&&e.native.target; if(t) 
 
 // ---------- ABAS ----------
 let activeTab=localStorage.getItem('activeTab')||'ovr';
+setTimeout(restoreSubs,0);   // reaplica a subpágina escolhida em cada aba (depois do parse do HTML)
 let _has={ovr:false};
 function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; if(id==='fixo') return DADOS.some(d=>natDe(d)==='fixo'); if(id==='rec') return RECEITA.length>0; if(id==='dre') return RECEITA.length>0&&DADOS.length>0; return DADOS.length>0; }
 function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs();
   const el=document.getElementById(t); if(el){ el.classList.remove('tab-enter'); void el.offsetWidth; el.classList.add('tab-enter'); } }
+// subpáginas dentro da aba (segmented control) — lembra a escolha por aba
+function showSub(tab,key){
+  try{localStorage.setItem('sub:'+tab,key);}catch(e){}
+  document.querySelectorAll('#'+tab+' .sp').forEach(d=>d.classList.toggle('active',d.dataset.sp===key));
+  document.querySelectorAll('#'+tab+' .subnav button').forEach(b=>b.classList.toggle('active',b.dataset.sp===key));
+}
+function restoreSubs(){
+  document.querySelectorAll('.subnav').forEach(nav=>{
+    const tab=nav.closest('.ovrbox,[id]')?.id; if(!tab) return;
+    let k=null; try{k=localStorage.getItem('sub:'+tab);}catch(e){}
+    if(k&&[...nav.querySelectorAll('button')].some(b=>b.dataset.sp===k)) showSub(tab,k);
+  });
+}
 function applyTabs(){
   const nav=document.getElementById('tabs');
   const temDados=DADOS.length||ORCAMENTO.length||ORCKPI||ORCREC.length||RECEITA.length;
