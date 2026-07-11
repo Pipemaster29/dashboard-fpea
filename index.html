@@ -499,7 +499,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v46 · Toolbars de filtro + header fino + focus rings · 11/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v47 · Drill-down nas pontes do EBITDA · 11/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -2092,7 +2092,7 @@ function ponteSteps(dd,g){   // g(key,col) já no escopo (mês único ou YTD)
   const ebR=ebO+deltas.reduce((s,x)=>s+x.v,0);
   return [{n:'Ebitda - BDG',v:ebO,tot:true},...deltas,{n:'Ebitda - Real',v:ebR,tot:true}];
 }
-function ponteChart(id,steps){
+function ponteChart(id,steps,mesQ,loc){
   destroy(id);
   const labels=steps.map(s=>s.n), barras=[], cores=[], rot=[];
   let cum=0;
@@ -2103,12 +2103,31 @@ function ponteChart(id,steps){
   });
   charts[id]=new Chart(id,{type:'bar',data:{labels,datasets:[{data:barras,backgroundColor:cores,borderWidth:0,borderRadius:2}]},
     options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},
+      onClick:(e,els)=>{ if(els&&els.length) drillPonte(steps[els[0].index].n,mesQ,loc); },
+      onHover:(e,els)=>{ e.native.target.style.cursor=els&&els.length?'pointer':'default'; },
       plugins:{legend:{display:false},
-        tooltip:{callbacks:{label:c=>{const v=rot[c.dataIndex];const tot=steps[c.dataIndex].tot;return (tot?'Total: ':'Δ ')+(v>=0&&!tot?'+':'')+BRL.format(v);}}},
+        tooltip:{callbacks:{label:c=>{const v=rot[c.dataIndex];const tot=steps[c.dataIndex].tot;return (tot?'Total: ':'Δ ')+(v>=0&&!tot?'+':'')+BRL.format(v)+' — clique p/ ver os lançamentos';}}},
         datalabels:{anchor:'end',align:'end',color:'#e2e8f0',font:{weight:'700',size:10},
           formatter:(_,ctx)=>{const i=ctx.dataIndex,v=rot[i];return (steps[i].tot?'':(v>=0?'+':''))+fmtMil(v);}}},
       scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',maxRotation:30,minRotation:0,font:{size:10}}},
         y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+}
+// drill da ponte: clique num degrau → lançamentos reais que compõem aquela linha (mesQ=null → YTD)
+function drillPonte(n,mesQ,loc){
+  const fM=d=>(!mesQ||d.mes===mesQ), fL=d=>(!loc||(d.loc||d.regiao)===loc);
+  const esc=(mesQ?('mês '+mesQ):'YTD')+(loc?' · '+loc:'');
+  const recMap=d=>({mes:d.mes,loc:d.regiao,centro:'',ccod:d.conta||'',classe:d.tipo==='fixa'?'Receita fixa':'Receita variável',material:d.contrato||'',nr:d.nr,mao:false,valor:d.valor});
+  if(n==='Receita Fixa') drillReal('Receita Fixa — realizado · '+esc,RECEITA.filter(d=>fM(d)&&fL(d)&&!d.nr&&d.tipo==='fixa').map(recMap));
+  else if(n==='Receita Var.') drillReal('Receita Variável — realizado · '+esc,RECEITA.filter(d=>fM(d)&&fL(d)&&!d.nr&&d.tipo==='variavel').map(recMap));
+  else if(n==='Custos Var.') drillReal('Custos Variáveis — realizado · '+esc,DADOS.filter(d=>fM(d)&&fL(d)&&!d.mao&&!d.nr&&natDe(d)==='variavel'));
+  else if(n==='Custos Pessoal') drillReal('Custos Fixos Pessoal — realizado · '+esc,DADOS.filter(d=>fM(d)&&fL(d)&&!d.mao&&!d.nr&&natDe(d)==='fixo'&&catDeLinha(d)==='pessoal'));
+  else if(n==='Custos O&M') drillReal('Custos Fixos O&M — realizado · '+esc,DADOS.filter(d=>fM(d)&&fL(d)&&!d.mao&&!d.nr&&natDe(d)==='fixo'&&catDeLinha(d)!=='pessoal'));
+  else if(n==='Não Recorrente') drillReal('Não Recorrentes — efeito no EBITDA (receita + custos com sinal invertido) · '+esc,
+    RECEITA.filter(d=>fM(d)&&fL(d)&&d.nr).map(recMap)
+      .concat(DADOS.filter(d=>fM(d)&&fL(d)&&d.nr&&!d.mao).map(d=>Object.assign({},d,{valor:-d.valor}))));
+  else if(n==='Impostos') flash('Impostos = −9,25% sobre a variação da receita bruta (premissa PIS/Cofins) — não há lançamentos.');
+  else if(n==='SG&A') flash('SG&A ainda sem base de realizado — o orçado entra nas duas colunas (Δ = 0).');
+  else flash('Este é o total da ponte — a composição completa está no Quadro DRE.');
 }
 function renderPonte(dd,mesQ,loc){
   const meses=dd.meses;
@@ -2118,7 +2137,7 @@ function renderPonte(dd,mesQ,loc){
   PONTE_LAST={sM,sY,mesQ,fim:meses[meses.length-1],loc};
   const lm=document.getElementById('ponteMLbl'); if(lm) lm.textContent='— '+mesQ+' · R$ mil (real − orçado por linha)';
   const ly=document.getElementById('ponteYLbl'); if(ly) ly.textContent='— até '+meses[meses.length-1]+' · R$ mil';
-  ponteChart('chPonteM',sM); ponteChart('chPonteY',sY);
+  ponteChart('chPonteM',sM,mesQ,loc); ponteChart('chPonteY',sY,null,loc);
 }
 function exportarPontePPT(){
   if(typeof PptxGenJS==='undefined'){ alert('A biblioteca de PowerPoint não carregou.'); return; }
