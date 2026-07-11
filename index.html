@@ -445,7 +445,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v43 · Comparativo por operação (AM × MA × Geral) · 11/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v44 · Forecast com linha Ajustado (sem NR) · 11/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -2098,36 +2098,44 @@ function renderForecast(dd,loc){
     else if(/fix/.test(t)) add(o.mes,'cf',orcVal(o));
     else if(/sg/.test(t)) add(o.mes,'sga',orcVal(o)); });
   const ebOrc=m=>{ const x=MO[m]; return x?x.rec*(1-tax)-x.cv-x.cf-x.sga:0; };
-  // EBITDA real do mês (recorrente + NR), igual ao quadro DRE
-  const ebReal=m=>{ const bruta=g('recF',m,'r')+g('recV',m,'r');
-    return bruta*(1-tax)-g('cv',m,'r')-g('cfPes',m,'r')-g('cfOM',m,'r')-g('sga',m,'o')+g('recNR',m,'r')-g('cNR',m,'r'); };
+  // EBITDA real do mês — AJUSTADO (recorrente, sem NR e sem a mão) e TOTAL (com NR)
+  const ebAjReal=m=>{ const bruta=g('recF',m,'r')+g('recV',m,'r');
+    return bruta*(1-tax)-g('cv',m,'r')-g('cfPes',m,'r')-g('cfOM',m,'r')-g('sga',m,'o'); };
+  const ebReal=m=>ebAjReal(m)+g('recNR',m,'r')-g('cNR',m,'r');
   const ano=(dd.meses[0]||Object.keys(MO)[0]||'01/2026').split('/')[1];
   const meses12=[];for(let m=1;m<=12;m++)meses12.push(String(m).padStart(2,'0')+'/'+ano);
   const setReal=new Set(dd.meses), firstProj=meses12.findIndex(m=>!setReal.has(m));
   const lastRealIdx=firstProj===-1?11:firstProj-1;
-  let cO=0,cF=0;
+  let cO=0,cF=0,cA=0;
   const serieOrc=meses12.map(m=>{cO+=ebOrc(m);return cO;});
   const serieFc=meses12.map(m=>{cF+=setReal.has(m)?ebReal(m):ebOrc(m);return cF;});
-  const fc=serieFc[11], orcTot=serieOrc[11], nProj=12-setReal.size;
+  // ajustado: YTD sem NR + os MESMOS meses futuros no orçado — mostra o fechamento recorrente
+  const serieAj=meses12.map(m=>{cA+=setReal.has(m)?ebAjReal(m):ebOrc(m);return cA;});
+  const fc=serieFc[11], fcAj=serieAj[11], orcTot=serieOrc[11], nProj=12-setReal.size;
   const lbl=document.getElementById('fcLbl');
-  if(lbl) lbl.textContent='— EBITDA acumulado: real até '+(dd.meses[dd.meses.length-1]||'—')+' + orçado nos '+nProj+' meses restantes';
+  if(lbl) lbl.textContent='— EBITDA acumulado: real até '+(dd.meses[dd.meses.length-1]||'—')+' + ORÇADO (BDG) nos '+nProj+' meses restantes — a projeção não usa média dos meses passados, então NR não entra nos meses futuros';
   const pcFc=orcTot?((fc-orcTot)/Math.abs(orcTot)*100):0;
+  const pcAj=orcTot?((fcAj-orcTot)/Math.abs(orcTot)*100):0;
   document.getElementById('fcCards').innerHTML=[
-    {lbl:'EBITDA Forecast '+ano,val:kBRL(fc),sub:'real YTD + orçado de '+nProj+' meses'},
+    {lbl:'EBITDA Forecast '+ano,val:kBRL(fc),sub:'real YTD (com NR) + orçado de '+nProj+' meses'},
+    {lbl:'Forecast Ajustado (sem NR)',val:kBRL(fcAj),sub:(pcAj>=0?'+':'')+pcAj.toFixed(1).replace('.',',')+'% vs BDG — só recorrente'},
     {lbl:'EBITDA Orçado '+ano,val:kBRL(orcTot),sub:'BDG ano cheio'},
     {lbl:'Δ Forecast vs Orçado',val:(fc-orcTot>=0?'+':'')+kBRL(fc-orcTot),sub:(pcFc>=0?'+':'')+pcFc.toFixed(1).replace('.',',')+'% vs BDG'+(loc?' · '+loc:'')}
   ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div><div class="sub">${c.sub}</div></div>`).join('');
   destroy('chForecast');
   const ultimo=(ctx,i)=>ctx.dataIndex===i;
   charts['chForecast']=new Chart('chForecast',{type:'line',data:{labels:meses12.map(mesCurto),datasets:[
-    {label:'Real + Projeção',data:serieFc,borderColor:'#00A0A8',backgroundColor:'#00A0A8',pointRadius:3,pointBackgroundColor:'#00A0A8',tension:.25,borderWidth:2.5,
+    {label:'Real + Projeção (com NR)',data:serieFc,borderColor:'#00A0A8',backgroundColor:'#00A0A8',pointRadius:3,pointBackgroundColor:'#00A0A8',tension:.25,borderWidth:2.5,
       segment:{borderDash:ctx=>ctx.p0DataIndex>=lastRealIdx?[6,5]:undefined},
       datalabels:{display:ctx=>ultimo(ctx,11)||ultimo(ctx,Math.max(lastRealIdx,0)),anchor:'end',align:'top',offset:4,color:'#e2e8f0',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}},
+    {label:'Ajustado + Projeção (sem NR)',data:serieAj,borderColor:'#6CBDC4',backgroundColor:'#6CBDC4',pointRadius:2,pointBackgroundColor:'#6CBDC4',tension:.25,borderWidth:2,
+      segment:{borderDash:ctx=>ctx.p0DataIndex>=lastRealIdx?[6,5]:undefined},
+      datalabels:{display:ctx=>ultimo(ctx,11),anchor:'end',align:'top',offset:4,color:'#6CBDC4',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}},
     {label:'Orçado acumulado',data:serieOrc,borderColor:'#FCB316',backgroundColor:'#FCB316',pointRadius:2,pointBackgroundColor:'#FCB316',tension:.25,borderWidth:2,borderDash:[3,3],
       datalabels:{display:ctx=>ultimo(ctx,11),anchor:'end',align:'bottom',offset:4,color:'#FCB316',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}}
   ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20,right:34}},
     plugins:{legend:{labels:{color:'#cbd5e1'}},
-      tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+(c.datasetIndex===0&&c.dataIndex>lastRealIdx?' (projeção)':'')}}},
+      tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+(c.datasetIndex<2&&c.dataIndex>lastRealIdx?' (projeção = orçado)':'')}}},
     scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
 }
 
