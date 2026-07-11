@@ -73,10 +73,12 @@
   .kpi.glass{background:rgba(255,255,255,.04)}
   @media(hover:hover){.kpi:hover{border-color:#3f5170}}
   .kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
-  .kpi .val{font-size:22px;font-weight:700}
+  .kpi .val{font-size:22px;font-weight:700;overflow-wrap:anywhere}
   .kpi .sub{font-size:12px;margin-top:5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:24px}
-  .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;transition:border-color .18s var(--ease-out)}
+  .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;transition:border-color .18s var(--ease-out);min-width:0}
+  .kpi{min-width:0}
+  .tablewrap{max-width:100%}
   .card.full{grid-column:1/-1}
   .expbar{position:absolute;top:12px;right:12px;z-index:3;display:flex;gap:6px}
   .xls{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;cursor:pointer;line-height:1.4}
@@ -144,6 +146,37 @@
   .drillhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;font-size:13.5px}
   .drillhead button{flex:none}
   @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}.drillbox{transform:none}}
+  /* números alinhados em todas as tabelas e KPIs */
+  td,.kpi .val{font-variant-numeric:tabular-nums}
+  /* scrollbar discreta no tema escuro */
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#33415a;border-radius:6px}
+  ::-webkit-scrollbar-thumb:hover{background:#465a7d}
+  /* telefone: espaçamentos e fontes compactos, sem estouro horizontal */
+  @media(max-width:700px){
+    main{padding:14px 12px}
+    header{padding:12px 14px}
+    header h1{font-size:16px;gap:8px}
+    header .brand img{height:26px}
+    .actions button{padding:9px 12px;font-size:12.5px}
+    .ovrbox{padding:14px 12px}
+    .card{padding:14px 12px}
+    .card .wrap{height:250px}
+    .kpipage .wrapk{height:180px}
+    .kpis{gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+    .kpi{padding:13px 14px}
+    .kpi .val{font-size:18px}
+    .kpi .sub{white-space:normal}
+    select{min-width:120px}
+    .ytdbox{margin-left:0;width:100%;justify-content:flex-start}
+    .tabbtn{padding:9px 12px;font-size:13px}
+    .sectitle{flex-wrap:wrap}
+    th,td{padding:7px 8px;font-size:12px}
+    .execgrid{grid-template-columns:1fr}
+    .drillbox{padding:12px}
+    #drillModal{padding:10px}
+  }
 </style>
 </head>
 <body>
@@ -405,7 +438,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v41 · Projeção de fechamento do ano (forecast EBITDA) · 11/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v42 · Mobile sem estouro horizontal + números tabulares · 11/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
