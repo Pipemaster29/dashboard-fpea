@@ -174,6 +174,7 @@
     .sectitle{flex-wrap:wrap}
     th,td{padding:7px 8px;font-size:12px}
     .execgrid{grid-template-columns:1fr}
+    .ocgrid{grid-template-columns:1fr!important}
     .drillbox{padding:12px}
     #drillModal{padding:10px}
   }
@@ -287,6 +288,12 @@
         <h3>Projeção de fechamento do ano <span class="small" id="fcLbl"></span></h3>
         <div class="kpis" id="fcCards" style="margin-bottom:10px"></div>
         <div class="wrap" style="height:290px"><canvas id="chForecast"></canvas></div></div>
+      <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOpsComp','EBITDA por operacao')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOpsComp','EBITDA por operacao')">🖼️ Imagem</button><button class="xls" onclick="exportarOpsCompXls()">⬇ Excel</button></div>
+        <h3>Comparativo por operação — YTD <span class="small" id="ocLbl"></span></h3>
+        <div style="display:grid;grid-template-columns:minmax(260px,1.1fr) 2fr;gap:16px;align-items:start" class="ocgrid">
+          <div class="wrap" style="height:280px"><canvas id="chOpsComp"></canvas></div>
+          <div class="tablewrap" style="max-height:320px"><table id="tabOpsComp"><thead></thead><tbody></tbody></table></div>
+        </div></div>
     </div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">DRE — Mês × YTD <span class="small">(R$ mil · igual ao quadro do CA)</span>
       <button class="btn-primary" style="margin-left:12px;padding:5px 12px" onclick="exportarDrePPT()" title="Gera um slide de PowerPoint com o quadro DRE (tabela nativa editável, paleta GNL).">📊 PPT do quadro</button>
@@ -438,7 +445,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v42 · Mobile sem estouro horizontal + números tabulares · 11/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v43 · Comparativo por operação (AM × MA × Geral) · 11/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1933,6 +1940,7 @@ function renderDre(){
   renderPonte(dd,mesQ,loc);
   renderResumoExe(dd,loc,mesQ);
   renderForecast(dd,loc);
+  renderOpsComp();
 }
 function exportarDreXls(){
   if(!DRE_LAST){ alert('Carregue receita + custos primeiro.'); return; }
@@ -2121,6 +2129,80 @@ function renderForecast(dd,loc){
     plugins:{legend:{labels:{color:'#cbd5e1'}},
       tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+(c.datasetIndex===0&&c.dataIndex>lastRealIdx?' (projeção)':'')}}},
     scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+}
+
+// ---------- COMPARATIVO POR OPERAÇÃO (AM × MA × Geral, YTD) ----------
+let OPSCOMP_LAST=null;
+function opsCompDados(){
+  return [['Amazonas','Amazonas'],['Maranhão','Maranhão'],['','Geral (AM+MA)']].map(([loc,nome])=>{
+    const dd=dreDados(loc);
+    const g=(k,m,c)=>((dd.L[k]||{})[m]||{r:0,o:0})[c]||0;
+    const Y=(k,c)=>dd.meses.reduce((s,m)=>s+g(k,m,c),0);
+    const liq=c=>(Y('recF',c)+Y('recV',c))*(1-dd.tax);
+    const sga=Y('sga','o');
+    const ebAj=c=>liq(c)-Y('cv',c)-Y('cfPes',c)-Y('cfOM',c)-sga;
+    const nr=Y('recNR','r')-Y('cNR','r');
+    return {nome,liqR:liq('r'),liqO:liq('o'),cvR:Y('cv','r'),cvO:Y('cv','o'),
+      cfR:Y('cfPes','r')+Y('cfOM','r'),cfO:Y('cfPes','o')+Y('cfOM','o'),sga,
+      ebAjR:ebAj('r'),ebAjO:ebAj('o'),nr,ebR:ebAj('r')+nr,ebO:ebAj('o'),
+      mgR:liq('r')?(ebAj('r')+nr)/liq('r')*100:null,mgO:liq('o')?ebAj('o')/liq('o')*100:null,fim:dd.meses[dd.meses.length-1]};
+  });
+}
+function renderOpsComp(){
+  const el=document.getElementById('tabOpsComp'); if(!el) return;
+  const ops=opsCompDados(); OPSCOMP_LAST=ops;
+  const lbl=document.getElementById('ocLbl');
+  if(lbl) lbl.textContent='— até '+(ops[2].fim||'—')+' · R$ mil · Δ = real − orçado';
+  const linhas=[
+    ['(=) Receita Líquida',o=>o.liqR,o=>o.liqO],
+    ['(−) Custos Variáveis',o=>-o.cvR,o=>-o.cvO],
+    ['(−) Custos Fixos',o=>-o.cfR,o=>-o.cfO],
+    ['(−) SG&A (orçado)',o=>-o.sga,o=>-o.sga],
+    ['(=) EBITDA Ajustado',o=>o.ebAjR,o=>o.ebAjO,'forte'],
+    ['(+/−) Não Recorrente',o=>o.nr,o=>0],
+    ['(=) EBITDA',o=>o.ebR,o=>o.ebO,'ebit'],
+    ['Margem EBITDA',o=>o.mgR,o=>o.mgO,'mg']
+  ];
+  el.querySelector('thead').innerHTML='<tr><th class="txt" rowspan="2">Linha</th>'+ops.map(o=>'<th colspan="2">'+o.nome+'</th>').join('')+'</tr>'+
+    '<tr>'+ops.map(()=>'<th>Real</th><th>Δ</th>').join('')+'</tr>';
+  el.querySelector('tbody').innerHTML=linhas.map(([n,fr,fo,k])=>{
+    const cls=k?' class="dre-'+k+'"':'';
+    return '<tr'+cls+'><td class="txt">'+n+'</td>'+ops.map(o=>{
+      const r=fr(o),oc=fo(o);
+      if(k==='mg'){ const d=(r!=null&&oc!=null)?r-oc:null;
+        return '<td>'+(r==null?'—':fmtMg(r))+'</td><td>'+(d==null?'—':(d>=0?'+':'')+d.toFixed(1).replace('.',',')+'pp')+'</td>'; }
+      const d=r-oc;
+      return '<td>'+fmtMil(r)+'</td><td class="'+(d>=0?'neg':'pos')+'">'+(d>=0?'+':'')+fmtMil(d)+'</td>';
+    }).join('')+'</tr>';
+  }).join('');
+  destroy('chOpsComp');
+  const dois=ops.slice(0,2);
+  charts['chOpsComp']=new Chart('chOpsComp',{type:'bar',data:{labels:dois.map(o=>o.nome),datasets:[
+    {label:'Orçado',data:dois.map(o=>o.ebO),backgroundColor:'#FCB316',order:2,
+      datalabels:{anchor:'end',align:'top',color:'#FCB316',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}},
+    {label:'EBITDA Real',data:dois.map(o=>o.ebR),backgroundColor:'#00A0A8',order:3,
+      datalabels:{anchor:'end',align:'top',color:'#e2e8f0',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}}
+  ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},
+    plugins:{legend:{labels:{color:'#cbd5e1'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
+    scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+}
+function exportarOpsCompXls(){
+  if(!OPSCOMP_LAST){ alert('Abra a aba DRE primeiro.'); return; }
+  const ops=OPSCOMP_LAST;
+  const aoa=[['Comparativo por operação — YTD até '+(ops[2].fim||''),'','','','','',''],
+    ['Linha',...ops.flatMap(o=>[o.nome+' Real',o.nome+' Orçado'])],
+    ['Receita Líquida',...ops.flatMap(o=>[o.liqR,o.liqO])],
+    ['Custos Variáveis',...ops.flatMap(o=>[-o.cvR,-o.cvO])],
+    ['Custos Fixos',...ops.flatMap(o=>[-o.cfR,-o.cfO])],
+    ['SG&A (orçado)',...ops.flatMap(o=>[-o.sga,-o.sga])],
+    ['EBITDA Ajustado',...ops.flatMap(o=>[o.ebAjR,o.ebAjO])],
+    ['(+/−) Não Recorrente',...ops.flatMap(o=>[o.nr,0])],
+    ['EBITDA',...ops.flatMap(o=>[o.ebR,o.ebO])],
+    ['Margem EBITDA %',...ops.flatMap(o=>[o.mgR==null?'':o.mgR/100,o.mgO==null?'':o.mgO/100])]];
+  const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:24},...Array(6).fill({wch:16})];
+  XLSX.utils.book_append_sheet(wb,ws,'Por operação');
+  XLSX.writeFile(wb,'Comparativo_Operacao_YTD.xlsx');
 }
 
 // ---------- RESUMO EXECUTIVO (Resultados Financeiros YTD — slide do CA) ----------
