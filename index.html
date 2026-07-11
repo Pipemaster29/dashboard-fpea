@@ -246,6 +246,10 @@
     <div class="kpis" id="dreKpis"></div>
     <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chEbitda','EBITDA Orcado x Real')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chEbitda','EBITDA Orcado x Real')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chEbitda','EBITDA Orcado x Real')">⬇ Excel</button></div><h3>EBITDA por mês <span class="small">— orçado × real</span></h3><div class="wrap"><canvas id="chEbitda"></canvas></div></div>
+      <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarPontePPT()" title="Slide com as DUAS pontes (Mês + YTD) + manchete automática — igual à análise do CA.">📊 PPT (Mês+YTD)</button><button class="xls png" onclick="exportarGraficoPNG('chPonteM','Ponte EBITDA Mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPonteM','Ponte EBITDA Mes')">⬇ Excel</button></div>
+        <h3>Ponte do EBITDA — Mês <span class="small" id="ponteMLbl"></span></h3><div class="wrap" style="height:300px"><canvas id="chPonteM"></canvas></div></div>
+      <div class="card full"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chPonteY','Ponte EBITDA YTD')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPonteY','Ponte EBITDA YTD')">⬇ Excel</button></div>
+        <h3>Ponte do EBITDA — YTD <span class="small" id="ponteYLbl"></span></h3><div class="wrap" style="height:300px"><canvas id="chPonteY"></canvas></div></div>
     </div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">DRE — Mês × YTD <span class="small">(R$ mil · igual ao quadro do CA)</span>
       <button class="btn-primary" style="margin-left:12px;padding:5px 12px" onclick="exportarDrePPT()" title="Gera um slide de PowerPoint com o quadro DRE (tabela nativa editável, paleta GNL).">📊 PPT do quadro</button>
@@ -253,6 +257,14 @@
     <div class="tablewrap dreq" style="margin-bottom:20px"><table id="tabDre"><thead></thead><tbody></tbody></table></div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Mês a mês <span class="small" id="dreVisLbl"></span></h3>
     <div class="tablewrap"><table id="tabDreMes"><thead></thead><tbody></tbody></table></div>
+    <h3 style="font-size:14px;font-weight:600;margin:18px 0 10px">📄 Resumo Executivo <span class="small">— Resultados Financeiros YTD (igual ao slide do CA)</span>
+      <button class="btn-primary" style="margin-left:12px;padding:5px 12px" onclick="exportarResumoPPT()" title="Gera o slide 'Resultados Financeiros — YTD' com os cards, viagens por cliente e KPIs R$/km.">📊 PPT do resumo</button></h3>
+    <div class="kpis" id="resKpis"></div>
+    <div class="kpis" id="resDesvios"></div>
+    <div class="grid">
+      <div class="card"><h3>Receita Variável — Viagens (CTEs) <span class="small">real × orçado</span></h3><div class="tablewrap" style="max-height:280px"><table id="tabResViag"><thead></thead><tbody></tbody></table></div></div>
+      <div class="card"><h3>KPIs Orçamento — Custo por km médio <span class="small">(YTD · usa o KM da aba Operações)</span></h3><div class="tablewrap" style="max-height:280px"><table id="tabResKm"><thead></thead><tbody></tbody></table></div></div>
+    </div>
     <div class="note" id="dreNote"></div>
   </div>
 
@@ -389,7 +401,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v39 · PPT do quadro DRE + gráfico limpo · 10/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v40 · Ponte EBITDA + Resumo Executivo (slides do CA) · 11/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -915,8 +927,10 @@ function exportarGraficoPPT(id,nome){
   const secAxis=(info.find(x=>x.axis!==primAxis)||{}).axis;   // eixo secundário (ex.: % acumulado do Pareto)
   const temSec=!!secAxis;
   const cores=['00A0A8','FCB316','02585C','6CBDC4','E4562E'];   // paleta GNL — igual ao dashboard
-  const opts={x:0.4,y:0.95,w:9.2,h:4.45,showLegend:true,legendPos:'b',legendColor:'E2E8F0',
-    catAxisLabelColor:'94A3B8',valAxisLabelColor:'94A3B8',chartColors:cores,dataBorder:{pt:0,color:'1E293B'}};
+  const opts={x:0.4,y:0.95,w:9.2,h:4.45,showLegend:true,legendPos:'b',legendColor:'E2E8F0',legendFontSize:10,
+    catAxisLabelColor:'94A3B8',catAxisLabelFontSize:9,valAxisLabelColor:'94A3B8',valAxisLabelFontSize:9,
+    valGridLine:{color:'334155',style:'solid',size:0.5},catGridLine:{style:'none'},
+    barGapWidthPct:40,chartColors:cores,dataBorder:{pt:0,color:'1E293B'},fontFace:'Segoe UI'};
   // agrupa por tipo (preservando ordem: barras antes de linha) para combo
   const ordem=[],grupos={};
   info.forEach(x=>{ if(!grupos[x.tipo]){grupos[x.tipo]=[];ordem.push(x.tipo);} grupos[x.tipo].push(x); });
@@ -1879,6 +1893,8 @@ function renderDre(){
   document.getElementById('dreNote').textContent=
     (semCF.length?'⚠️ '+semCF.join(', ')+' sem custos fixos REALIZADOS carregados — EBITDA desses meses superestimado. ':'')+
     'Valores em R$ mil, negativos entre parênteses. Recorrente = sem NÃO RECORRENTES e sem lançamentos a mão. (+/−) Não Recorrente = receita NR − custos NR (estornos viram benefício). SG&A: sem base de realizado — o ORÇADO entra nas duas colunas; se estiver incompleto no consolidado, o EBITDA fica maior que o oficial. Deduções = '+(dd.tax*100).toFixed(2).replace('.',',')+'% sobre a receita bruta recorrente.';
+  renderPonte(dd,mesQ,loc);
+  renderResumoExe(dd,loc,mesQ);
 }
 function exportarDreXls(){
   if(!DRE_LAST){ alert('Carregue receita + custos primeiro.'); return; }
@@ -1941,6 +1957,200 @@ function exportarDrePPT(){
   s.addText('DRE até o EBITDA — '+(loc||'GNL Brasil')+' · R$ mil',{x:0.35,y:0.14,w:9.3,h:0.38,fontSize:16,bold:true,color:'02585C'});
   s.addTable(rows,{x:0.35,y:0.58,w:9.3,colW:[3.35,0.86,0.86,0.72,0.96,0.96,0.78,0.66],border:{pt:0.5,color:'DDDDDD'},rowH:0.225});
   pptx.writeFile({fileName:('DRE_EBITDA'+(loc?'_'+loc:'')+'_'+mesQ.replace('/','-'))+'.pptx'});
+}
+
+// ---------- PONTE DO EBITDA (Ebitda-BDG → deltas → Ebitda-Real), Mês e YTD ----------
+let PONTE_LAST=null;
+function ponteSteps(dd,g){   // g(key,col) já no escopo (mês único ou YTD)
+  const tax=dd.tax;
+  const bR=g('recF','r')+g('recV','r'), bO=g('recF','o')+g('recV','o');
+  const ebO=bO*(1-tax)-g('cv','o')-g('cfPes','o')-g('cfOM','o')-g('sga','o');
+  const deltas=[
+    {n:'Receita Fixa',v:g('recF','r')-g('recF','o')},
+    {n:'Receita Var.',v:g('recV','r')-g('recV','o')},
+    {n:'Impostos',v:-(bR-bO)*tax},
+    {n:'Custos Var.',v:-(g('cv','r')-g('cv','o'))},
+    {n:'Custos Pessoal',v:-(g('cfPes','r')-g('cfPes','o'))},
+    {n:'Custos O&M',v:-(g('cfOM','r')-g('cfOM','o'))},
+    {n:'SG&A',v:0},
+    {n:'Não Recorrente',v:g('recNR','r')-g('cNR','r')}
+  ];
+  const ebR=ebO+deltas.reduce((s,x)=>s+x.v,0);
+  return [{n:'Ebitda - BDG',v:ebO,tot:true},...deltas,{n:'Ebitda - Real',v:ebR,tot:true}];
+}
+function ponteChart(id,steps){
+  destroy(id);
+  const labels=steps.map(s=>s.n), barras=[], cores=[], rot=[];
+  let cum=0;
+  steps.forEach(s=>{
+    if(s.tot){ barras.push([0,s.v]); cores.push('#94a3b8'); cum=s.v; }
+    else { const lo=Math.min(cum,cum+s.v), hi=Math.max(cum,cum+s.v); barras.push([lo,hi]); cores.push(s.v>=0?'#00A0A8':'#E4562E'); cum+=s.v; }
+    rot.push(s.v);
+  });
+  charts[id]=new Chart(id,{type:'bar',data:{labels,datasets:[{data:barras,backgroundColor:cores,borderWidth:0,borderRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>{const v=rot[c.dataIndex];const tot=steps[c.dataIndex].tot;return (tot?'Total: ':'Δ ')+(v>=0&&!tot?'+':'')+BRL.format(v);}}},
+        datalabels:{anchor:'end',align:'end',color:'#e2e8f0',font:{weight:'700',size:10},
+          formatter:(_,ctx)=>{const i=ctx.dataIndex,v=rot[i];return (steps[i].tot?'':(v>=0?'+':''))+fmtMil(v);}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#94a3b8',maxRotation:30,minRotation:0,font:{size:10}}},
+        y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+}
+function renderPonte(dd,mesQ,loc){
+  const meses=dd.meses;
+  const gM=(k,c)=>((dd.L[k]||{})[mesQ]||{r:0,o:0})[c]||0;
+  const gY=(k,c)=>meses.reduce((s,m)=>s+(((dd.L[k]||{})[m]||{r:0,o:0})[c]||0),0);
+  const sM=ponteSteps(dd,gM), sY=ponteSteps(dd,gY);
+  PONTE_LAST={sM,sY,mesQ,fim:meses[meses.length-1],loc};
+  const lm=document.getElementById('ponteMLbl'); if(lm) lm.textContent='— '+mesQ+' · R$ mil (real − orçado por linha)';
+  const ly=document.getElementById('ponteYLbl'); if(ly) ly.textContent='— até '+meses[meses.length-1]+' · R$ mil';
+  ponteChart('chPonteM',sM); ponteChart('chPonteY',sY);
+}
+function exportarPontePPT(){
+  if(typeof PptxGenJS==='undefined'){ alert('A biblioteca de PowerPoint não carregou.'); return; }
+  if(!PONTE_LAST){ alert('Abra a aba DRE primeiro.'); return; }
+  const {sM,sY,mesQ,fim,loc}=PONTE_LAST;
+  const pptx=new PptxGenJS(); pptx.defineLayout({name:'W169',width:10,height:5.63}); pptx.layout='W169';
+  const s=pptx.addSlide(); s.background={color:'FFFFFF'};
+  // manchete automática (igual à análise do CA)
+  const difTot=sY[sY.length-1].v-sY[0].v;
+  const difAj=difTot-(sY.find(x=>x.n==='Não Recorrente')||{v:0}).v;
+  const MM=v=>(Math.abs(v)/1e6).toFixed(1).replace('.',',');
+  s.addShape(pptx.ShapeType.roundRect,{x:0.3,y:0.12,w:1.9,h:0.3,fill:{color:'00A0A8'},rectRadius:0.05});
+  s.addText('DRE – Real vs Orçado',{x:0.3,y:0.12,w:1.9,h:0.3,fontSize:10,bold:true,color:'FFFFFF',align:'center'});
+  s.addText([{text:'EBITDA: ',options:{color:'00A0A8',bold:true}},
+    {text:'R$ '+MM(difTot)+'MM '+(difTot>=0?'acima':'abaixo')+' do Orçamento não considerando os itens não recorrentes e R$ '+MM(difAj)+'MM no Ebitda ajustado.',options:{color:'02585C',bold:true}}],
+    {x:0.3,y:0.48,w:9.4,h:0.55,fontSize:16});
+  const wf=(steps,y,tit)=>{
+    const labels=steps.map(x=>x.n), base=[],pos=[],neg=[],tot=[];
+    let cum=0;
+    steps.forEach(x=>{ if(x.tot){ base.push(0);pos.push(0);neg.push(0);tot.push(x.v); cum=x.v; }
+      else { base.push(Math.min(cum,cum+x.v)); if(x.v>=0){pos.push(Math.abs(x.v));neg.push(0);}else{neg.push(Math.abs(x.v));pos.push(0);} tot.push(0); cum+=x.v; } });
+    s.addText(tit+'  (R$ Mil)',{x:0.35,y:y-0.32,w:9,h:0.3,fontSize:11,bold:true,color:'404040'});
+    s.addChart(pptx.ChartType.bar,[
+      {name:'Base',labels,values:base},{name:'Melhora',labels,values:pos},{name:'Piora',labels,values:neg},{name:'Total',labels,values:tot}],
+      {x:0.3,y,w:9.4,h:1.72,barGrouping:'stacked',chartColors:['FFFFFF','00A0A8','E4562E','A6A6A6'],
+       showLegend:false,showValue:false,catAxisLabelFontSize:8,catAxisLabelColor:'575757',
+       valAxisHidden:true,valAxisLabelFontSize:7,valGridLine:{style:'none'},dataBorder:{pt:0,color:'FFFFFF'}});
+  };
+  wf(sM,1.45,'EBITDA – Mês | '+mesQ+(loc?' · '+loc:''));
+  wf(sY,3.62,'EBITDA – YTD '+fim+(loc?' · '+loc:''));
+  pptx.writeFile({fileName:('Ponte_EBITDA'+(loc?'_'+loc:'')+'_'+mesQ.replace('/','-'))+'.pptx'});
+}
+
+// ---------- RESUMO EXECUTIVO (Resultados Financeiros YTD — slide do CA) ----------
+let RES_LAST=null;
+function renderResumoExe(dd,loc,mesQ){
+  const meses=dd.meses, fim=meses[meses.length-1];
+  const g=(k,m,c)=>((dd.L[k]||{})[m]||{r:0,o:0})[c]||0;
+  const Y=(k,c)=>meses.reduce((s,m)=>s+g(k,m,c),0);
+  const tax=dd.tax;
+  const brutaR=Y('recF','r')+Y('recV','r'), brutaO=Y('recF','o')+Y('recV','o');
+  const liqR=brutaR*(1-tax), liqO=brutaO*(1-tax);
+  const cvR=Y('cv','r'), cvO=Y('cv','o'), cfR=Y('cfPes','r')+Y('cfOM','r'), cfO=Y('cfPes','o')+Y('cfOM','o');
+  const sga=Y('sga','o');
+  const nr=Y('recNR','r')-Y('cNR','r');
+  const ebAjR=liqR-cvR-cfR-sga, ebAjO=liqO-cvO-cfO-sga;
+  const ebR=ebAjR+nr, ebO=ebAjO;
+  // viagens (recorrente) por cliente
+  const vR={},vO={};let vRT=0,vOT=0,vRM=0,vOM=0;
+  RECEITA.forEach(d=>{ if(loc&&d.regiao!==loc) return; if(!d.viag) return;
+    const k=recCompKey(d.contrato); vR[k]=(vR[k]||0)+d.viag; vRT+=d.viag; if(d.mes===mesQ) vRM+=d.viag; });
+  ORCREC.forEach(o=>{ if(o.tipo!=='viagens') return; if(!new Set(meses).has(o.mes)) return; if(loc&&o.regiao!==loc) return;
+    const k=recCompKey(orcRecKey(o)); vO[k]=(vO[k]||0)+o.valor; vOT+=o.valor; if(o.mes===mesQ) vOM+=o.valor; });
+  // R$/km por categoria×região (YTD, meses com km preenchido)
+  const kmTab=[];
+  [['combustivel','Combustível (Diesel)'],['manutencao','Manutenção'],['pneus','Pneus']].forEach(([cat,nome])=>{
+    const {costReal,orcCost}=kpiSeries(cat);
+    const linha={nome};
+    ['Maranhão','Amazonas'].forEach(l2=>{
+      let c=0,k=0,co=0,ko=0;
+      meses.forEach(m=>{ const km=kmGet(l2,m,'km'); if(km){c+=costReal[l2+'|'+m]||0;k+=km;}
+        const kmo=kmGet(l2,m,'kmOrc'); const oc=orcCost[l2+'|'+m]; if(kmo&&oc){co+=oc;ko+=kmo;} });
+      linha[l2]={r:k?c/k:null,o:ko?co/ko:null};
+    });
+    kmTab.push(linha);
+  });
+  RES_LAST={fim,mesQ,loc,tax,ebR,ebO,ebAjR,ebAjO,nr,liqR,liqO,cvR,cvO,cfR,cfO,sga,vR,vO,vRT,vOT,vRM,vOM,kmTab};
+  // cards
+  const pc=(r,o)=>o?PCT((r-o)/Math.abs(o)*100):'—';
+  document.getElementById('resKpis').innerHTML=[
+    {lbl:'EBITDA Total (YTD)',val:kBRL(ebR),sub:(ebR-ebO>=0?'+':'')+kBRL(ebR-ebO)+' vs orçamento ('+pc(ebR,ebO)+')'},
+    {lbl:'EBITDA Ajustado',val:pc(ebAjR,ebAjO),sub:(ebAjR-ebAjO>=0?'+':'')+kBRL(ebAjR-ebAjO)+' vs orçado'},
+    {lbl:'(+/−) Não Recorrente',val:(nr>=0?'+':'')+kBRL(nr),sub:'receita NR − custos NR'},
+    {lbl:'Receita Líquida (YTD)',val:kBRL(liqR),sub:pc(liqR,liqO)+' vs orçado'},
+    {lbl:'Viagens '+(mesQ||''),val:INT.format(vRM),sub:'orç. '+INT.format(Math.round(vOM))+' ('+(vOM?PCT((vRM-vOM)/vOM*100):'—')+')'},
+    {lbl:'Viagens YTD',val:INT.format(vRT),sub:'orç. '+INT.format(Math.round(vOT))+' ('+(vOT?PCT((vRT-vOT)/vOT*100):'—')+')'}
+  ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div><div class="sub">${c.sub}</div></div>`).join('');
+  document.getElementById('resDesvios').innerHTML=[
+    {lbl:'Custos Variáveis',r:cvR,o:cvO},{lbl:'Custos Fixos',r:cfR,o:cfO},{lbl:'SG&A (orç. nas 2 colunas)',r:sga,o:sga}
+  ].map(x=>{ const d=x.o?(x.r-x.o)/Math.abs(x.o)*100:0; const cls=d>0?'pos':'neg';
+    return `<div class="kpi glass"><div class="lbl">Desvio · ${x.lbl}</div><div class="val ${cls}">${PCT(d)}</div><div class="sub">${BRL.format(x.r)} vs ${BRL.format(x.o)} orçado</div></div>`;}).join('');
+  // tabela viagens por cliente
+  const keys=uniq(Object.keys(vR).concat(Object.keys(vO))).sort((a,b)=>(vR[b]||0)-(vR[a]||0));
+  document.querySelector('#tabResViag thead').innerHTML='<tr><th class="txt">Cliente</th><th>Real YTD</th><th>Orçado</th><th>Δ</th></tr>';
+  document.querySelector('#tabResViag tbody').innerHTML=keys.map(k=>{const r=vR[k]||0,o=Math.round(vO[k]||0),d=r-o;
+    return `<tr><td class="txt">${k}</td><td>${INT.format(r)}</td><td>${INT.format(o)}</td><td class="${d>=0?'neg':'pos'}">${(d>=0?'+':'')+INT.format(d)}</td></tr>`;}).join('')
+    +`<tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt">TOTAL</td><td>${INT.format(vRT)}</td><td>${INT.format(Math.round(vOT))}</td><td class="${vRT-vOT>=0?'neg':'pos'}">${(vRT-vOT>=0?'+':'')+INT.format(Math.round(vRT-vOT))}</td></tr>`;
+  // tabela R$/km
+  const fkm=v=>v==null?'—':'R$ '+v.toFixed(2).replace('.',',');
+  const fpct=(r,o)=>(r==null||!o)?'':' <span class="small">('+PCT((r-o)/o*100)+' vs orç.)</span>';
+  document.querySelector('#tabResKm thead').innerHTML='<tr><th class="txt">Categoria</th><th>Maranhão</th><th>Amazonas</th></tr>';
+  document.querySelector('#tabResKm tbody').innerHTML=kmTab.map(l=>
+    `<tr><td class="txt">${l.nome}</td><td>${fkm(l['Maranhão'].r)}${fpct(l['Maranhão'].r,l['Maranhão'].o)}</td><td>${fkm(l['Amazonas'].r)}${fpct(l['Amazonas'].r,l['Amazonas'].o)}</td></tr>`).join('');
+}
+function exportarResumoPPT(){
+  if(typeof PptxGenJS==='undefined'){ alert('A biblioteca de PowerPoint não carregou.'); return; }
+  if(!RES_LAST){ alert('Abra a aba DRE primeiro.'); return; }
+  const R=RES_LAST;
+  const pc=(r,o)=>o?PCT((r-o)/Math.abs(o)*100):'—';
+  const kMil=v=>{const x=Math.round(v/1000);return (x<0?'('+INT.format(-x)+')':INT.format(x));};
+  const pptx=new PptxGenJS(); pptx.defineLayout({name:'W169',width:10,height:5.63}); pptx.layout='W169';
+  const s=pptx.addSlide(); s.background={color:'FFFFFF'};
+  s.addShape(pptx.ShapeType.roundRect,{x:0.3,y:0.14,w:2.2,h:0.3,fill:{color:'00A0A8'},rectRadius:0.05});
+  s.addText('Resultados Financeiros',{x:0.3,y:0.14,w:2.2,h:0.3,fontSize:10,bold:true,color:'FFFFFF',align:'center'});
+  s.addText('Resultados Financeiros — YTD '+R.fim+(R.loc?' · '+R.loc:''),{x:0.3,y:0.5,w:9,h:0.4,fontSize:18,bold:true,color:'00A0A8'});
+  s.addText('R$ Mil · Real vs Orçado',{x:0.3,y:0.86,w:9,h:0.28,fontSize:11,bold:true,color:'575757'});
+  // cards topo
+  const card=(x,w,fill,txtColor,tit,val,sub)=>{
+    s.addShape(pptx.ShapeType.roundRect,{x,y:1.22,w,h:1.0,fill:{color:fill},line:{color:'00A0A8',width:fill==='FFFFFF'?1:0},rectRadius:0.06});
+    s.addText(tit,{x:x+0.08,y:1.27,w:w-0.16,h:0.24,fontSize:9.5,bold:true,color:txtColor==='FFFFFF'?'FFFFFF':'02585C'});
+    s.addText(val,{x:x+0.08,y:1.5,w:w-0.16,h:0.4,fontSize:17,bold:true,color:txtColor});
+    s.addText(sub,{x:x+0.08,y:1.9,w:w-0.16,h:0.26,fontSize:8,color:txtColor==='FFFFFF'?'E8FFFF':'575757'});
+  };
+  card(0.3,2.4,'00A0A8','FFFFFF','EBITDA Total (R$ Mil)',kMil(R.ebR),(R.ebR-R.ebO>=0?'+ ':'')+kMil(R.ebR-R.ebO)+' vs orçamento ('+pc(R.ebR,R.ebO)+')');
+  card(2.85,2.4,'FCB316','3A2A00','EBITDA Ajustado',pc(R.ebAjR,R.ebAjO),(R.ebAjR-R.ebAjO>=0?'+ ':'')+kMil(R.ebAjR-R.ebAjO)+' Mil vs orçado');
+  card(5.4,2.4,'FFFFFF','02585C','Receita Líquida (R$ Mil)',kMil(R.liqR)+' ('+pc(R.liqR,R.liqO)+')',kMil(R.liqR-R.liqO)+' Mil vs orçado');
+  card(7.95,1.75,'FFFFFF','02585C','Não Recorrente',(R.nr>=0?'+':'')+kMil(R.nr),'receita NR − custos NR');
+  // desvios
+  s.addText('DESVIOS VS ORÇADO — YTD',{x:0.3,y:2.34,w:5,h:0.24,fontSize:9,bold:true,color:'B23B18'});
+  const desv=(x,tit,r,o)=>{ const d=o?(r-o)/Math.abs(o)*100:0;
+    s.addShape(pptx.ShapeType.roundRect,{x,y:2.6,w:3.05,h:0.72,fill:{color:'F1F8F9'},line:{color:'CFE8EA',width:0.75},rectRadius:0.05});
+    s.addText(tit,{x:x+0.08,y:2.64,w:1.5,h:0.3,fontSize:9,bold:true,color:'02585C'});
+    s.addText(PCT(d),{x:x+0.08,y:2.9,w:1.2,h:0.34,fontSize:14,bold:true,color:d>0?'C00000':'007040'});
+    s.addText(kMil(r)+' vs '+kMil(o)+' orçado',{x:x+1.3,y:2.78,w:1.7,h:0.4,fontSize:8,color:'575757'});
+  };
+  desv(0.3,'Custos Variáveis',R.cvR,R.cvO);
+  desv(3.45,'Custos Fixos',R.cfR,R.cfO);
+  desv(6.6,'SG&A (orç.)',R.sga,R.sga);
+  // viagens por cliente (tabela)
+  s.addText('Receita Variável — Viagens (CTEs)',{x:0.3,y:3.52,w:4.6,h:0.26,fontSize:10.5,bold:true,color:'02585C'});
+  const cell=(t,o)=>({text:String(t),options:Object.assign({fontSize:8.5,color:'404040',align:'right'},o)});
+  const vKeys=uniq(Object.keys(R.vR).concat(Object.keys(R.vO))).sort((a,b)=>(R.vR[b]||0)-(R.vR[a]||0)).slice(0,7);
+  const vRows=[[cell('Cliente',{align:'left',bold:true,color:'FFFFFF',fill:'00A0A8'}),cell('Real',{bold:true,color:'FFFFFF',fill:'00A0A8'}),cell('Orç.',{bold:true,color:'FFFFFF',fill:'00A0A8'}),cell('Δ',{bold:true,color:'FFFFFF',fill:'00A0A8'})]];
+  vKeys.forEach(k=>{const r=R.vR[k]||0,o=Math.round(R.vO[k]||0),d=r-o;
+    vRows.push([cell(k,{align:'left'}),cell(INT.format(r)),cell(INT.format(o)),cell((d>=0?'+':'')+INT.format(d),{color:d>=0?'007040':'C00000',bold:true})]);});
+  vRows.push([cell('TOTAL',{align:'left',bold:true,fill:'E8F4F5'}),cell(INT.format(R.vRT),{bold:true,fill:'E8F4F5'}),cell(INT.format(Math.round(R.vOT)),{bold:true,fill:'E8F4F5'}),cell((R.vRT-R.vOT>=0?'+':'')+INT.format(Math.round(R.vRT-R.vOT)),{bold:true,fill:'E8F4F5'})]);
+  s.addTable(vRows,{x:0.3,y:3.8,w:4.55,colW:[2.15,0.8,0.8,0.8],border:{pt:0.5,color:'DDDDDD'},rowH:0.185});
+  // KPIs R$/km (tabela)
+  s.addText('KPIs Orçamento — Custo por km médio (YTD)',{x:5.15,y:3.52,w:4.55,h:0.26,fontSize:10.5,bold:true,color:'02585C'});
+  const fkm=v=>v==null?'—':'R$ '+v.toFixed(2).replace('.',',');
+  const fp=(r,o)=>(r==null||!o)?'':(' ('+PCT((r-o)/o*100)+')');
+  const kRows=[[cell('Categoria',{align:'left',bold:true,color:'FFFFFF',fill:'00A0A8'}),cell('Maranhão',{bold:true,color:'FFFFFF',fill:'00A0A8'}),cell('Amazonas',{bold:true,color:'FFFFFF',fill:'00A0A8'})]];
+  R.kmTab.forEach(l=>kRows.push([cell(l.nome,{align:'left'}),cell(fkm(l['Maranhão'].r)+fp(l['Maranhão'].r,l['Maranhão'].o)),cell(fkm(l['Amazonas'].r)+fp(l['Amazonas'].r,l['Amazonas'].o))]));
+  s.addTable(kRows,{x:5.15,y:3.8,w:4.55,colW:[1.85,1.35,1.35],border:{pt:0.5,color:'DDDDDD'},rowH:0.24});
+  s.addText('% vs orçado. R$/km usa o KM digitado na aba Operações. SG&A: orçado nas duas colunas até haver base de realizado.',{x:0.3,y:5.3,w:9.4,h:0.24,fontSize:7.5,color:'8a8a8a'});
+  pptx.writeFile({fileName:('Resultados_Financeiros_YTD_'+R.fim.replace('/','-'))+(R.loc?'_'+R.loc:'')+'.pptx'});
 }
 
 // ---------- CASCATA (waterfall) Orçado → Real, Custos Variáveis ----------
