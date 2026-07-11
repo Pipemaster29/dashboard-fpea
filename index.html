@@ -499,7 +499,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v47 · Drill-down nas pontes do EBITDA · 11/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v48 · Render preguiçoso por aba (8× mais rápido) · 11/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -528,6 +528,7 @@ setTimeout(restoreSubs,0);   // reaplica a subpágina escolhida em cada aba (dep
 let _has={ovr:false};
 function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; if(id==='fixo') return DADOS.some(d=>natDe(d)==='fixo'); if(id==='rec') return RECEITA.length>0; if(id==='dre') return RECEITA.length>0&&DADOS.length>0; return DADOS.length>0; }
 function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs();
+  renderTab(activeTab);   // render preguiçoso: a aba renderiza na primeira abertura após os dados mudarem
   const el=document.getElementById(t); if(el){ el.classList.remove('tab-enter'); void el.offsetWidth; el.classList.add('tab-enter'); } }
 // subpáginas dentro da aba (segmented control) — lembra a escolha por aba
 function showSub(tab,key){
@@ -954,10 +955,19 @@ function atualizarUI(){
   if(RECEITA.length) badge.push('Receita: '+INT.format(RECEITA.length)+' lançamentos ✓');
   if(!DADOS.length&&ORCAMENTO.length) badge.push('— carregue o realizado (KSB1) para ver o Orçado vs Real');
   document.getElementById('fileBadge').textContent=badge.join(' · ')||'nenhum arquivo carregado';
-  if(DADOS.length){ montarFiltros(); render(); }
-  montarEscopoOVR(); renderOVR(); renderOps(); renderParetoTab(); renderExec(); renderFixo(); renderReceita(); renderDre();
+  if(DADOS.length) montarFiltros();
+  montarEscopoOVR();
+  _has.ovr=ORCAMENTO.length>0&&DADOS.length>0;   // estimativa p/ a aba aparecer; o renderOVR refina ao abrir
+  marcarTudoSujo();
   applyTabs();
+  renderTab(activeTab);
 }
+// ---------- RENDER PREGUIÇOSO: só a aba visível renderiza; as outras ao serem abertas ----------
+const _dirty={};
+const RENDER_TAB={ ovr:()=>renderOVR(), rec:()=>renderReceita(), dre:()=>renderDre(), exec:()=>renderExec(),
+  fixo:()=>renderFixo(), ops:()=>renderOps(), pareto:()=>renderParetoTab(), dash:()=>{ if(DADOS.length) render(); } };
+function marcarTudoSujo(){ Object.keys(RENDER_TAB).forEach(t=>_dirty[t]=true); }
+function renderTab(t){ if(RENDER_TAB[t]&&_dirty[t]){ _dirty[t]=false; RENDER_TAB[t](); } }
 
 // ---------- filtros realizado ----------
 function uniq(a){return[...new Set(a)];}
@@ -1518,7 +1528,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharDrill(); });
 function fatorPisCofins(){ const el=document.getElementById('pisCofins'); return (el&&el.checked)?(1-0.0925):1; }
 // valor de uma linha do ORÇAMENTO: crédito PIS/Cofins só existe no VARIÁVEL — fixo e SG&A são sempre brutos (igual ao EBITDA)
 function orcVal(o){ return o.valor*(/variav/.test(norm(o.tipo))?fatorPisCofins():1); }
-function recalcOrc(){ if(ORCAMENTO.length) renderOVR(); if(DADOS.length){ renderOpsCalc(); renderParetoTab(); renderExec(); renderFixo(); } renderReceita(); renderDre(); }
+function recalcOrc(){ marcarTudoSujo(); renderTab(activeTab); }
 function montarEscopoOVR(){
   if(!ORCAMENTO.length) return;
   const tipos=uniq(ORCAMENTO.map(o=>o.tipo)).filter(Boolean).sort();
