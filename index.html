@@ -511,7 +511,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v50 · Custos pelo valor cheio na DRE (a mão neutraliza NR) · 12/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v51 · SG&A realizado na DRE e derivados · 12/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -525,6 +525,7 @@ let ORCAMENTO=[];    // {tipo, mes, classeCod, classeNome, valor}
 let ORCKPI=null;     // {localidade:{mes:{km, custo:{manut,pneu,lubrif,comb,total}}}}  (OBZ R$/km)
 let ORCREC=[];       // orçamento de RECEITA: {tipo(fixa|variavel|viagens|cte|km|tax), contrato, regiao, mes, valor}
 let RECEITA_RAW=[];  // receita REAL completa: {mes, conta, contrato, regiao, tipo(fixa|variavel), valor(+), viag, texto}
+let SGA_RAW=[],SGA=[];   // SG&A REALIZADO: {mes, conta, texto, forn, loc, valor, nr, mao}
 let RECEITA=[];      // receita real da visão (cortada pelo Período YTD)
 let charts={};
 let sortState={col:'valor',dir:1};
@@ -584,6 +585,7 @@ function aplicarPeriodo(){
   const cut=sel?sel.value:'';
   DADOS=cut?DADOS_RAW.filter(d=>mesOrd(d.mes)<=mesOrd(cut)):DADOS_RAW.slice();
   RECEITA=cut?RECEITA_RAW.filter(d=>mesOrd(d.mes)<=mesOrd(cut)):RECEITA_RAW.slice();
+  SGA=cut?SGA_RAW.filter(d=>mesOrd(d.mes)<=mesOrd(cut)):SGA_RAW.slice();
   atualizarUI();
 }
 
@@ -642,6 +644,11 @@ function lerArquivo(file){
         if(!novos.length){ alert('Reconheci "'+file.name+'" como Receita, mas não achei valores.'); return; }
         const antes=RECEITA_RAW.length; RECEITA_RAW=novos;
         flash(antes?`🔄 Receita real atualizada (${INT.format(novos.length)} lançamentos).`:`➕ Receita real carregada (${INT.format(novos.length)} lançamentos).`);
+      }else if(ehSGA(aoa)){
+        const novos=parseSGA(aoa);
+        if(!novos.length){ alert('Reconheci "'+file.name+'" como SG&A realizado, mas não achei valores.'); return; }
+        const antes=SGA_RAW.length; SGA_RAW=novos;
+        flash(antes?`🔄 SG&A real atualizado (${INT.format(novos.length)} lançamentos).`:`➕ SG&A real carregado (${INT.format(novos.length)} lançamentos) — a DRE agora usa o realizado.`);
       }else if(ehOrcReceita(aoa)){
         const novos=parseOrcReceita(aoa);
         if(!novos.length){ alert('Reconheci "'+file.name+'" como Orçamento de Receita, mas não achei valores.'); return; }
@@ -673,6 +680,33 @@ function lerArquivo(file){
     }catch(err){ alert('Erro ao ler "'+file.name+'": '+err.message); }
   };
   r.readAsArrayBuffer(file);
+}
+// ----- SG&A realizado (razão contábil: Ano/Mês + Montante em moeda interna + Centro de lucro) -----
+function ehSGA(aoa){
+  const h=(aoa[0]||[]).map(norm);
+  return h.some(x=>x==='ano/mes')&&h.some(x=>x.includes('montante em moeda'))&&h.some(x=>x.includes('centro de lucro'));
+}
+function parseSGA(aoa){
+  const h=(aoa[0]||[]).map(norm);
+  const ix=n=>h.findIndex(x=>x===n), ixI=n=>h.findIndex(x=>x.includes(n));
+  const cMes=ix('ano/mes'), cVal=ixI('montante em moeda'), cConta=ix('conta'), cTexto=ix('texto'),
+        cRef=ixI('referencia'), cCL=ixI('centro de lucro'), cForn=ixI('fornecedor');
+  const out=[];
+  for(let i=1;i<aoa.length;i++){ const r=aoa[i]||[];
+    const vm=r[cMes], v=r[cVal];
+    if(typeof v!=='number') continue;
+    let mes='';
+    if(vm instanceof Date&&!isNaN(vm)) mes=String(vm.getMonth()+1).padStart(2,'0')+'/'+vm.getFullYear();
+    else { const s2=String(vm||'').trim(); let m1=s2.match(/^(\d{4})[\/\-](\d{1,2})$/); if(m1) mes=m1[2].padStart(2,'0')+'/'+m1[1];
+      else { m1=s2.match(/^(\d{1,2})[\/\-](\d{4})$/); if(m1) mes=m1[1].padStart(2,'0')+'/'+m1[2]; } }
+    if(!mes) continue;
+    const blob=norm(String(r[cTexto]||'')+' '+String(r[cRef]||''));
+    const cl=String(r[cCL]||'');
+    out.push({mes,conta:String(r[cConta]||''),texto:String(r[cTexto]||'').slice(0,80),forn:String(r[cForn]||'').slice(0,40),
+      loc:/amz/i.test(cl)?'Amazonas':'Maranhão',
+      nr:blob.includes('nao recorrente'),mao:blob.includes('lancado a mao'),valor:v});
+  }
+  return out;
 }
 function escolherAba(wb){
   // prefere aba OBZ (orçamento KPIs); senão a aba com mais conteúdo
@@ -965,6 +999,7 @@ function atualizarUI(){
   if(ORCKPI) badge.push('Orçado R$/km ✓');
   if(ORCREC.length) badge.push('Orçamento Receita ✓');
   if(RECEITA.length) badge.push('Receita: '+INT.format(RECEITA.length)+' lançamentos ✓');
+  if(SGA.length) badge.push('SG&A real: '+INT.format(SGA.length)+' ✓');
   if(!DADOS.length&&ORCAMENTO.length) badge.push('— carregue o realizado (KSB1) para ver o Orçado vs Real');
   document.getElementById('fileBadge').textContent=badge.join(' · ')||'nenhum arquivo carregado';
   if(DADOS.length) montarFiltros();
@@ -1106,6 +1141,10 @@ function exportarBases(){
     const h=['Tipo','Mês','Região','Categoria','Classe (cód)','Classe (nome)','Valor orçado (R$)'];
     const rows=ORCAMENTO.map(o=>[o.tipo,o.mes,o.regiao,GRUPO_NOME[o.cat]||o.cat,o.classeCod||'',o.classeNome||'',o.valor]);
     abas.push({nome:'Orçamento',aoa:[h,...rows]});
+  }
+  if(SGA.length){
+    const h=['Mês','Localidade','Conta','Texto','Fornecedor','Obs','Valor (R$)'];
+    abas.push({nome:'SG&A (real)',aoa:[h,...SGA.map(d=>[d.mes,d.loc,d.conta,d.texto,d.forn,d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.valor])]});
   }
   baixarXlsx('bases_dashboard_fpea',abas);
 }
@@ -1925,6 +1964,10 @@ function dreDados(loc){
     if(d.nr&&!d.mao) add('cNR',d.mes,'r',d.valor);
     if(natDe(d)==='fixo') add(catDeLinha(d)==='pessoal'?'cfPes':'cfOM',d.mes,'r',d.valor);
     else add('cv',d.mes,'r',d.valor); });
+  // SG&A REALIZADO (base própria) — valor cheio; NR marcado também alimenta a linha própria
+  SGA.forEach(d=>{ if(loc&&d.loc!==loc) return; if(!setM.has(d.mes)) return;
+    add('sga',d.mes,'r',d.valor);
+    if(d.nr&&!d.mao) add('cNR',d.mes,'r',d.valor); });
   ORCAMENTO.forEach(o=>{ if(!setM.has(o.mes)) return; if(loc&&o.regiao!==loc) return; const t=norm(o.tipo);
     if(/variav/.test(t)) add('cv',o.mes,'o',orcVal(o));
     else if(/fix/.test(t)) add(/pessoal/.test(t)?'cfPes':'cfOM',o.mes,'o',orcVal(o));
@@ -1936,7 +1979,7 @@ function dreLinhas(dd){
   const bruta=(m,c)=>g('recF',m,c)+g('recV',m,c);
   const liq=(m,c)=>bruta(m,c)*(1-dd.tax);
   const custos=(m,c)=>g('cv',m,c)+g('cfPes',m,c)+g('cfOM',m,c);
-  const sga=(m,c)=>g('sga',m,'o');                                   // SG&A real ainda sem base — orçado nas duas colunas
+  const sga=(m,c)=>(c==='r'&&SGA.length)?g('sga',m,'r'):g('sga',m,'o');   // com a base SG&A: realizado; sem ela: orçado nas 2 colunas
   const ebAj=(m,c)=>liq(m,c)-custos(m,c)-sga(m,c);
   const nr=(m,c)=>c==='r'?(g('recNR',m,'r')-g('cNR',m,'r')):0;        // receita NR entra, custo NR (negativo=estorno) vira benefício
   const eb=(m,c)=>ebAj(m,c)+nr(m,c);
@@ -1951,7 +1994,7 @@ function dreLinhas(dd){
     {n:'(−) Custos Fixos',f:(m,c)=>-(g('cfPes',m,c)+g('cfOM',m,c)),k:'sub'},
     {n:'Pessoal',f:(m,c)=>-g('cfPes',m,c),k:'sub2'},
     {n:'O&M — Materiais e Serviços',f:(m,c)=>-g('cfOM',m,c),k:'sub2'},
-    {n:'(−) SG&A (orçado)',f:(m,c)=>-sga(m,c)},
+    {n:'(−) SG&A'+(SGA.length?'':' (orçado)'),f:(m,c)=>-sga(m,c)},
     {n:'(=) EBITDA — Ajustado',f:ebAj,k:'ebit'},
     {n:'Mg EBITDA — Ajustado',f:(m,c)=>{const l=liq(m,c);return l?ebAj(m,c)/l*100:0;},k:'mg'},
     {n:'(+/−) Não Recorrente',f:nr},
@@ -2027,7 +2070,7 @@ function renderDre(){
   const semCF=meses.filter(m=>{ const g=k=>((dd.L[k]||{})[m]||{r:0,o:0}); return !(g('cfPes').r+g('cfOM').r)&&(g('cfPes').o+g('cfOM').o)>0; });
   document.getElementById('dreNote').textContent=
     (semCF.length?'⚠️ '+semCF.join(', ')+' sem custos fixos REALIZADOS carregados — EBITDA desses meses superestimado. ':'')+
-    'Valores em R$ mil, negativos entre parênteses. Custos pelo valor CHEIO — os lançamentos a mão neutralizam os NR dentro do custo (o cheio já é o recorrente com ajustes). (+/−) Não Recorrente = receita NR − custos NR, somado após o Ajustado. SG&A: sem base de realizado — o ORÇADO entra nas duas colunas; se estiver incompleto no consolidado, o EBITDA fica maior que o oficial. Deduções = '+(dd.tax*100).toFixed(2).replace('.',',')+'% sobre a receita bruta recorrente.';
+    'Valores em R$ mil, negativos entre parênteses. Custos pelo valor CHEIO — os lançamentos a mão neutralizam os NR dentro do custo (o cheio já é o recorrente com ajustes). (+/−) Não Recorrente = receita NR − custos NR, somado após o Ajustado. SG&A: '+(SGA.length?'REALIZADO da base SG&A (orçado na coluna orçado).':'sem base de realizado — o ORÇADO entra nas duas colunas.')+' Deduções = '+(dd.tax*100).toFixed(2).replace('.',',')+'% sobre a receita bruta recorrente.';
   renderPonte(dd,mesQ,loc);
   renderResumoExe(dd,loc,mesQ);
   renderForecast(dd,loc);
@@ -2110,7 +2153,7 @@ function ponteSteps(dd,g){   // g(key,col) já no escopo (mês único ou YTD)
     {n:'Custos Var.',v:-(g('cv','r')-g('cv','o'))},
     {n:'Custos Pessoal',v:-(g('cfPes','r')-g('cfPes','o'))},
     {n:'Custos O&M',v:-(g('cfOM','r')-g('cfOM','o'))},
-    {n:'SG&A',v:0},
+    {n:'SG&A',v:SGA.length?-(g('sga','r')-g('sga','o')):0},
     {n:'Não Recorrente',v:g('recNR','r')-g('cNR','r')}
   ];
   const ebR=ebO+deltas.reduce((s,x)=>s+x.v,0);
@@ -2150,7 +2193,8 @@ function drillPonte(n,mesQ,loc){
     RECEITA.filter(d=>fM(d)&&fL(d)&&d.nr).map(recMap)
       .concat(DADOS.filter(d=>fM(d)&&fL(d)&&d.nr&&!d.mao).map(d=>Object.assign({},d,{valor:-d.valor}))));
   else if(n==='Impostos') flash('Impostos = −9,25% sobre a variação da receita bruta (premissa PIS/Cofins) — não há lançamentos.');
-  else if(n==='SG&A') flash('SG&A ainda sem base de realizado — o orçado entra nas duas colunas (Δ = 0).');
+  else if(n==='SG&A'){ if(SGA.length) drillReal('SG&A — realizado · '+esc,SGA.filter(d=>fM(d)&&fL(d)).map(d=>({mes:d.mes,loc:d.loc,centro:'',ccod:d.conta,classe:'SG&A',material:d.texto||d.forn,nr:d.nr,mao:d.mao,valor:d.valor})));
+    else flash('SG&A ainda sem base de realizado — o orçado entra nas duas colunas (Δ = 0).'); }
   else flash('Este é o total da ponte — a composição completa está no Quadro DRE.');
 }
 function renderPonte(dd,mesQ,loc){
@@ -2211,7 +2255,7 @@ function renderForecast(dd,loc){
   const ebOrc=m=>{ const x=MO[m]; return x?x.rec*(1-tax)-x.cv-x.cf-x.sga:0; };
   // EBITDA real do mês — AJUSTADO (recorrente, sem NR e sem a mão) e TOTAL (com NR)
   const ebAjReal=m=>{ const bruta=g('recF',m,'r')+g('recV',m,'r');
-    return bruta*(1-tax)-g('cv',m,'r')-g('cfPes',m,'r')-g('cfOM',m,'r')-g('sga',m,'o'); };
+    return bruta*(1-tax)-g('cv',m,'r')-g('cfPes',m,'r')-g('cfOM',m,'r')-(SGA.length?g('sga',m,'r'):g('sga',m,'o')); };
   const ebReal=m=>ebAjReal(m)+g('recNR',m,'r')-g('cNR',m,'r');
   const ano=(dd.meses[0]||Object.keys(MO)[0]||'01/2026').split('/')[1];
   const meses12=[];for(let m=1;m<=12;m++)meses12.push(String(m).padStart(2,'0')+'/'+ano);
@@ -2280,6 +2324,9 @@ function renderCheckup(){
     ['Receita — tudo (base) = DRE (bruta recorrente + receita NR)',recTudo,recRec+recNR,chip(ok(recTudo,recRec+recNR))],
     ['EBITDA Ajustado + linha (+/−) NR = EBITDA',ajY+nrY,ebY,chip(ok(ajY+nrY,ebY))]
   ];
+  if(SGA.length){ const setM2=new Set(dd.meses);
+    const sgaBase=s(SGA.filter(d=>setM2.has(d.mes))), sgaDre=Y('sga','r');
+    linhas.splice(8,0,['SG&A — realizado (base SG&A) = linha "(−) SG&A" da DRE',sgaBase,sgaDre,chip(ok(sgaBase,sgaDre))]); }
   el.querySelector('thead').innerHTML='<tr><th class="txt">Conciliação (período selecionado · geral)</th><th>Valor</th><th>Na DRE</th><th>Status</th></tr>';
   el.querySelector('tbody').innerHTML=linhas.map(([n,v,v2,st])=>
     `<tr><td class="txt">${n}</td><td>${fmtMil(v)}</td><td>${v2===''?'':fmtMil(v2)}</td><td>${st}</td></tr>`).join('');
@@ -2347,11 +2394,11 @@ function opsCompDados(){
     const g=(k,m,c)=>((dd.L[k]||{})[m]||{r:0,o:0})[c]||0;
     const Y=(k,c)=>dd.meses.reduce((s,m)=>s+g(k,m,c),0);
     const liq=c=>(Y('recF',c)+Y('recV',c))*(1-dd.tax);
-    const sga=Y('sga','o');
-    const ebAj=c=>liq(c)-Y('cv',c)-Y('cfPes',c)-Y('cfOM',c)-sga;
+    const sgaO=Y('sga','o'), sgaR=SGA.length?Y('sga','r'):sgaO;
+    const ebAj=c=>liq(c)-Y('cv',c)-Y('cfPes',c)-Y('cfOM',c)-(c==='r'?sgaR:sgaO);
     const nr=Y('recNR','r')-Y('cNR','r');
     return {nome,liqR:liq('r'),liqO:liq('o'),cvR:Y('cv','r'),cvO:Y('cv','o'),
-      cfR:Y('cfPes','r')+Y('cfOM','r'),cfO:Y('cfPes','o')+Y('cfOM','o'),sga,
+      cfR:Y('cfPes','r')+Y('cfOM','r'),cfO:Y('cfPes','o')+Y('cfOM','o'),sgaR,sgaO,
       ebAjR:ebAj('r'),ebAjO:ebAj('o'),nr,ebR:ebAj('r')+nr,ebO:ebAj('o'),
       mgR:liq('r')?(ebAj('r')+nr)/liq('r')*100:null,mgO:liq('o')?ebAj('o')/liq('o')*100:null,fim:dd.meses[dd.meses.length-1]};
   });
@@ -2365,7 +2412,7 @@ function renderOpsComp(){
     ['(=) Receita Líquida',o=>o.liqR,o=>o.liqO],
     ['(−) Custos Variáveis',o=>-o.cvR,o=>-o.cvO],
     ['(−) Custos Fixos',o=>-o.cfR,o=>-o.cfO],
-    ['(−) SG&A (orçado)',o=>-o.sga,o=>-o.sga],
+    ['(−) SG&A'+(SGA.length?'':' (orçado)'),o=>-o.sgaR,o=>-o.sgaO],
     ['(=) EBITDA Ajustado',o=>o.ebAjR,o=>o.ebAjO,'forte'],
     ['(+/−) Não Recorrente',o=>o.nr,o=>0],
     ['(=) EBITDA',o=>o.ebR,o=>o.ebO,'ebit'],
@@ -2402,7 +2449,7 @@ function exportarOpsCompXls(){
     ['Receita Líquida',...ops.flatMap(o=>[o.liqR,o.liqO])],
     ['Custos Variáveis',...ops.flatMap(o=>[-o.cvR,-o.cvO])],
     ['Custos Fixos',...ops.flatMap(o=>[-o.cfR,-o.cfO])],
-    ['SG&A (orçado)',...ops.flatMap(o=>[-o.sga,-o.sga])],
+    ['SG&A',...ops.flatMap(o=>[-o.sgaR,-o.sgaO])],
     ['EBITDA Ajustado',...ops.flatMap(o=>[o.ebAjR,o.ebAjO])],
     ['(+/−) Não Recorrente',...ops.flatMap(o=>[o.nr,0])],
     ['EBITDA',...ops.flatMap(o=>[o.ebR,o.ebO])],
@@ -2423,9 +2470,9 @@ function renderResumoExe(dd,loc,mesQ){
   const brutaR=Y('recF','r')+Y('recV','r'), brutaO=Y('recF','o')+Y('recV','o');
   const liqR=brutaR*(1-tax), liqO=brutaO*(1-tax);
   const cvR=Y('cv','r'), cvO=Y('cv','o'), cfR=Y('cfPes','r')+Y('cfOM','r'), cfO=Y('cfPes','o')+Y('cfOM','o');
-  const sga=Y('sga','o');
+  const sgaO=Y('sga','o'), sgaR=SGA.length?Y('sga','r'):sgaO;
   const nr=Y('recNR','r')-Y('cNR','r');
-  const ebAjR=liqR-cvR-cfR-sga, ebAjO=liqO-cvO-cfO-sga;
+  const ebAjR=liqR-cvR-cfR-sgaR, ebAjO=liqO-cvO-cfO-sgaO;
   const ebR=ebAjR+nr, ebO=ebAjO;
   // viagens (recorrente) por cliente
   const vR={},vO={};let vRT=0,vOT=0,vRM=0,vOM=0;
@@ -2446,7 +2493,7 @@ function renderResumoExe(dd,loc,mesQ){
     });
     kmTab.push(linha);
   });
-  RES_LAST={fim,mesQ,loc,tax,ebR,ebO,ebAjR,ebAjO,nr,liqR,liqO,cvR,cvO,cfR,cfO,sga,vR,vO,vRT,vOT,vRM,vOM,kmTab};
+  RES_LAST={fim,mesQ,loc,tax,ebR,ebO,ebAjR,ebAjO,nr,liqR,liqO,cvR,cvO,cfR,cfO,sgaR,sgaO,vR,vO,vRT,vOT,vRM,vOM,kmTab};
   // cards
   const pc=(r,o)=>o?PCT((r-o)/Math.abs(o)*100):'—';
   document.getElementById('resKpis').innerHTML=[
@@ -2458,7 +2505,7 @@ function renderResumoExe(dd,loc,mesQ){
     {lbl:'Viagens YTD',val:INT.format(vRT),sub:'orç. '+INT.format(Math.round(vOT))+' ('+(vOT?PCT((vRT-vOT)/vOT*100):'—')+')'}
   ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div><div class="sub">${c.sub}</div></div>`).join('');
   document.getElementById('resDesvios').innerHTML=[
-    {lbl:'Custos Variáveis',r:cvR,o:cvO},{lbl:'Custos Fixos',r:cfR,o:cfO},{lbl:'SG&A (orç. nas 2 colunas)',r:sga,o:sga}
+    {lbl:'Custos Variáveis',r:cvR,o:cvO},{lbl:'Custos Fixos',r:cfR,o:cfO},{lbl:'SG&A'+(SGA.length?'':' (orç. nas 2 colunas)'),r:sgaR,o:sgaO}
   ].map(x=>{ const d=x.o?(x.r-x.o)/Math.abs(x.o)*100:0; const cls=d>0?'pos':'neg';
     return `<div class="kpi glass"><div class="lbl">Desvio · ${x.lbl}</div><div class="val ${cls}">${PCT(d)}</div><div class="sub">${BRL.format(x.r)} vs ${BRL.format(x.o)} orçado</div></div>`;}).join('');
   // tabela viagens por cliente
@@ -2507,7 +2554,7 @@ function exportarResumoPPT(){
   };
   desv(0.3,'Custos Variáveis',R.cvR,R.cvO);
   desv(3.45,'Custos Fixos',R.cfR,R.cfO);
-  desv(6.6,'SG&A (orç.)',R.sga,R.sga);
+  desv(6.6,'SG&A'+(SGA.length?'':' (orç.)'),R.sgaR,R.sgaO);
   // viagens por cliente (tabela)
   s.addText('Receita Variável — Viagens (CTEs)',{x:0.3,y:3.52,w:4.6,h:0.26,fontSize:10.5,bold:true,color:'02585C'});
   const cell=(t,o)=>({text:String(t),options:Object.assign({fontSize:8.5,color:'404040',align:'right'},o)});
@@ -2524,7 +2571,7 @@ function exportarResumoPPT(){
   const kRows=[[cell('Categoria',{align:'left',bold:true,color:'FFFFFF',fill:'00A0A8'}),cell('Maranhão',{bold:true,color:'FFFFFF',fill:'00A0A8'}),cell('Amazonas',{bold:true,color:'FFFFFF',fill:'00A0A8'})]];
   R.kmTab.forEach(l=>kRows.push([cell(l.nome,{align:'left'}),cell(fkm(l['Maranhão'].r)+fp(l['Maranhão'].r,l['Maranhão'].o)),cell(fkm(l['Amazonas'].r)+fp(l['Amazonas'].r,l['Amazonas'].o))]));
   s.addTable(kRows,{x:5.15,y:3.8,w:4.55,colW:[1.85,1.35,1.35],border:{pt:0.5,color:'DDDDDD'},rowH:0.24});
-  s.addText('% vs orçado. R$/km usa o KM digitado na aba Operações. SG&A: orçado nas duas colunas até haver base de realizado.',{x:0.3,y:5.3,w:9.4,h:0.24,fontSize:7.5,color:'8a8a8a'});
+  s.addText('% vs orçado. R$/km usa o KM digitado na aba Operações. SG&A: '+(SGA.length?'realizado da base SG&A.':'orçado nas duas colunas até haver base de realizado.'),{x:0.3,y:5.3,w:9.4,h:0.24,fontSize:7.5,color:'8a8a8a'});
   pptx.writeFile({fileName:('Resultados_Financeiros_YTD_'+R.fim.replace('/','-'))+(R.loc?'_'+R.loc:'')+'.pptx'});
 }
 
@@ -2641,7 +2688,7 @@ function exportarWaterfall(){
 }
 
 function limpar(){
-  DADOS_RAW=[];DADOS=[];ORCAMENTO=[];ORCKPI=null;ORCREC=[];RECEITA_RAW=[];RECEITA=[];_has.ovr=false;Object.keys(charts).forEach(destroy);
+  DADOS_RAW=[];DADOS=[];ORCAMENTO=[];ORCKPI=null;ORCREC=[];RECEITA_RAW=[];RECEITA=[];SGA_RAW=[];SGA=[];_has.ovr=false;Object.keys(charts).forEach(destroy);
   ['dash','ovr','rec','dre','exec','fixo','ops','pareto','tabs'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('drop').classList.remove('hidden');
   document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
@@ -2663,7 +2710,7 @@ async function carregarDaNuvem(){
     }
     if(data&&data.payload){
       const obj=descomprimir(data.payload);
-      DADOS_RAW=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null; ORCREC=obj.ORCREC||[]; RECEITA_RAW=obj.RECEITA||[];
+      DADOS_RAW=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null; ORCREC=obj.ORCREC||[]; RECEITA_RAW=obj.RECEITA||[]; SGA_RAW=obj.SGA||[];
       migrarDados();   // bases salvas antes dos blocos do fixo ganham bloco/categoria corretos
       aplicarPeriodo(); marcarAtualizado(data.updated_at);
     }else{
@@ -2675,10 +2722,10 @@ async function carregarDaNuvem(){
 }
 
 async function salvarNaNuvem(auto){
-  if(!DADOS_RAW.length&&!ORCAMENTO.length&&!ORCKPI&&!ORCREC.length&&!RECEITA_RAW.length){ if(!auto)alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
+  if(!DADOS_RAW.length&&!ORCAMENTO.length&&!ORCKPI&&!ORCREC.length&&!RECEITA_RAW.length&&!SGA_RAW.length){ if(!auto)alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
   const info=document.getElementById('cloudInfo'); info.innerHTML='<span class="spin"></span> salvando…';
   try{
-    const payload=comprimir({DADOS:DADOS_RAW,ORCAMENTO,ORCKPI,ORCREC,RECEITA:RECEITA_RAW});   // sempre a base COMPLETA (o seletor de período é só visão)
+    const payload=comprimir({DADOS:DADOS_RAW,ORCAMENTO,ORCKPI,ORCREC,RECEITA:RECEITA_RAW,SGA:SGA_RAW});   // sempre a base COMPLETA (o seletor de período é só visão)
     const {error}=await sb.from('dataset').upsert({id:'atual',payload,updated_at:new Date().toISOString()});
     if(error){ info.textContent=''; (auto?flash('⚠️ Erro ao salvar na nuvem: '+error.message):alert('Erro ao salvar na nuvem: '+error.message)); return; }
     marcarAtualizado(new Date().toISOString());
