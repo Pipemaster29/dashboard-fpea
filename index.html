@@ -296,6 +296,7 @@
       <button data-sp="proj" onclick="showSub('dre','proj')">📈 Projeção & Operações</button>
       <button data-sp="quadro" onclick="showSub('dre','quadro')">📋 Quadro DRE</button>
       <button data-sp="resexe" onclick="showSub('dre','resexe')">📄 Resumo Executivo</button>
+      <button data-sp="check" onclick="showSub('dre','check')">🩺 Check-up</button>
     </div>
     <div class="sp active" data-sp="visao">
     <div class="resumo" id="dreResumo"></div>
@@ -343,6 +344,17 @@
       <div class="card"><h3>Receita Variável — Viagens (CTEs) <span class="small">real × orçado</span></h3><div class="tablewrap" style="max-height:280px"><table id="tabResViag"><thead></thead><tbody></tbody></table></div></div>
       <div class="card"><h3>KPIs Orçamento — Custo por km médio <span class="small">(YTD · usa o KM da aba Operações)</span></h3><div class="tablewrap" style="max-height:280px"><table id="tabResKm"><thead></thead><tbody></tbody></table></div></div>
     </div>
+    </div>
+    <div class="sp" data-sp="check">
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">🩺 Check-up de consistência <span class="small">— sempre no GERAL (AM+MA), período selecionado lá em cima</span>
+      <button class="btn-ghost" style="margin-left:12px;padding:5px 12px" onclick="exportarCheckupXls()">⬇ Excel do check-up</button></h3>
+    <div class="resumo" id="ckResumo"></div>
+    <h3 style="font-size:13.5px;font-weight:600;margin:14px 0 8px">1 · Conciliação entre abas <span class="small">— por que cada número é igual (ou diferente por regra) nas outras abas</span></h3>
+    <div class="tablewrap" style="margin-bottom:18px"><table id="tabCkConc"><thead></thead><tbody></tbody></table></div>
+    <h3 style="font-size:13.5px;font-weight:600;margin:14px 0 8px">2 · EBITDA — prova de acumulação <span class="small">— acumulado(mês) tem que ser acumulado(mês anterior) + mensal</span></h3>
+    <div class="tablewrap" style="margin-bottom:18px"><table id="tabCkAcum"><thead></thead><tbody></tbody></table></div>
+    <h3 style="font-size:13.5px;font-weight:600;margin:14px 0 8px">3 · Alertas de marcação da base <span class="small">— NR × lançamentos a mão</span></h3>
+    <div id="ckAlertas"></div>
     </div>
     <div class="note" id="dreNote"></div>
   </div>
@@ -499,7 +511,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v48 · Render preguiçoso por aba (8× mais rápido) · 11/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v49 · Check-up de consistência (conciliação + acumulação + marcação) · 12/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -2019,6 +2031,7 @@ function renderDre(){
   renderResumoExe(dd,loc,mesQ);
   renderForecast(dd,loc);
   renderOpsComp();
+  renderCheckup();
 }
 function exportarDreXls(){
   if(!DRE_LAST){ alert('Carregue receita + custos primeiro.'); return; }
@@ -2234,6 +2247,93 @@ function renderForecast(dd,loc){
     plugins:{legend:{labels:{color:'#cbd5e1'}},
       tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)+(c.datasetIndex<2&&c.dataIndex>lastRealIdx?' (projeção = orçado)':'')}}},
     scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+}
+
+// ---------- CHECK-UP DE CONSISTÊNCIA (conciliação entre abas + acumulação + marcação) ----------
+let CK_LAST=null;
+function renderCheckup(){
+  const el=document.getElementById('tabCkConc'); if(!el) return;
+  const s=a=>a.reduce((x,d)=>x+d.valor,0);
+  const V=DADOS.filter(d=>natDe(d)==='variavel'), F=DADOS.filter(d=>natDe(d)==='fixo');
+  const dec=A=>({tudo:s(A),mao:s(A.filter(d=>d.mao)),nr:s(A.filter(d=>d.nr&&!d.mao)),rec:s(A.filter(d=>!d.mao&&!d.nr))});
+  const dV=dec(V), dF=dec(F);
+  const dd=dreDados('');
+  const Y=(kk,c)=>dd.meses.reduce((x,m)=>x+(((dd.L[kk]||{})[m]||{r:0,o:0})[c]||0),0);
+  const cvDre=Y('cv','r'), cfDre=Y('cfPes','r')+Y('cfOM','r'), cNR=Y('cNR','r');
+  const recRec=Y('recF','r')+Y('recV','r'), recNR=Y('recNR','r');
+  const recTudo=s(RECEITA);
+  const ok=(a,b)=>Math.abs(a-b)<=1;
+  const chip=b=>b?'<span style="color:var(--good);font-weight:700">✓ bate</span>':'<span style="color:var(--bad);font-weight:700">✗ NÃO BATE</span>';
+  const linhas=[
+    ['Custos Variáveis — tudo (aba Orçado vs Real / Pareto)',dV.tudo,'',''],
+    ['&nbsp;&nbsp;(−) lançamentos a mão',dV.mao,'',''],
+    ['&nbsp;&nbsp;(−) não recorrentes',dV.nr,'',''],
+    ['&nbsp;&nbsp;(=) recorrente → linha "(−) Variáveis" da DRE',dV.rec,cvDre,chip(ok(dV.rec,cvDre))],
+    ['Custos Fixos — tudo (aba Custos Fixos/Blocos)',dF.tudo,'',''],
+    ['&nbsp;&nbsp;(−) lançamentos a mão',dF.mao,'',''],
+    ['&nbsp;&nbsp;(−) não recorrentes',dF.nr,'',''],
+    ['&nbsp;&nbsp;(=) recorrente → linha "(−) Custos Fixos" da DRE',dF.rec,cfDre,chip(ok(dF.rec,cfDre))],
+    ['Custos NR (variável + fixo) → linha NR da DRE (custos)',dV.nr+dF.nr,cNR,chip(ok(dV.nr+dF.nr,cNR))],
+    ['Receita — tudo (base carregada)',recTudo,'',''],
+    ['&nbsp;&nbsp;(=) recorrente + NR → DRE (bruta + linha NR)',recRec+recNR,recTudo,chip(ok(recRec+recNR,recTudo))]
+  ];
+  el.querySelector('thead').innerHTML='<tr><th class="txt">Conciliação (período selecionado · geral)</th><th>Valor</th><th>Na DRE</th><th>Status</th></tr>';
+  el.querySelector('tbody').innerHTML=linhas.map(([n,v,v2,st])=>
+    `<tr><td class="txt">${n}</td><td>${fmtMil(v)}</td><td>${v2===''?'':fmtMil(v2)}</td><td>${st}</td></tr>`).join('');
+  // 2) acumulação do EBITDA
+  const L=dreLinhas(dd); const ebL=L.find(l=>l.n==='(=) EBITDA')||L[L.length-2];
+  const eb=m=>ebL.f(m,'r');
+  let acum=0; const okA=[];
+  const rows2=dd.meses.map((m,i)=>{
+    const mes=eb(m); const ant=acum; acum+=mes;
+    const bate=Math.abs((ant+mes)-acum)<0.01; okA.push(bate);
+    return `<tr><td class="txt">${m}</td><td>${fmtMil(mes)}</td><td>${fmtMil(ant)}</td><td>${fmtMil(ant+mes)}</td><td>${fmtMil(acum)}</td><td>${chip(bate)}</td></tr>`;
+  }).join('');
+  document.querySelector('#tabCkAcum thead').innerHTML='<tr><th class="txt">Mês</th><th>EBITDA do mês</th><th>Acum. anterior</th><th>Anterior + mês</th><th>Acumulado</th><th>Status</th></tr>';
+  document.querySelector('#tabCkAcum tbody').innerHTML=rows2;
+  // 3) alertas de marcação
+  const alertas=[];
+  // 3a) pares cruzados: A MÃO com espelho NR no mesmo mês
+  const marc=DADOS.filter(d=>d.mao||d.nr), porMes={};
+  marc.forEach(d=>{(porMes[d.mes]=porMes[d.mes]||[]).push(d);});
+  const cruz=[];
+  Object.entries(porMes).forEach(([m,arr])=>{
+    arr.filter(a=>a.mao).forEach(a=>{
+      const p=arr.find(b=>b.nr&&!b.mao&&Math.abs(b.valor+a.valor)<0.02);
+      if(p) cruz.push({mes:m,nat:natDe(a),desc:(a.material||a.objeto||a.forn||'Lançado a mão').slice(0,45),vMao:a.valor,vNr:p.valor});
+    });
+  });
+  if(cruz.length) alertas.push('<b>🔀 '+cruz.length+' par(es) com marcação CRUZADA</b> — um lado está "A MÃO" e o estorno está "NÃO RECORRENTE". Assim a DRE tira o custo original da linha e ainda soma o estorno como benefício NR. <u>Marque os DOIS lados com a MESMA marcação</u>:'+
+    '<ul style="margin:6px 0 0 18px">'+cruz.map(c=>`<li>${c.mes} · ${c.desc} (${c.nat}) — a mão ${fmtMil(c.vMao)} × NR ${fmtMil(c.vNr)}</li>`).join('')+'</ul>');
+  // 3b) a mão não zera no período
+  const mesesMao={}; DADOS.forEach(d=>{ if(d.mao) mesesMao[d.mes]=(mesesMao[d.mes]||0)+d.valor; });
+  const sobras=Object.entries(mesesMao).filter(([,v])=>Math.abs(v)>1).sort();
+  const totMao=Object.values(mesesMao).reduce((a,b)=>a+b,0);
+  if(sobras.length){
+    const raw=DADOS_RAW.filter(d=>d.mao).reduce((x,d)=>x+d.valor,0);
+    const foraDoCorte=Math.abs(raw)<Math.abs(totMao)-1;
+    alertas.push('<b>⚖️ Lançamentos A MÃO não se zeram</b> no período ('+sobras.map(([m,v])=>m+': '+fmtMil(v)).join(' · ')+' · total '+fmtMil(totMao)+'). '+
+      (foraDoCorte?'Parte dos pares fecha em meses FORA do período selecionado (ex.: VW jan–mar × junho) — no ano inteiro soma '+fmtMil(raw)+'. Amplie o período ou lance os dois lados no mesmo mês.':'Há pares sem contrapartida na base — confira a marcação.'));
+  }
+  // 3c) NR sem par (informativo)
+  const nrMes={}; DADOS.forEach(d=>{ if(d.nr&&!d.mao) nrMes[d.mes]=(nrMes[d.mes]||0)+d.valor; });
+  const nrTot=Object.values(nrMes).reduce((a,b)=>a+b,0);
+  alertas.push('<b>ℹ️ Não recorrentes (custos)</b> por mês: '+Object.entries(nrMes).sort().map(([m,v])=>m+': '+fmtMil(v)).join(' · ')+' · total '+fmtMil(nrTot)+'. Na DRE isso vira benefício/custo na linha (+/−) Não Recorrente junto com a receita NR ('+fmtMil(recNR)+').');
+  document.getElementById('ckAlertas').innerHTML=alertas.map(a=>`<div class="resumo" style="border-left-color:${a.startsWith('<b>ℹ️')?'var(--accent)':'var(--warn)'}">${a}</div>`).join('');
+  const falhas=linhas.filter(l=>l[3]&&l[3].includes('✗')).length+okA.filter(b=>!b).length;
+  document.getElementById('ckResumo').innerHTML=(falhas?'🚨 <b>'+falhas+' conciliação(ões) falharam</b> — veja abaixo.':'✅ <b>Todas as conciliações batem.</b>')+
+    ' As abas de custos (Orçado vs Real, Pareto, Custos Fixos, Execução) mostram o realizado <b>com tudo</b>; a DRE mostra o <b>recorrente</b> (sem NR e sem a mão) e devolve os NR na linha própria — a tabela 1 é a ponte entre os dois. '+(cruz.length||sobras.length?'⚠️ Há <b>alertas de marcação</b> na seção 3 que explicam diferenças tipo 20.965 × 20.146.':'');
+  CK_LAST={linhas,cruz,sobras,totMao,nrMes,meses:dd.meses,eb};
+}
+function exportarCheckupXls(){
+  if(!CK_LAST){ alert('Abra o check-up primeiro.'); return; }
+  const {linhas,cruz,sobras,totMao,nrMes,meses,eb}=CK_LAST;
+  const strip=h=>String(h).replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ');
+  const a1=[['Conciliação','Valor','Na DRE','Status']].concat(linhas.map(l=>[strip(l[0]),l[1],l[2],strip(l[3]||'')]));
+  let ac=0; const a2=[['Mês','EBITDA do mês','Acum anterior','Anterior+mês','Acumulado']].concat(meses.map(m=>{const v=eb(m);const ant=ac;ac+=v;return [m,v,ant,ant+v,ac];}));
+  const a3=[['Alertas'],['Pares cruzados (a mão × NR espelhados)']].concat(cruz.map(c=>[c.mes+' · '+c.desc+' ('+c.nat+')',c.vMao,c.vNr]))
+    .concat([[''],['A MÃO por mês (deveria zerar)']],sobras.map(([m,v])=>[m,v]),[['total',totMao]],[[''],['NR custos por mês']],Object.entries(nrMes).sort().map(([m,v])=>[m,v]));
+  baixarXlsx('Checkup_Consistencia',[{nome:'Conciliação',aoa:a1},{nome:'Acumulação EBITDA',aoa:a2},{nome:'Marcação',aoa:a3}]);
 }
 
 // ---------- COMPARATIVO POR OPERAÇÃO (AM × MA × Geral, YTD) ----------
