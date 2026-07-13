@@ -243,7 +243,7 @@
     <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOVR','Orcado vs Real por mes')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOVR','Orcado vs Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button></div><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarWaterfallPPT()">📊 PPT</button><button class="xls png" onclick="exportarWaterfallPNG()">🖼️ Imagem</button><button class="xls" onclick="exportarWaterfall()">⬇ Excel</button></div>
-        <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Cascata Orçado → Real <span class="small">— ponte por categoria + Não Recorrente (lançamentos "a mão" ficam de fora)</span>
+        <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Cascata Orçado → Real <span class="small">— ponte por categoria + degrau Não Recorrente (a mão fica dentro das categorias — neutraliza os NR)</span>
           <select id="wfNat" onchange="renderWaterfall()" style="margin-left:auto;min-width:140px">
             <option value="variavel">Custos Variáveis</option>
             <option value="fixo">Custos Fixos</option>
@@ -288,7 +288,7 @@
       <select id="dreMes" onchange="renderDre()"></select>
       <label>Matriz mensal</label>
       <select id="dreVis" onchange="renderDre()"><option value="real">Realizado</option><option value="orc">Orçado</option></select>
-      <span class="small">Valores em R$ mil. YTD segue o Período lá em cima. EBITDA Ajustado = recorrente (sem NR e sem lançamentos a mão); (+/−) Não Recorrente entra depois.</span>
+      <span class="small">Valores em R$ mil. YTD segue o Período lá em cima. Custos pelo valor CHEIO (os lançamentos a mão neutralizam os NR dentro do custo); (+/−) Não Recorrente devolve o efeito real e soma no EBITDA.</span>
     </div>
     <div class="subnav">
       <button class="active" data-sp="visao" onclick="showSub('dre','visao')">📌 Visão geral</button>
@@ -511,7 +511,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v49 · Check-up de consistência (conciliação + acumulação + marcação) · 12/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v50 · Custos pelo valor cheio na DRE (a mão neutraliza NR) · 12/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1919,9 +1919,10 @@ function dreDados(loc){
     else add(d.tipo==='fixa'?'recF':'recV',d.mes,'r',d.valor); });
   ORCREC.forEach(o=>{ if(!setM.has(o.mes)) return; if(loc&&o.regiao!==loc) return;
     if(o.tipo==='fixa') add('recF',o.mes,'o',o.valor); if(o.tipo==='variavel') add('recV',o.mes,'o',o.valor); });
-  // CUSTOS: recorrente sem NR e sem lançamentos a mão; NR de custo vai pra linha própria
-  DADOS.forEach(d=>{ if(loc&&d.loc!==loc) return; if(d.mao) return;
-    if(d.nr){ add('cNR',d.mes,'r',d.valor); return; }
+  // CUSTOS: valor CHEIO (convenção da base: os "a mão" NEUTRALIZAM os NR dentro do custo — o cheio JÁ é o recorrente com ajustes).
+  // Os NR também alimentam a linha própria (cNR): Ajustado = liq − custo cheio; a linha (+/−) NR devolve o efeito real.
+  DADOS.forEach(d=>{ if(loc&&d.loc!==loc) return;
+    if(d.nr&&!d.mao) add('cNR',d.mes,'r',d.valor);
     if(natDe(d)==='fixo') add(catDeLinha(d)==='pessoal'?'cfPes':'cfOM',d.mes,'r',d.valor);
     else add('cv',d.mes,'r',d.valor); });
   ORCAMENTO.forEach(o=>{ if(!setM.has(o.mes)) return; if(loc&&o.regiao!==loc) return; const t=norm(o.tipo);
@@ -2026,7 +2027,7 @@ function renderDre(){
   const semCF=meses.filter(m=>{ const g=k=>((dd.L[k]||{})[m]||{r:0,o:0}); return !(g('cfPes').r+g('cfOM').r)&&(g('cfPes').o+g('cfOM').o)>0; });
   document.getElementById('dreNote').textContent=
     (semCF.length?'⚠️ '+semCF.join(', ')+' sem custos fixos REALIZADOS carregados — EBITDA desses meses superestimado. ':'')+
-    'Valores em R$ mil, negativos entre parênteses. Recorrente = sem NÃO RECORRENTES e sem lançamentos a mão. (+/−) Não Recorrente = receita NR − custos NR (estornos viram benefício). SG&A: sem base de realizado — o ORÇADO entra nas duas colunas; se estiver incompleto no consolidado, o EBITDA fica maior que o oficial. Deduções = '+(dd.tax*100).toFixed(2).replace('.',',')+'% sobre a receita bruta recorrente.';
+    'Valores em R$ mil, negativos entre parênteses. Custos pelo valor CHEIO — os lançamentos a mão neutralizam os NR dentro do custo (o cheio já é o recorrente com ajustes). (+/−) Não Recorrente = receita NR − custos NR, somado após o Ajustado. SG&A: sem base de realizado — o ORÇADO entra nas duas colunas; se estiver incompleto no consolidado, o EBITDA fica maior que o oficial. Deduções = '+(dd.tax*100).toFixed(2).replace('.',',')+'% sobre a receita bruta recorrente.';
   renderPonte(dd,mesQ,loc);
   renderResumoExe(dd,loc,mesQ);
   renderForecast(dd,loc);
@@ -2142,9 +2143,9 @@ function drillPonte(n,mesQ,loc){
   const recMap=d=>({mes:d.mes,loc:d.regiao,centro:'',ccod:d.conta||'',classe:d.tipo==='fixa'?'Receita fixa':'Receita variável',material:d.contrato||'',nr:d.nr,mao:false,valor:d.valor});
   if(n==='Receita Fixa') drillReal('Receita Fixa — realizado · '+esc,RECEITA.filter(d=>fM(d)&&fL(d)&&!d.nr&&d.tipo==='fixa').map(recMap));
   else if(n==='Receita Var.') drillReal('Receita Variável — realizado · '+esc,RECEITA.filter(d=>fM(d)&&fL(d)&&!d.nr&&d.tipo==='variavel').map(recMap));
-  else if(n==='Custos Var.') drillReal('Custos Variáveis — realizado · '+esc,DADOS.filter(d=>fM(d)&&fL(d)&&!d.mao&&!d.nr&&natDe(d)==='variavel'));
-  else if(n==='Custos Pessoal') drillReal('Custos Fixos Pessoal — realizado · '+esc,DADOS.filter(d=>fM(d)&&fL(d)&&!d.mao&&!d.nr&&natDe(d)==='fixo'&&catDeLinha(d)==='pessoal'));
-  else if(n==='Custos O&M') drillReal('Custos Fixos O&M — realizado · '+esc,DADOS.filter(d=>fM(d)&&fL(d)&&!d.mao&&!d.nr&&natDe(d)==='fixo'&&catDeLinha(d)!=='pessoal'));
+  else if(n==='Custos Var.') drillReal('Custos Variáveis — realizado (valor cheio) · '+esc,DADOS.filter(d=>fM(d)&&fL(d)&&natDe(d)==='variavel'));
+  else if(n==='Custos Pessoal') drillReal('Custos Fixos Pessoal — realizado (valor cheio) · '+esc,DADOS.filter(d=>fM(d)&&fL(d)&&natDe(d)==='fixo'&&catDeLinha(d)==='pessoal'));
+  else if(n==='Custos O&M') drillReal('Custos Fixos O&M — realizado (valor cheio) · '+esc,DADOS.filter(d=>fM(d)&&fL(d)&&natDe(d)==='fixo'&&catDeLinha(d)!=='pessoal'));
   else if(n==='Não Recorrente') drillReal('Não Recorrentes — efeito no EBITDA (receita + custos com sinal invertido) · '+esc,
     RECEITA.filter(d=>fM(d)&&fL(d)&&d.nr).map(recMap)
       .concat(DADOS.filter(d=>fM(d)&&fL(d)&&d.nr&&!d.mao).map(d=>Object.assign({},d,{valor:-d.valor}))));
@@ -2264,18 +2265,20 @@ function renderCheckup(){
   const recTudo=s(RECEITA);
   const ok=(a,b)=>Math.abs(a-b)<=1;
   const chip=b=>b?'<span style="color:var(--good);font-weight:700">✓ bate</span>':'<span style="color:var(--bad);font-weight:700">✗ NÃO BATE</span>';
+  const chipZero=v=>Math.abs(v)<=1?chip(true):'<span style="color:var(--warn);font-weight:700">⚠ sobra '+fmtMil(v)+'</span>';
+  const L0=dreLinhas(dd);
+  const yL=n=>{const l=L0.find(x=>x.n===n)||L0.find(x=>x.n.includes(n)); return l?dd.meses.reduce((x,m)=>x+l.f(m,'r'),0):0;};
+  const ajY=yL('(=) EBITDA — Ajustado'), nrY=yL('(+/−) Não Recorrente'), ebY=yL('(=) EBITDA');
   const linhas=[
-    ['Custos Variáveis — tudo (aba Orçado vs Real / Pareto)',dV.tudo,'',''],
-    ['&nbsp;&nbsp;(−) lançamentos a mão',dV.mao,'',''],
-    ['&nbsp;&nbsp;(−) não recorrentes',dV.nr,'',''],
-    ['&nbsp;&nbsp;(=) recorrente → linha "(−) Variáveis" da DRE',dV.rec,cvDre,chip(ok(dV.rec,cvDre))],
-    ['Custos Fixos — tudo (aba Custos Fixos/Blocos)',dF.tudo,'',''],
-    ['&nbsp;&nbsp;(−) lançamentos a mão',dF.mao,'',''],
-    ['&nbsp;&nbsp;(−) não recorrentes',dF.nr,'',''],
-    ['&nbsp;&nbsp;(=) recorrente → linha "(−) Custos Fixos" da DRE',dF.rec,cfDre,chip(ok(dF.rec,cfDre))],
-    ['Custos NR (variável + fixo) → linha NR da DRE (custos)',dV.nr+dF.nr,cNR,chip(ok(dV.nr+dF.nr,cNR))],
-    ['Receita — tudo (base carregada)',recTudo,'',''],
-    ['&nbsp;&nbsp;(=) recorrente + NR → DRE (bruta + linha NR)',recRec+recNR,recTudo,chip(ok(recRec+recNR,recTudo))]
+    ['Custos Variáveis — valor cheio (Orçado vs Real / Pareto / Cascata) = linha "(−) Variáveis" da DRE',dV.tudo,cvDre,chip(ok(dV.tudo,cvDre))],
+    ['&nbsp;&nbsp;dentro dele: lançamentos a mão',dV.mao,'',''],
+    ['&nbsp;&nbsp;dentro dele: não recorrentes (o a mão deve anular)',dV.nr,'',''],
+    ['&nbsp;&nbsp;a mão + NR (ideal = 0 — se sobrar, veja os alertas)',dV.mao+dV.nr,'',chipZero(dV.mao+dV.nr)],
+    ['Custos Fixos — valor cheio (Custos Fixos / Execução) = linha "(−) Custos Fixos" da DRE',dF.tudo,cfDre,chip(ok(dF.tudo,cfDre))],
+    ['&nbsp;&nbsp;a mão + NR dentro do fixo (ideal = 0)',dF.mao+dF.nr,'',chipZero(dF.mao+dF.nr)],
+    ['Custos NR (variável + fixo) → linha (+/−) NR da DRE (custos)',dV.nr+dF.nr,cNR,chip(ok(dV.nr+dF.nr,cNR))],
+    ['Receita — tudo (base) = DRE (bruta recorrente + receita NR)',recTudo,recRec+recNR,chip(ok(recTudo,recRec+recNR))],
+    ['EBITDA Ajustado + linha (+/−) NR = EBITDA',ajY+nrY,ebY,chip(ok(ajY+nrY,ebY))]
   ];
   el.querySelector('thead').innerHTML='<tr><th class="txt">Conciliação (período selecionado · geral)</th><th>Valor</th><th>Na DRE</th><th>Status</th></tr>';
   el.querySelector('tbody').innerHTML=linhas.map(([n,v,v2,st])=>
@@ -2322,7 +2325,7 @@ function renderCheckup(){
   document.getElementById('ckAlertas').innerHTML=alertas.map(a=>`<div class="resumo" style="border-left-color:${a.startsWith('<b>ℹ️')?'var(--accent)':'var(--warn)'}">${a}</div>`).join('');
   const falhas=linhas.filter(l=>l[3]&&l[3].includes('✗')).length+okA.filter(b=>!b).length;
   document.getElementById('ckResumo').innerHTML=(falhas?'🚨 <b>'+falhas+' conciliação(ões) falharam</b> — veja abaixo.':'✅ <b>Todas as conciliações batem.</b>')+
-    ' As abas de custos (Orçado vs Real, Pareto, Custos Fixos, Execução) mostram o realizado <b>com tudo</b>; a DRE mostra o <b>recorrente</b> (sem NR e sem a mão) e devolve os NR na linha própria — a tabela 1 é a ponte entre os dois. '+(cruz.length||sobras.length?'⚠️ Há <b>alertas de marcação</b> na seção 3 que explicam diferenças tipo 20.965 × 20.146.':'');
+    ' Os custos agora são o <b>valor cheio em TODAS as abas</b> (inclusive na DRE) — os lançamentos a mão neutralizam os NR dentro do custo. A linha (+/−) Não Recorrente devolve o efeito real e soma com o EBITDA Ajustado. '+(cruz.length||sobras.length?'⚠️ Se "a mão + NR" não zera (seção 3), a marcação da base tem sobra — o custo cheio continua certo, mas a linha NR pode carregar diferença.':'');
   CK_LAST={linhas,cruz,sobras,totMao,nrMes,meses:dd.meses,eb};
 }
 function exportarCheckupXls(){
@@ -2543,14 +2546,14 @@ function wfDados(loc,natSel){
   const real={},orc={};
   cats.forEach(c=>{real[c]=0;orc[c]=0;});
   let nr=0;
-  rows.forEach(d=>{ if(d.mao) return;
-    if(d.nr){ nr+=d.valor; return; }
+  // convenção da base: os "a mão" NEUTRALIZAM os NR dentro do custo → ficam nas categorias; NR é degrau próprio
+  rows.forEach(d=>{ if(d.nr&&!d.mao){ nr+=d.valor; return; }
     const c=catDeLinha(d); if(real[c]!=null) real[c]+=d.valor; });
   const reTipo=natSel==='fixo'?/fix/:/variav/;
   ORCAMENTO.forEach(o=>{ if(loc&&o.regiao!==loc) return; if(!reTipo.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
     if(orc[o.cat]!=null) orc[o.cat]+=orcVal(o); });
   const orcTot=cats.reduce((s,c)=>s+orc[c],0);
-  const realTot=cats.reduce((s,c)=>s+real[c],0)+nr;   // real da cascata = recorrente + NR (sem os "a mão")
+  const realTot=cats.reduce((s,c)=>s+real[c],0)+nr;   // real da cascata = custo cheio (categorias com a mão) + NR
   return {cats,orc,real,nr,orcTot,realTot};
 }
 // monta os degraus da cascata (compartilhado entre gráfico e exports)
