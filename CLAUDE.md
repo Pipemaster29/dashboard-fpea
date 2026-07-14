@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Response style
+
+Be extremely concise and objective in chat replies in this repo. Short, direct sentences. No preamble, no
+filler, no restating the question, no hedging. Get to the point in as few words/tokens as possible while
+staying technically correct.
+
 ## What this is
 
 A single-file, client-side FP&A dashboard for GNL Brasil Logística ("Dashboard FP&A"). Users drag in Excel
