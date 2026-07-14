@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v52 · Folha aberta: Pessoal por conta + SG&A orçado por localidade · 12/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v53 · SG&A corporativo: Manaus + Rio de Janeiro (só no Geral) · 12/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -706,7 +706,7 @@ function parseSGA(aoa){
     const blob=norm(String(r[cTexto]||'')+' '+String(r[cRef]||''));
     const cl=String(r[cCL]||'');
     out.push({mes,conta:String(r[cConta]||''),texto:String(r[cTexto]||'').slice(0,80),forn:String(r[cForn]||'').slice(0,40),
-      loc:/amz/i.test(cl)?'Amazonas':'Maranhão',
+      loc:/amz|manaus/i.test(cl)?'Manaus':'Rio de Janeiro',   // SG&A só tem estas 2 localizações
       nr:blob.includes('nao recorrente'),mao:blob.includes('lancado a mao'),valor:v});
   }
   return out;
@@ -856,9 +856,11 @@ function parseOrcamento(aoa){
     const descrLinha=iDescr>=0?String(row[iDescr]||''):'';
     // região: coluna Projeto (oficial); senão a letra do CC (folha nova vem sem CC, com Projeto = Amazonas/Maranhão)
     const proj=iProj>=0?norm(row[iProj]):'';
-    // Manaus (sozinho) = Amazonas; "Escritório RJ / Manaus" e "Rio de Janeiro" = corporativo → cai no CC (→ Maranhão)
-    const regiao=(proj.includes('amazon')||(proj.includes('manaus')&&!proj.includes('rj')&&!proj.includes('rio')))?'Amazonas'
-      :(proj.includes('maranh')?'Maranhão':localidadeDe(cc));
+    const nt0=norm(tipo);
+    // SG&A é corporativo e tem localizações PRÓPRIAS: Manaus e Rio de Janeiro ("Escritório RJ/Manaus" fica no RJ)
+    const regiao=/sg/.test(nt0)
+      ?((proj.includes('manaus')&&!proj.includes('rj')&&!proj.includes('rio'))?'Manaus':'Rio de Janeiro')
+      :(proj.includes('amazon')||proj.includes('manaus')?'Amazonas':(proj.includes('maranh')?'Maranhão':localidadeDe(cc)));
     const nt=norm(tipo);   // o Tipo do orçamento já separa: "Custos Fixos - Pessoal" × "Custos Fixos - O&M"
     const cat=/fix/.test(nt)?(/pessoal/.test(nt)?'pessoal':'om_fixo'):classificarCusto(descrLinha+' '+nome, nome);
     const bloco=/fix/.test(nt)?((!cod&&/pessoal/.test(nt))?'pessoal':blocoFixoDe(cod,nome)):undefined;   // folha agregada (sem conta) → Pessoal
@@ -2007,14 +2009,15 @@ function dreDados(loc){
     if(d.nr&&!d.mao) add('cNR',d.mes,'r',d.valor);
     if(natDe(d)==='fixo') add(catDeLinha(d)==='pessoal'?'cfPes':'cfOM',d.mes,'r',d.valor);
     else add('cv',d.mes,'r',d.valor); });
-  // SG&A REALIZADO (base própria) — valor cheio; NR marcado também alimenta a linha própria
-  SGA.forEach(d=>{ if(loc&&d.loc!==loc) return; if(!setM.has(d.mes)) return;
+  // SG&A REALIZADO (base própria) — corporativo (Manaus + Rio de Janeiro): entra apenas na visão GERAL
+  SGA.forEach(d=>{ if(loc) return; if(!setM.has(d.mes)) return;
     add('sga',d.mes,'r',d.valor);
     if(d.nr&&!d.mao) add('cNR',d.mes,'r',d.valor); });
-  ORCAMENTO.forEach(o=>{ if(!setM.has(o.mes)) return; if(loc&&o.regiao!==loc) return; const t=norm(o.tipo);
+  ORCAMENTO.forEach(o=>{ if(!setM.has(o.mes)) return; const t=norm(o.tipo);
+    if(/sg/.test(t)){ if(!loc) add('sga',o.mes,'o',orcVal(o)); return; }   // SG&A corporativo (Manaus+RJ): só no Geral
+    if(loc&&o.regiao!==loc) return;
     if(/variav/.test(t)) add('cv',o.mes,'o',orcVal(o));
-    else if(/fix/.test(t)) add(/pessoal/.test(t)?'cfPes':'cfOM',o.mes,'o',orcVal(o));
-    else if(/sg/.test(t)) add('sga',o.mes,'o',orcVal(o)); });
+    else if(/fix/.test(t)) add(/pessoal/.test(t)?'cfPes':'cfOM',o.mes,'o',orcVal(o)); });
   return {L,meses,tax};
 }
 function dreLinhas(dd){
@@ -2113,7 +2116,7 @@ function renderDre(){
   const semCF=meses.filter(m=>{ const g=k=>((dd.L[k]||{})[m]||{r:0,o:0}); return !(g('cfPes').r+g('cfOM').r)&&(g('cfPes').o+g('cfOM').o)>0; });
   document.getElementById('dreNote').textContent=
     (semCF.length?'⚠️ '+semCF.join(', ')+' sem custos fixos REALIZADOS carregados — EBITDA desses meses superestimado. ':'')+
-    'Valores em R$ mil, negativos entre parênteses. Custos pelo valor CHEIO — os lançamentos a mão neutralizam os NR dentro do custo (o cheio já é o recorrente com ajustes). (+/−) Não Recorrente = receita NR − custos NR, somado após o Ajustado. SG&A: '+(SGA.length?'REALIZADO da base SG&A (orçado na coluna orçado).':'sem base de realizado — o ORÇADO entra nas duas colunas.')+' Deduções = '+(dd.tax*100).toFixed(2).replace('.',',')+'% sobre a receita bruta recorrente.';
+    'Valores em R$ mil, negativos entre parênteses. Custos pelo valor CHEIO — os lançamentos a mão neutralizam os NR dentro do custo (o cheio já é o recorrente com ajustes). (+/−) Não Recorrente = receita NR − custos NR, somado após o Ajustado. SG&A: corporativo com localizações próprias (Manaus + Rio de Janeiro) — entra apenas na visão GERAL; '+(SGA.length?'realizado da base SG&A.':'sem base de realizado — o ORÇADO entra nas duas colunas.')+' Deduções = '+(dd.tax*100).toFixed(2).replace('.',',')+'% sobre a receita bruta recorrente.';
   renderPonte(dd,mesQ,loc);
   renderResumoExe(dd,loc,mesQ);
   renderForecast(dd,loc);
@@ -2291,10 +2294,11 @@ function renderForecast(dd,loc){
   const MO={};
   const add=(m,k,v)=>{ (MO[m]=MO[m]||{rec:0,cv:0,cf:0,sga:0})[k]+=v; };
   ORCREC.forEach(o=>{ if(loc&&o.regiao!==loc) return; if(o.tipo==='fixa'||o.tipo==='variavel') add(o.mes,'rec',o.valor); });
-  ORCAMENTO.forEach(o=>{ if(loc&&o.regiao!==loc) return; const t=norm(o.tipo);
+  ORCAMENTO.forEach(o=>{ const t=norm(o.tipo);
+    if(/sg/.test(t)){ if(!loc) add(o.mes,'sga',orcVal(o)); return; }   // SG&A corporativo: só no Geral
+    if(loc&&o.regiao!==loc) return;
     if(/variav/.test(t)) add(o.mes,'cv',orcVal(o));
-    else if(/fix/.test(t)) add(o.mes,'cf',orcVal(o));
-    else if(/sg/.test(t)) add(o.mes,'sga',orcVal(o)); });
+    else if(/fix/.test(t)) add(o.mes,'cf',orcVal(o)); });
   const ebOrc=m=>{ const x=MO[m]; return x?x.rec*(1-tax)-x.cv-x.cf-x.sga:0; };
   // EBITDA real do mês — AJUSTADO (recorrente, sem NR e sem a mão) e TOTAL (com NR)
   const ebAjReal=m=>{ const bruta=g('recF',m,'r')+g('recV',m,'r');
@@ -2450,12 +2454,12 @@ function renderOpsComp(){
   const el=document.getElementById('tabOpsComp'); if(!el) return;
   const ops=opsCompDados(); OPSCOMP_LAST=ops;
   const lbl=document.getElementById('ocLbl');
-  if(lbl) lbl.textContent='— até '+(ops[2].fim||'—')+' · R$ mil · Δ = real − orçado';
+  if(lbl) lbl.textContent='— até '+(ops[2].fim||'—')+' · R$ mil · Δ = real − orçado · SG&A é corporativo (Manaus+RJ) e entra só no Geral — por isso AM + MA + SG&A = Geral';
   const linhas=[
     ['(=) Receita Líquida',o=>o.liqR,o=>o.liqO],
     ['(−) Custos Variáveis',o=>-o.cvR,o=>-o.cvO],
     ['(−) Custos Fixos',o=>-o.cfR,o=>-o.cfO],
-    ['(−) SG&A'+(SGA.length?'':' (orçado)'),o=>-o.sgaR,o=>-o.sgaO],
+    ['(−) SG&A — corporativo, só no Geral'+(SGA.length?'':' (orçado)'),o=>-o.sgaR,o=>-o.sgaO],
     ['(=) EBITDA Ajustado',o=>o.ebAjR,o=>o.ebAjO,'forte'],
     ['(+/−) Não Recorrente',o=>o.nr,o=>0],
     ['(=) EBITDA',o=>o.ebR,o=>o.ebO,'ebit'],
