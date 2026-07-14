@@ -384,6 +384,9 @@
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chBlocos','Custos Fixos por Bloco')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chBlocos','Custos Fixos por Bloco')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chBlocos','Custos Fixos por Bloco')">⬇ Excel</button></div><h3>Orçado × Realizado por bloco <span class="small">(acumulado dos meses realizados)</span></h3><div class="wrap" style="height:340px"><canvas id="chBlocos"></canvas></div></div>
     </div>
     <div class="tablewrap"><table id="tabFixo"><thead></thead><tbody></tbody></table></div>
+    <h3 style="font-size:14px;font-weight:600;margin:18px 0 10px">👥 Pessoal — abertura por conta <span class="small">— orçado (folha aberta) × realizado, meses com realizado · clique numa conta p/ ver os lançamentos</span>
+      <button class="btn-ghost" style="margin-left:12px;padding:5px 12px" onclick="exportarPesAbXls()">⬇ Excel da abertura</button></h3>
+    <div class="tablewrap" style="max-height:430px;margin-bottom:20px"><table id="tabPesAb"><thead></thead><tbody></tbody></table></div>
     <div class="note">Blocos pela divisão de contas da DRE: 4001* = Pessoal · 4007* = Materiais · 4011*/4013010001 = Viagens · 4022010001 = Seguros · contas com "aluguel" no nome = Aluguéis · listas específicas p/ Serviços Prestados e Outros O&M. Orçado = tipos "Custos Fixos" do orçamento, mesmos blocos, meses com realizado, sempre BRUTO (crédito PIS/Cofins não se aplica ao fixo — igual à análise do EBITDA).</div>
   </div>
 
@@ -511,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v51 · SG&A realizado na DRE e derivados · 12/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v52 · Folha aberta: Pessoal por conta + SG&A orçado por localidade · 12/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -853,7 +856,9 @@ function parseOrcamento(aoa){
     const descrLinha=iDescr>=0?String(row[iDescr]||''):'';
     // região: coluna Projeto (oficial); senão a letra do CC (folha nova vem sem CC, com Projeto = Amazonas/Maranhão)
     const proj=iProj>=0?norm(row[iProj]):'';
-    const regiao=proj.includes('amazon')?'Amazonas':(proj.includes('maranh')?'Maranhão':localidadeDe(cc));
+    // Manaus (sozinho) = Amazonas; "Escritório RJ / Manaus" e "Rio de Janeiro" = corporativo → cai no CC (→ Maranhão)
+    const regiao=(proj.includes('amazon')||(proj.includes('manaus')&&!proj.includes('rj')&&!proj.includes('rio')))?'Amazonas'
+      :(proj.includes('maranh')?'Maranhão':localidadeDe(cc));
     const nt=norm(tipo);   // o Tipo do orçamento já separa: "Custos Fixos - Pessoal" × "Custos Fixos - O&M"
     const cat=/fix/.test(nt)?(/pessoal/.test(nt)?'pessoal':'om_fixo'):classificarCusto(descrLinha+' '+nome, nome);
     const bloco=/fix/.test(nt)?((!cod&&/pessoal/.test(nt))?'pessoal':blocoFixoDe(cod,nome)):undefined;   // folha agregada (sem conta) → Pessoal
@@ -1821,6 +1826,44 @@ function renderFixo(){
     return `<tr style="cursor:pointer" onclick="abrirDrillBloco('${b}')"><td class="txt">${BLOCO_ICO[b]} ${BLOCO_NOME[b]}</td><td>${BRL.format(x.orc)}</td><td><b>${BRL.format(x.real)}</b></td>`+
       `<td class="${cls}">${(d>=0?'+':'')+BRL.format(d)}</td><td class="${cls}">${x.orc?PCT(p):'—'}</td><td class="txt">${farol.ico} ${farol.txt}</td><td>${Math.abs(x.nr)>1?BRL.format(x.nr):'—'}</td></tr>`;
   }).join('')+`<tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt">TOTAL</td><td>${BRL.format(totO)}</td><td>${BRL.format(totR)}</td><td class="${dv>0?'pos':'neg'}">${(dv>=0?'+':'')+BRL.format(dv)}</td><td class="${dv>0?'pos':'neg'}">${totO?PCT(dp):'—'}</td><td></td><td>${BRL.format(totNR)}</td></tr>`;
+  renderPessoalAb(loc,mesesReal);
+}
+// ---------- PESSOAL — ABERTURA POR CONTA (folha aberta do orçamento × realizado) ----------
+let PESAB_LAST=null;
+function renderPessoalAb(loc,mesesReal){
+  const el=document.getElementById('tabPesAb'); if(!el) return;
+  const setReal=new Set(mesesReal);
+  const A={};
+  const ent=k=>A[k]||(A[k]={cod:k,nome:'',real:0,orc:0});
+  DADOS.forEach(d=>{ if(natDe(d)!=='fixo') return; if(loc&&d.loc!==loc) return; if(blocoDe(d)!=='pessoal') return;
+    const x=ent(d.ccod||'?'); x.real+=d.valor; if(!x.nome&&d.classe) x.nome=d.classe; });
+  ORCAMENTO.forEach(o=>{ if(!/fix/.test(norm(o.tipo))) return; if(loc&&o.regiao!==loc) return;
+    if((o.bloco||blocoFixoDe(o.classeCod,o.classeNome))!=='pessoal') return;
+    if(setReal.size&&!setReal.has(o.mes)) return;
+    const x=ent(o.classeCod||'?'); x.orc+=orcVal(o); if(o.classeNome) x.nome=o.classeNome; });
+  const rows=Object.values(A).filter(x=>Math.abs(x.real)>0.005||Math.abs(x.orc)>0.005).sort((a,b)=>Math.abs(b.real)-Math.abs(a.real));
+  rows.forEach(x=>{ if(x.cod==='?') x.nome=x.nome||'(sem conta na folha do orçamento)'; });
+  PESAB_LAST={rows,loc};
+  const totR=rows.reduce((s,x)=>s+x.real,0), totO=rows.reduce((s,x)=>s+x.orc,0), dv=totR-totO;
+  el.querySelector('thead').innerHTML='<tr><th class="txt">Conta</th><th class="txt">Descrição</th><th>Orçado</th><th>Realizado</th><th>Δ R$</th><th>Δ %</th><th class="txt">Farol</th></tr>';
+  el.querySelector('tbody').innerHTML=rows.map(x=>{
+    const d=x.real-x.orc,p=x.orc?d/x.orc*100:null,cls=d>0?'pos':'neg';
+    const farol=execFarol(x.orc?x.real/x.orc*100:null);
+    return `<tr style="cursor:pointer" onclick="drillPesConta('${x.cod}')"><td class="txt">${x.cod}</td><td class="txt" title="${(x.nome||'').replace(/"/g,'')}">${(x.nome||'—').slice(0,42)}</td>`+
+      `<td>${x.orc?BRL.format(x.orc):'—'}</td><td><b>${BRL.format(x.real)}</b></td><td class="${cls}">${(d>=0?'+':'')+BRL.format(d)}</td><td class="${cls}">${x.orc?PCT(p):'—'}</td><td class="txt">${farol.ico} ${farol.txt}</td></tr>`;
+  }).join('')+`<tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt" colspan="2">TOTAL Pessoal</td><td>${BRL.format(totO)}</td><td>${BRL.format(totR)}</td><td class="${dv>0?'pos':'neg'}">${(dv>=0?'+':'')+BRL.format(dv)}</td><td class="${dv>0?'pos':'neg'}">${totO?PCT(dv/Math.abs(totO)*100):'—'}</td><td></td></tr>`;
+}
+function drillPesConta(cod){
+  const loc=(document.getElementById('fixoLoc')||{}).value||'';
+  drillReal('Pessoal · conta '+cod+(loc?' · '+loc:''),
+    DADOS.filter(d=>natDe(d)==='fixo'&&blocoDe(d)==='pessoal'&&(d.ccod||'?')===cod&&(!loc||d.loc===loc)));
+}
+function exportarPesAbXls(){
+  if(!PESAB_LAST||!PESAB_LAST.rows.length){ alert('Abra a aba Custos Fixos primeiro.'); return; }
+  const {rows,loc}=PESAB_LAST;
+  const aoa=[['Conta','Descrição','Orçado (meses realizados)','Realizado','Δ R$','Δ %']].concat(
+    rows.map(x=>[x.cod,x.nome,x.orc,x.real,x.real-x.orc,x.orc?(x.real-x.orc)/x.orc:'']));
+  baixarXlsx('Pessoal_abertura'+(loc?'_'+loc:''),[{nome:'Pessoal por conta',aoa}]);
 }
 function abrirDrillBloco(b){
   const loc=(document.getElementById('fixoLoc')||{}).value||'';
