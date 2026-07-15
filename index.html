@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v62 · PPT com rótulos de dados e barras grossas (igual ao dash) · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v63 · Página KPI em PPT no formato exato do slide do CA · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1488,17 +1488,25 @@ function exportarKpiPPT(){
     ['Amazonas','Maranhão'].forEach((loc,c)=>{
       const sr=opsSerie(loc,meses,costReal,orcCost);
       const clean=a=>a.map(v=>v==null?null:Math.round(v*100)/100);
+      // igual ao slide oficial do CA: barra escura = orçado, barra clara = real, rótulos 2 casas em cima,
+      // linha âmbar da diferença com rótulos, sem legenda e sem eixo da direita
       const combo=[
-        {type:pptx.ChartType.bar,data:[{name:'Orçado',labels:lbl,values:clean(sr.orc)},{name:'Realizado',labels:lbl,values:clean(sr.real)}],options:{chartColors:['02585C','00A0A8']}},
-        {type:pptx.ChartType.line,data:[{name:'Diferença',labels:lbl,values:clean(sr.dif)}],options:{chartColors:['FCB316'],secondaryValAxis:true,secondaryCatAxis:true}}
+        {type:pptx.ChartType.bar,data:[{name:'Orçado',labels:lbl,values:clean(sr.orc)},{name:'Realizado',labels:lbl,values:clean(sr.real)}],
+          options:{chartColors:['02585C','76B9BD'],showValue:true,dataLabelColor:'404040',dataLabelFontSize:7.5,
+            dataLabelPosition:'outEnd',dataLabelFormatCode:'#,##0.00'}},
+        {type:pptx.ChartType.line,data:[{name:'Diferença',labels:lbl,values:clean(sr.dif)}],
+          options:{chartColors:['FCB316'],secondaryValAxis:true,secondaryCatAxis:true,
+            showValue:true,dataLabelColor:'B87400',dataLabelFontSize:7.5,dataLabelPosition:'b',dataLabelFormatCode:'+#,##0.00;-#,##0.00',
+            lineSize:2.25,lineDataSymbol:'circle',lineDataSymbolSize:6}}
       ];
-      s.addChart(combo,{x:1.55+c*4.3,y,w:3.9,h:1.48,showLegend:r===0,legendPos:'t',legendFontSize:8,legendColor:'404040',
+      s.addChart(combo,{x:1.55+c*4.3,y,w:3.9,h:1.48,showLegend:false,barGapWidthPct:30,fontFace:'Segoe UI',
         catAxisLabelColor:'575757',catAxisLabelFontSize:8,dataBorder:{pt:0,color:'FFFFFF'},
-        valAxes:[{valAxisLabelColor:'575757',valAxisLabelFontSize:8},{valAxisLabelFontSize:8,valAxisLabelColor:'FCB316'}],   // 2º eixo (Diferença) visível em âmbar
+        valGridLine:{color:'E4E7EA',style:'solid',size:0.5},catGridLine:{style:'none'},
+        valAxes:[{valAxisLabelColor:'575757',valAxisLabelFontSize:8,valAxisLabelFormatCode:'#,##0.00'},{valAxisHidden:true}],
         catAxes:[{catAxisLabelColor:'575757',catAxisLabelFontSize:8},{catAxisHidden:true}]});
     });
   });
-  s.addText('Orçado (barra escura) · Realizado (barra clara) · Diferença = realizado − orçado (linha âmbar, eixo oculto)',{x:0.3,y:5.28,w:9.4,h:0.3,fontSize:9,color:'575757'});
+  s.addText('Barra escura = Orçado · barra clara = Realizado · linha âmbar = diferença (realizado − orçado)',{x:0.3,y:5.28,w:9.4,h:0.3,fontSize:9,color:'575757'});
   pptx.writeFile({fileName:'KPIs_R_km_'+new Date().toISOString().slice(0,10)+'.pptx'});
 }
 
