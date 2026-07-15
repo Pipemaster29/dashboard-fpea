@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v57 · Cascata fixa com os degraus oficiais (contas 3*) · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v58 · Cascata lembra a visão escolhida (Fixos/Variáveis + região) · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -541,6 +541,11 @@ try{ Chart.defaults.onHover=(e,els)=>{ const t=e.native&&e.native.target; if(t) 
 // ---------- ABAS ----------
 let activeTab=localStorage.getItem('activeTab')||'ovr';
 setTimeout(restoreSubs,0);   // reaplica a subpágina escolhida em cada aba (depois do parse do HTML)
+setTimeout(()=>{ try{                             // reaplica a última visão da cascata (Fixos/Variáveis + região)
+  const n=localStorage.getItem('wfNat'), l=localStorage.getItem('wfLoc');
+  if(n&&document.getElementById('wfNat')) document.getElementById('wfNat').value=n;
+  if(l!=null&&document.getElementById('wfLoc')&&[...document.getElementById('wfLoc').options].some(o=>o.value===l)) document.getElementById('wfLoc').value=l;
+}catch(e){} },0);
 let _has={ovr:false};
 function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; if(id==='fixo') return DADOS.some(d=>natDe(d)==='fixo'); if(id==='rec') return RECEITA.length>0; if(id==='dre') return RECEITA.length>0&&DADOS.length>0; return DADOS.length>0; }
 function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs();
@@ -2717,6 +2722,7 @@ function renderWaterfall(){
   destroy('chWf');
   if(!DADOS.length||!ORCAMENTO.length){ WF_LAST=null; return; }
   const loc=wfLocSel(), nat=wfNatSel();
+  try{ localStorage.setItem('wfNat',nat); localStorage.setItem('wfLoc',loc); }catch(e){}   // lembra a visão escolhida
   const dd=wfDados(loc,nat);
   const labels=['Orçado'], barras=[], cores=[], rotulos=[], passos=['__orc'];
   barras.push([0,dd.orcTot]); cores.push('#02585C'); rotulos.push(dd.orcTot);   // total inicial (teal escuro)
