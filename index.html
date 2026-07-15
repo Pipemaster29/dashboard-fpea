@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v53 · SG&A corporativo: Manaus + Rio de Janeiro (só no Geral) · 12/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v54 · SG&A no Orçado vs Real · transferência = Maranhão · cascata fecha com a DRE · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -776,7 +776,9 @@ function parseOrcReceita(aoa){
   const out=[];
   for(let r=1;r<aoa.length;r++){ const row=aoa[r]; if(!row) continue;
     const tipo=T[norm(row[0])]; if(!tipo) continue;
-    const contrato=String(row[1]||'').trim(), regiao=String(row[2]||'').trim();
+    const contrato=String(row[1]||'').trim();
+    let regiao=String(row[2]||'').trim();
+    if(/transf/i.test(contrato)) regiao='Maranhão';   // transferência de carreta é MARANHÃO (custo e receita)
     meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,contrato,regiao,mes,valor:v}); });
   }
   return out;
@@ -798,7 +800,7 @@ function contratoCanon(c){
   if(n==='suzano') return 'SUZANO';
   return String(c).trim().toUpperCase();
 }
-const regiaoContrato=c=>/AZUL|TRANSF/.test(c)?'Amazonas':'Maranhão';
+const regiaoContrato=c=>/TRANSF/.test(c)?'Maranhão':(/AZUL/.test(c)?'Amazonas':'Maranhão');   // transferência de carreta é MARANHÃO
 function ehReceitaGNL(aoa){
   const h=(aoa[0]||[]).map(norm);
   return h.includes('contrato')&&h.some(x=>x.includes('montante'))&&h.some(x=>x.includes('quantidade de viagem'));
@@ -860,7 +862,8 @@ function parseOrcamento(aoa){
     // SG&A é corporativo e tem localizações PRÓPRIAS: Manaus e Rio de Janeiro ("Escritório RJ/Manaus" fica no RJ)
     const regiao=/sg/.test(nt0)
       ?((proj.includes('manaus')&&!proj.includes('rj')&&!proj.includes('rio'))?'Manaus':'Rio de Janeiro')
-      :(proj.includes('amazon')||proj.includes('manaus')?'Amazonas':(proj.includes('maranh')?'Maranhão':localidadeDe(cc)));
+      :(proj.includes('transf')?'Maranhão'   // transferência de carreta: custo orçado é MARANHÃO
+        :(proj.includes('amazon')||proj.includes('manaus')?'Amazonas':(proj.includes('maranh')?'Maranhão':localidadeDe(cc))));
     const nt=norm(tipo);   // o Tipo do orçamento já separa: "Custos Fixos - Pessoal" × "Custos Fixos - O&M"
     const cat=/fix/.test(nt)?(/pessoal/.test(nt)?'pessoal':'om_fixo'):classificarCusto(descrLinha+' '+nome, nome);
     const bloco=/fix/.test(nt)?((!cod&&/pessoal/.test(nt))?'pessoal':blocoFixoDe(cod,nome)):undefined;   // folha agregada (sem conta) → Pessoal
@@ -991,6 +994,11 @@ function migrarDados(){
     if(natDe(d)==='fixo'){ d.bloco=d.bloco||blocoFixoDe(d.ccod,d.classe); d.cat=d.bloco==='pessoal'?'pessoal':'om_fixo'; }
   });
   ORCAMENTO.forEach(o=>{ if(/fix/.test(norm(o.tipo))&&!o.bloco) o.bloco=blocoFixoDe(o.classeCod,o.classeNome); });
+  // transferência de carreta é MARANHÃO (receita real, receita orçada) — corrige bases salvas antes da regra
+  RECEITA_RAW.forEach(d=>{ if(/transf/i.test(d.contrato||'')) d.regiao='Maranhão'; });
+  ORCREC.forEach(o=>{ if(/transf/i.test(o.contrato||'')) o.regiao='Maranhão'; });
+  // SG&A tem localizações próprias (Manaus + Rio de Janeiro) — migra bases salvas com AM/MA
+  SGA_RAW.forEach(d=>{ if(d.loc==='Amazonas') d.loc='Manaus'; else if(d.loc==='Maranhão') d.loc='Rio de Janeiro'; });
 }
 // bases antigas (salvas na nuvem antes do custo fixo) não têm o campo — eram todas variáveis
 function natDe(d){ return d.nat||'variavel'; }
@@ -1603,12 +1611,14 @@ function renderOVR(){
   const bm={}; ORCAMENTO.forEach(o=>{ if(!tipo||o.tipo===tipo) bm[o.mes]=(bm[o.mes]||0)+orcVal(o); });
   // realizado do escopo: variáveis → M80OV* · fixos O&M → M80OF*+om_fixo · fixos Pessoal → M80OF*+pessoal
   const nt=norm(tipo);
-  let fReal=null;
+  let fReal=null, ehSga=/sg/.test(nt);
   if(/variav/.test(nt)) fReal=d=>natDe(d)==='variavel';
   else if(/fix/.test(nt)&&/pessoal/.test(nt)) fReal=d=>natDe(d)==='fixo'&&catDeLinha(d)==='pessoal';
   else if(/fix/.test(nt)) fReal=d=>natDe(d)==='fixo'&&catDeLinha(d)==='om_fixo';
-  const temReal = !!fReal && DADOS.some(fReal);
-  const rm={}; if(temReal) DADOS.forEach(d=>{ if(fReal(d)) rm[d.mes]=(rm[d.mes]||0)+d.valor; });
+  const temReal = (!!fReal && DADOS.some(fReal)) || (ehSga && SGA.length>0);   // SG&A real vem da base própria
+  const rm={};
+  if(temReal&&fReal) DADOS.forEach(d=>{ if(fReal(d)) rm[d.mes]=(rm[d.mes]||0)+d.valor; });
+  if(temReal&&ehSga) SGA.forEach(d=>{ rm[d.mes]=(rm[d.mes]||0)+d.valor; });
   // folha orçada parece incompleta? (orçado de pessoal muito menor que o realizado)
   let avisoFolha='';
   if(/fix/.test(nt)&&/pessoal/.test(nt)&&temReal){
@@ -1652,7 +1662,9 @@ function renderOVR(){
   if(temReal) dsOVR.push({label:'Realizado',data:meses.map(m=>rm[m]||0),backgroundColor:'#00A0A8'});
   charts.chOVR=new Chart('chOVR',{type:'bar',data:{labels:meses,datasets:dsOVR},options:{responsive:true,maintainAspectRatio:false,
     onClick:(e,els)=>{ if(!els.length) return; const m=meses[els[0].index];
-      if(dsOVR[els[0].datasetIndex].label==='Realizado'&&fReal) drillReal('Realizado · '+tipo+' · '+m, DADOS.filter(d=>fReal(d)&&d.mes===m));
+      if(dsOVR[els[0].datasetIndex].label==='Realizado'&&ehSga) drillReal('Realizado SG&A · '+m,
+        SGA.filter(d=>d.mes===m).map(d=>({mes:d.mes,loc:d.loc,centro:'',ccod:d.conta,classe:'SG&A',material:d.texto||d.forn,nr:d.nr,mao:d.mao,valor:d.valor})));
+      else if(dsOVR[els[0].datasetIndex].label==='Realizado'&&fReal) drillReal('Realizado · '+tipo+' · '+m, DADOS.filter(d=>fReal(d)&&d.mes===m));
       else drillOrcam('Orçado · '+tipo+' · '+m, ORCAMENTO.filter(o=>(!tipo||o.tipo===tipo)&&o.mes===m)); },
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
@@ -2374,6 +2386,12 @@ function renderCheckup(){
   if(SGA.length){ const setM2=new Set(dd.meses);
     const sgaBase=s(SGA.filter(d=>setM2.has(d.mes))), sgaDre=Y('sga','r');
     linhas.splice(8,0,['SG&A — realizado (base SG&A) = linha "(−) SG&A" da DRE',sgaBase,sgaDre,chip(ok(sgaBase,sgaDre))]); }
+  // cascata × DRE: o total da cascata (degraus por categoria + degrau NR) tem que fechar com a linha da DRE
+  const wfV=wfDados('','variavel'), wfF=wfDados('','fixo');
+  linhas.push(['Cascata Variáveis — total REAL (categorias + degrau NR) = linha da DRE',wfV.realTot,cvDre,chip(ok(wfV.realTot,cvDre))]);
+  linhas.push(['Cascata Variáveis — total ORÇADO = orçado da DRE',wfV.orcTot,Y('cv','o'),chip(ok(wfV.orcTot,Y('cv','o')))]);
+  linhas.push(['Cascata Fixos — total REAL = linha da DRE',wfF.realTot,cfDre,chip(ok(wfF.realTot,cfDre))]);
+  linhas.push(['Cascata Fixos — total ORÇADO = orçado da DRE',wfF.orcTot,Y('cfPes','o')+Y('cfOM','o'),chip(ok(wfF.orcTot,Y('cfPes','o')+Y('cfOM','o')))]);
   el.querySelector('thead').innerHTML='<tr><th class="txt">Conciliação (período selecionado · geral)</th><th>Valor</th><th>Na DRE</th><th>Status</th></tr>';
   el.querySelector('tbody').innerHTML=linhas.map(([n,v,v2,st])=>
     `<tr><td class="txt">${n}</td><td>${fmtMil(v)}</td><td>${v2===''?'':fmtMil(v2)}</td><td>${st}</td></tr>`).join('');
