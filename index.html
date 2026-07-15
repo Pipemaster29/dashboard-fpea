@@ -224,7 +224,7 @@
     <button class="tabbtn" data-t="ops" onclick="showTab('ops')">🚚 Operações & R$/KM</button>
     <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')">🔎 Pareto & Gargalos</button>
     <button class="tabbtn" data-t="dash" onclick="showTab('dash')">📈 Análise de Custos</button>
-    <span class="ytdbox"><label>Período (YTD)</label><select id="ytdAte" onchange="aplicarPeriodo()" title="Acumulado de janeiro até o mês escolhido — vale para TODAS as análises, drills e exports. Na nuvem fica sempre a base completa."></select></span>
+    <span class="ytdbox"><label>Período</label><select id="ytdAte" onchange="aplicarPeriodo()" title="Acumulado (YTD) de janeiro até o mês escolhido, OU um mês isolado — vale para TODAS as análises, drills e exports. Na nuvem fica sempre a base completa."></select></span>
   </nav>
 
   <!-- ORÇADO vs REAL -->
@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v60 · Transferência de Carreta = Transporte · Maranhão (3 linhas orçadas) · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v61 · Pareto recorrente (sem a mão/NR/zerados) + período por mês isolado · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -584,16 +584,24 @@ function montarYtd(){
   const sel=document.getElementById('ytdAte'); if(!sel) return;
   const cur=sel.value;
   const meses=uniq(DADOS_RAW.map(d=>d.mes).concat(RECEITA_RAW.map(d=>d.mes))).sort((a,b)=>mesOrd(a)-mesOrd(b));
-  sel.innerHTML='<option value="">jan – '+(meses.length?mesCurto(meses[meses.length-1]):'—')+' (tudo)</option>'+
-    meses.slice(0,-1).map(m=>`<option value="${m}">jan – ${mesCurto(m)}/${m.slice(3)}</option>`).join('');
-  if(cur&&meses.includes(cur)) sel.value=cur;
+  sel.innerHTML='<optgroup label="Acumulado (YTD)">'+
+      '<option value="">jan – '+(meses.length?mesCurto(meses[meses.length-1]):'—')+' (tudo)</option>'+
+      meses.slice(0,-1).map(m=>`<option value="${m}">jan – ${mesCurto(m)}/${m.slice(3)}</option>`).join('')+
+    '</optgroup>'+
+    '<optgroup label="Mês isolado">'+
+      meses.map(m=>`<option value="M:${m}">só ${mesCurto(m)}/${m.slice(3)}</option>`).join('')+
+    '</optgroup>';
+  if(cur&&[...sel.options].some(o=>o.value===cur)) sel.value=cur;
 }
 function aplicarPeriodo(){
   const sel=document.getElementById('ytdAte');
   const cut=sel?sel.value:'';
-  DADOS=cut?DADOS_RAW.filter(d=>mesOrd(d.mes)<=mesOrd(cut)):DADOS_RAW.slice();
-  RECEITA=cut?RECEITA_RAW.filter(d=>mesOrd(d.mes)<=mesOrd(cut)):RECEITA_RAW.slice();
-  SGA=cut?SGA_RAW.filter(d=>mesOrd(d.mes)<=mesOrd(cut)):SGA_RAW.slice();
+  let f=null;                                                         // sem corte = tudo
+  if(cut.startsWith('M:')){ const m=cut.slice(2); f=d=>d.mes===m; }   // mês isolado
+  else if(cut){ f=d=>mesOrd(d.mes)<=mesOrd(cut); }                    // acumulado até o mês
+  DADOS=f?DADOS_RAW.filter(f):DADOS_RAW.slice();
+  RECEITA=f?RECEITA_RAW.filter(f):RECEITA_RAW.slice();
+  SGA=f?SGA_RAW.filter(f):SGA_RAW.slice();
   atualizarUI();
 }
 
@@ -1533,9 +1541,11 @@ function renderPareto2(){
   if(!DADOS.length) return;
   const g=document.getElementById('pareGrupo').value;const loc=document.getElementById('pareLoc').value;const dim=document.getElementById('pareDim').value;
   _pareCtx={g,loc,dim};
-  const rows=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc));
+  // Pareto = concentração RECORRENTE: lançamentos a mão e NR ficam de fora (os pares se anulam e só poluem o ranking)
+  const rows=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr);
   const agg={};rows.forEach(d=>{const k=pareKey(d,dim);agg[k]=(agg[k]||0)+d.valor;});
-  const totNet=Object.values(agg).reduce((s,v)=>s+v,0);                    // líquido do grupo (bate com a DRE)
+  Object.keys(agg).forEach(k=>{ if(Math.abs(agg[k])<1) delete agg[k]; });   // itens que zeram saem do ranking
+  const totNet=Object.values(agg).reduce((s,v)=>s+v,0);                    // líquido recorrente do grupo
   const estornos=Object.values(agg).filter(v=>v<0).reduce((s,v)=>s+v,0);   // baixas/estornos
   let items=Object.entries(agg).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const nItens=items.length;const tot=items.reduce((s,x)=>s+x[1],0);       // bruto (base das % das barras)
@@ -1545,7 +1555,7 @@ function renderPareto2(){
   const n80=cumItems.findIndex(p=>p>=80)+1;
   const temEstorno=estornos<-1;
   document.getElementById('pareKpis').innerHTML=[
-    {lbl:'Custo líquido do grupo'+(loc?' · '+loc:''),val:BRL.format(totNet),sub:temEstorno?'bruto '+kBRL(tot)+' · estornos '+kBRL(estornos):''},
+    {lbl:'Custo recorrente do grupo'+(loc?' · '+loc:''),val:BRL.format(totNet),sub:(temEstorno?'bruto '+kBRL(tot)+' · estornos '+kBRL(estornos)+' · ':'')+'sem NR / a mão'},
     {lbl:'Itens p/ 80% do bruto',val:n80>0?INT.format(n80):'—',sub:'de '+INT.format(nItens)+' itens'},
     {lbl:'Maior item',val:items.length?BRL.format(items[0][1]):'—',sub:items.length?String(items[0][0]).slice(0,30):''}
   ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub" title="${String(c.sub).replace(/"/g,'')}">${c.sub}</div>`:''}</div>`).join('');
@@ -1574,7 +1584,7 @@ function renderPareto2(){
 let DRILL_LAST=null;   // lançamentos do drill aberto, para exportar
 function abrirDrill(idx){
   const it=_pareItems[idx]; if(!it) return; const {g,loc,dim}=_pareCtx;
-  const linhas=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&pareKey(d,dim)===it.key).sort((a,b)=>b.valor-a.valor);
+  const linhas=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr&&pareKey(d,dim)===it.key).sort((a,b)=>b.valor-a.valor);   // mesmo filtro do Pareto (recorrente)
   const tot=linhas.reduce((s,d)=>s+d.valor,0);
   DRILL_LAST={linhas,nome:(GRUPO_NOME[g]||g)+' '+(loc?loc+' ':'')+String(it.key)};
   document.getElementById('drillTit').innerHTML=`<b>${String(it.key).slice(0,70)}</b> · ${GRUPO_NOME[g]||g}${loc?' · '+loc:''} · ${INT.format(linhas.length)} lançamentos · ${BRL.format(tot)}`;
