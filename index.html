@@ -387,7 +387,7 @@
     <h3 style="font-size:14px;font-weight:600;margin:18px 0 10px">👥 Pessoal — abertura por conta <span class="small">— orçado (folha aberta) × realizado, meses com realizado · clique numa conta p/ ver os lançamentos</span>
       <button class="btn-ghost" style="margin-left:12px;padding:5px 12px" onclick="exportarPesAbXls()">⬇ Excel da abertura</button></h3>
     <div class="tablewrap" style="max-height:430px;margin-bottom:20px"><table id="tabPesAb"><thead></thead><tbody></tbody></table></div>
-    <div class="note">Blocos pela divisão de contas da DRE: 4001* = Pessoal · 4007* = Materiais · 4011*/4013010001 = Viagens · 4022010001 = Seguros · contas com "aluguel" no nome = Aluguéis · listas específicas p/ Serviços Prestados e Outros O&M. Orçado = tipos "Custos Fixos" do orçamento, mesmos blocos, meses com realizado, sempre BRUTO (crédito PIS/Cofins não se aplica ao fixo — igual à análise do EBITDA).</div>
+    <div class="note">Seguros (conta 4022*): o realizado é rateado <b>50% Amazonas / 50% Maranhão</b> (a apólice é lançada toda no CC do Maranhão) — cada lançamento aparece como duas metades no drill. Blocos pela divisão de contas da DRE: 4001* = Pessoal · 4007* = Materiais · 4011*/4013010001 = Viagens · 4022010001 = Seguros · contas com "aluguel" no nome = Aluguéis · listas específicas p/ Serviços Prestados e Outros O&M. Orçado = tipos "Custos Fixos" do orçamento, mesmos blocos, meses com realizado, sempre BRUTO (crédito PIS/Cofins não se aplica ao fixo — igual à análise do EBITDA).</div>
   </div>
 
   <!-- OPERAÇÕES & R$/KM -->
@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v55 · Combustível AM corrigido (diesel orçado da transferência volta pro Amazonas) · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v56 · Seguros rateados 50/50 + check cascata AM+MA=Geral=DRE · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -675,6 +675,7 @@ function lerArquivo(file){
         const org=novos[0].origem;
         const antes=DADOS_RAW.filter(d=>d.origem===org).length;
         DADOS_RAW=DADOS_RAW.filter(d=>d.origem!==org).concat(novos); // substitui a base "org" (não soma)
+        ratearSeguro();   // seguros (4022*) → 50% Amazonas / 50% Maranhão
         flash(antes?`🔄 "${org}" atualizado: ${INT.format(antes)} → ${INT.format(novos.length)} lançamentos (substituí a versão anterior).`
                    :`➕ "${org}" carregado: ${INT.format(novos.length)} lançamentos.`);
       }
@@ -1004,6 +1005,18 @@ function migrarDados(){
   ORCAMENTO.forEach(o=>{ if(/variav/.test(norm(o.tipo))&&String(o.classeCod||'').startsWith('4024')&&o.regiao==='Maranhão') o.regiao='Amazonas'; });
   // SG&A tem localizações próprias (Manaus + Rio de Janeiro) — migra bases salvas com AM/MA
   SGA_RAW.forEach(d=>{ if(d.loc==='Amazonas') d.loc='Manaus'; else if(d.loc==='Maranhão') d.loc='Rio de Janeiro'; });
+  ratearSeguro();
+}
+// SEGUROS (conta 4022*, fixo): a apólice é lançada toda no CC do Maranhão — rateio 50% Amazonas / 50% Maranhão.
+// Cada lançamento vira duas metades (uma por região); a flag 'rateio' evita ratear de novo (idempotente).
+function ratearSeguro(){
+  const novos=[];
+  DADOS_RAW.forEach(d=>{
+    if(d.rateio||natDe(d)!=='fixo'||!String(d.ccod||'').startsWith('4022')) return;
+    d.rateio=true; d.valor=d.valor/2;
+    novos.push(Object.assign({},d,{loc:d.loc==='Maranhão'?'Amazonas':'Maranhão'}));
+  });
+  if(novos.length) DADOS_RAW=DADOS_RAW.concat(novos);
 }
 // bases antigas (salvas na nuvem antes do custo fixo) não têm o campo — eram todas variáveis
 function natDe(d){ return d.nat||'variavel'; }
@@ -2391,12 +2404,22 @@ function renderCheckup(){
   if(SGA.length){ const setM2=new Set(dd.meses);
     const sgaBase=s(SGA.filter(d=>setM2.has(d.mes))), sgaDre=Y('sga','r');
     linhas.splice(8,0,['SG&A — realizado (base SG&A) = linha "(−) SG&A" da DRE',sgaBase,sgaDre,chip(ok(sgaBase,sgaDre))]); }
-  // cascata × DRE: o total da cascata (degraus por categoria + degrau NR) tem que fechar com a linha da DRE
+  // cascata × DRE: o total da cascata (degraus por categoria + degrau NR) tem que fechar com a linha da DRE,
+  // e a soma das cascatas por operação (AM + MA) tem que dar o Geral — no real, no orçado e na diferença
   const wfV=wfDados('','variavel'), wfF=wfDados('','fixo');
+  const wfVA=wfDados('Amazonas','variavel'), wfVM=wfDados('Maranhão','variavel');
+  const wfFA=wfDados('Amazonas','fixo'), wfFM=wfDados('Maranhão','fixo');
+  const cvO=Y('cv','o'), cfO=Y('cfPes','o')+Y('cfOM','o');
   linhas.push(['Cascata Variáveis — total REAL (categorias + degrau NR) = linha da DRE',wfV.realTot,cvDre,chip(ok(wfV.realTot,cvDre))]);
-  linhas.push(['Cascata Variáveis — total ORÇADO = orçado da DRE',wfV.orcTot,Y('cv','o'),chip(ok(wfV.orcTot,Y('cv','o')))]);
+  linhas.push(['Cascata Variáveis — total ORÇADO = orçado da DRE',wfV.orcTot,cvO,chip(ok(wfV.orcTot,cvO))]);
+  linhas.push(['&nbsp;&nbsp;AM + MA = Geral (REAL)',wfVA.realTot+wfVM.realTot,wfV.realTot,chip(ok(wfVA.realTot+wfVM.realTot,wfV.realTot))]);
+  linhas.push(['&nbsp;&nbsp;AM + MA = Geral (ORÇADO)',wfVA.orcTot+wfVM.orcTot,wfV.orcTot,chip(ok(wfVA.orcTot+wfVM.orcTot,wfV.orcTot))]);
+  linhas.push(['&nbsp;&nbsp;Δ (AM + MA) = Δ da DRE',(wfVA.realTot+wfVM.realTot)-(wfVA.orcTot+wfVM.orcTot),cvDre-cvO,chip(ok((wfVA.realTot+wfVM.realTot)-(wfVA.orcTot+wfVM.orcTot),cvDre-cvO))]);
   linhas.push(['Cascata Fixos — total REAL = linha da DRE',wfF.realTot,cfDre,chip(ok(wfF.realTot,cfDre))]);
-  linhas.push(['Cascata Fixos — total ORÇADO = orçado da DRE',wfF.orcTot,Y('cfPes','o')+Y('cfOM','o'),chip(ok(wfF.orcTot,Y('cfPes','o')+Y('cfOM','o')))]);
+  linhas.push(['Cascata Fixos — total ORÇADO = orçado da DRE',wfF.orcTot,cfO,chip(ok(wfF.orcTot,cfO))]);
+  linhas.push(['&nbsp;&nbsp;AM + MA = Geral (REAL)',wfFA.realTot+wfFM.realTot,wfF.realTot,chip(ok(wfFA.realTot+wfFM.realTot,wfF.realTot))]);
+  linhas.push(['&nbsp;&nbsp;AM + MA = Geral (ORÇADO)',wfFA.orcTot+wfFM.orcTot,wfF.orcTot,chip(ok(wfFA.orcTot+wfFM.orcTot,wfF.orcTot))]);
+  linhas.push(['&nbsp;&nbsp;Δ (AM + MA) = Δ da DRE',(wfFA.realTot+wfFM.realTot)-(wfFA.orcTot+wfFM.orcTot),cfDre-cfO,chip(ok((wfFA.realTot+wfFM.realTot)-(wfFA.orcTot+wfFM.orcTot),cfDre-cfO))]);
   el.querySelector('thead').innerHTML='<tr><th class="txt">Conciliação (período selecionado · geral)</th><th>Valor</th><th>Na DRE</th><th>Status</th></tr>';
   el.querySelector('tbody').innerHTML=linhas.map(([n,v,v2,st])=>
     `<tr><td class="txt">${n}</td><td>${fmtMil(v)}</td><td>${v2===''?'':fmtMil(v2)}</td><td>${st}</td></tr>`).join('');
