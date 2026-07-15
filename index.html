@@ -243,7 +243,7 @@
     <div class="grid">
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOVR','Orcado vs Real por mes')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOVR','Orcado vs Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button></div><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarWaterfallPPT()">📊 PPT</button><button class="xls png" onclick="exportarWaterfallPNG()">🖼️ Imagem</button><button class="xls" onclick="exportarWaterfall()">⬇ Excel</button></div>
-        <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Cascata Orçado → Real <span class="small">— ponte por categoria + degrau Não Recorrente (a mão fica dentro das categorias — neutraliza os NR)</span>
+        <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Cascata Orçado → Real <span class="small">— Δ real − orçado por categoria, no valor cheio (NR e lançamentos a mão se anulam dentro de cada categoria) — fecha com a DRE</span>
           <select id="wfNat" onchange="renderWaterfall()" style="margin-left:auto;min-width:140px">
             <option value="variavel">Custos Variáveis</option>
             <option value="fixo">Custos Fixos</option>
@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v58 · Cascata lembra a visão escolhida (Fixos/Variáveis + região) · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v59 · Cascata no valor cheio: degraus = Δ real por categoria (fecha com a DRE) · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -2696,17 +2696,18 @@ function wfDados(loc,natSel){
   const mesesReal=new Set(rows.map(d=>d.mes));
   const real={},orc={};
   cats.forEach(c=>{real[c]=0;orc[c]=0;});
-  let nr=0;
-  // convenção da base: os "a mão" NEUTRALIZAM os NR dentro do custo → ficam nas categorias; NR é degrau próprio
+  // categorias no VALOR CHEIO (NR e "a mão" dentro — os pares se anulam DENTRO de cada categoria, igual à DRE).
+  // Sem degrau NR separado: separá-lo quebrava os pares (a mão ficava na categoria e o estorno saía) e inflava
+  // os degraus — ex.: Pessoal +4,7M em vez do Δ real −1,3M. Assim cada degrau é o Δ verdadeiro e o total = DRE.
+  const nr=0;
   const catFn=natSel==='fixo'?wfGrupoFixoDe:catDeLinha;
-  rows.forEach(d=>{ if(d.nr&&!d.mao){ nr+=d.valor; return; }
-    const c=catFn(d); if(real[c]!=null) real[c]+=d.valor; });
+  rows.forEach(d=>{ const c=catFn(d); if(real[c]!=null) real[c]+=d.valor; });
   const reTipo=natSel==='fixo'?/fix/:/variav/;
   ORCAMENTO.forEach(o=>{ if(loc&&o.regiao!==loc) return; if(!reTipo.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
     const oc=natSel==='fixo'?(WF_GRUPO_FIXO[o.bloco||blocoFixoDe(o.classeCod,o.classeNome)]||'licenc'):o.cat;
     if(orc[oc]!=null) orc[oc]+=orcVal(o); });
   const orcTot=cats.reduce((s,c)=>s+orc[c],0);
-  const realTot=cats.reduce((s,c)=>s+real[c],0)+nr;   // real da cascata = custo cheio (categorias com a mão) + NR
+  const realTot=cats.reduce((s,c)=>s+real[c],0);   // valor cheio = mesma linha da DRE
   return {cats,orc,real,nr,orcTot,realTot};
 }
 // monta os degraus da cascata (compartilhado entre gráfico e exports)
@@ -2747,7 +2748,7 @@ function renderWaterfall(){
         if(key==='__orc') drillOrcam('Cascata · Orçado '+natTxt+locTxt, ORCAMENTO.filter(o=>reTipo.test(norm(o.tipo))&&(!loc||o.regiao===loc)&&(!mesesSet.size||mesesSet.has(o.mes))));
         else if(key==='__real') drillReal('Cascata · Real '+natTxt+locTxt+' (valor cheio)', rowsNat);
         else if(key==='__nr') drillReal('Não Recorrente '+natTxt+locTxt, rowsNat.filter(d=>d.nr&&!d.mao));
-        else drillReal(WF_NOME[key]+locTxt+' (valor cheio, sem o degrau NR)', rowsNat.filter(d=>!(d.nr&&!d.mao)&&(nat==='fixo'?wfGrupoFixoDe(d):catDeLinha(d))===key)); },
+        else drillReal(WF_NOME[key]+locTxt+' (valor cheio — NR e a mão se anulam dentro)', rowsNat.filter(d=>(nat==='fixo'?wfGrupoFixoDe(d):catDeLinha(d))===key)); },
       plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>{const v=rotulos[c.dataIndex];return (c.dataIndex===0||c.dataIndex===labels.length-1?'Total: ':'Δ ')+(v>=0&&c.dataIndex!==0&&c.dataIndex!==labels.length-1?'+':'')+BRL.format(v);}}},
         datalabels:{anchor:'end',align:'end',color:'#e2e8f0',font:{weight:'700',size:10},
