@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v56 · Seguros rateados 50/50 + check cascata AM+MA=Geral=DRE · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v57 · Cascata fixa com os degraus oficiais (contas 3*) · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -2671,10 +2671,16 @@ function exportarResumoPPT(){
 // ---------- CASCATA (waterfall) Orçado → Real, Custos Variáveis ----------
 let WF_LAST=null;   // guarda os dados da última cascata para exportar
 const WF_CATS=['combustivel','manutencao','pneus','lubrificantes','transporte','outros'];
-const WF_NOME={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros',pessoal:'Pessoal (Folha)',om_fixo:'O&M Fixo'};
+const WF_NOME={combustivel:'Combustível',manutencao:'Manutenção',pneus:'Pneus/Câmaras',lubrificantes:'Lubrificantes',transporte:'Transporte',outros:'Outros',
+  pessoal:'Pessoal',om:'O&M (Material + Serviços)',licenc:'Licenciamento (Aluguéis + Outros)',segviag:'Seguros e Viagens'};
 function wfLocSel(){ return (document.getElementById('wfLoc')||{}).value||''; }   // '' = Geral
 function wfNatSel(){ return (document.getElementById('wfNat')||{}).value||'variavel'; }
-const WF_CATS_FIXO=['pessoal','om_fixo'];
+// degraus da cascata FIXA = agrupamento oficial das contas 3* (gráfico do CA):
+//   O&M = Material (3201040009/4007*) + Serviços CF (3201030003) · Licenciamento = Aluguéis (3201010004/4010*) +
+//   Outros O&M (3201040002) · Seguros e Viagens = 3201040005 (4022010001) + 3201040007 (4011*/4013010001)
+const WF_CATS_FIXO=['pessoal','om','licenc','segviag'];
+const WF_GRUPO_FIXO={pessoal:'pessoal',materiais:'om',servicos:'om',alugueis:'licenc',outros_om:'licenc',seguros:'segviag',viagens:'segviag'};
+const wfGrupoFixoDe=d=>WF_GRUPO_FIXO[blocoDe(d)]||'licenc';
 // Regras da cascata: lançamentos "a mão" (que só existem p/ zerar os NR) ficam FORA;
 // os "não recorrentes" saem das categorias e viram um degrau próprio (igual ao slide do CA).
 function wfDados(loc,natSel){
@@ -2687,11 +2693,13 @@ function wfDados(loc,natSel){
   cats.forEach(c=>{real[c]=0;orc[c]=0;});
   let nr=0;
   // convenção da base: os "a mão" NEUTRALIZAM os NR dentro do custo → ficam nas categorias; NR é degrau próprio
+  const catFn=natSel==='fixo'?wfGrupoFixoDe:catDeLinha;
   rows.forEach(d=>{ if(d.nr&&!d.mao){ nr+=d.valor; return; }
-    const c=catDeLinha(d); if(real[c]!=null) real[c]+=d.valor; });
+    const c=catFn(d); if(real[c]!=null) real[c]+=d.valor; });
   const reTipo=natSel==='fixo'?/fix/:/variav/;
   ORCAMENTO.forEach(o=>{ if(loc&&o.regiao!==loc) return; if(!reTipo.test(norm(o.tipo))) return; if(mesesReal.size&&!mesesReal.has(o.mes)) return;
-    if(orc[o.cat]!=null) orc[o.cat]+=orcVal(o); });
+    const oc=natSel==='fixo'?(WF_GRUPO_FIXO[o.bloco||blocoFixoDe(o.classeCod,o.classeNome)]||'licenc'):o.cat;
+    if(orc[oc]!=null) orc[oc]+=orcVal(o); });
   const orcTot=cats.reduce((s,c)=>s+orc[c],0);
   const realTot=cats.reduce((s,c)=>s+real[c],0)+nr;   // real da cascata = custo cheio (categorias com a mão) + NR
   return {cats,orc,real,nr,orcTot,realTot};
@@ -2731,9 +2739,9 @@ function renderWaterfall(){
         const mesesSet=new Set(rowsNat.map(d=>d.mes));
         const reTipo=nat==='fixo'?/fix/:/variav/;
         if(key==='__orc') drillOrcam('Cascata · Orçado '+natTxt+locTxt, ORCAMENTO.filter(o=>reTipo.test(norm(o.tipo))&&(!loc||o.regiao===loc)&&(!mesesSet.size||mesesSet.has(o.mes))));
-        else if(key==='__real') drillReal('Cascata · Real '+natTxt+locTxt+' (sem lançamentos a mão)', rowsNat.filter(d=>!d.mao));
+        else if(key==='__real') drillReal('Cascata · Real '+natTxt+locTxt+' (valor cheio)', rowsNat);
         else if(key==='__nr') drillReal('Não Recorrente '+natTxt+locTxt, rowsNat.filter(d=>d.nr&&!d.mao));
-        else drillReal(WF_NOME[key]+locTxt+' · recorrente (sem NR / a mão)', rowsNat.filter(d=>!d.mao&&!d.nr&&catDeLinha(d)===key)); },
+        else drillReal(WF_NOME[key]+locTxt+' (valor cheio, sem o degrau NR)', rowsNat.filter(d=>!(d.nr&&!d.mao)&&(nat==='fixo'?wfGrupoFixoDe(d):catDeLinha(d))===key)); },
       plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>{const v=rotulos[c.dataIndex];return (c.dataIndex===0||c.dataIndex===labels.length-1?'Total: ':'Δ ')+(v>=0&&c.dataIndex!==0&&c.dataIndex!==labels.length-1?'+':'')+BRL.format(v);}}},
         datalabels:{anchor:'end',align:'end',color:'#e2e8f0',font:{weight:'700',size:10},
