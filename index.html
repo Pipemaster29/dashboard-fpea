@@ -429,8 +429,9 @@
     </div>
     </div>
     <div class="sp" data-sp="km">
-    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem por mês <span class="small">(preencha à mão — realizado e orçado, por região)</span></h3>
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quilometragem por mês <span class="small">(real digitado · orçado automático ✨ quando a base permite)</span></h3>
     <div class="tablewrap"><table id="tabKm"><thead></thead><tbody></tbody></table></div>
+    <div class="note" id="kmNota"></div>
     </div>
     <div class="note">R$/km realizado = custo SAP da categoria (por região e mês) ÷ KM realizado. R$/km orçado = custo do orçamento ÷ KM orçado. Diferença = realizado − orçado. O KM fica salvo no navegador.</div>
   </div>
@@ -514,7 +515,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v63 · Página KPI em PPT no formato exato do slide do CA · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v64 · KM por categoria no MA + KM orçado automático (viagens × km) · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1317,23 +1318,61 @@ function ordenar(col){sortState.dir=sortState.col===col?-sortState.dir:1;sortSta
 let kmGrid={};try{kmGrid=JSON.parse(localStorage.getItem('kmGrid')||'{}');}catch(e){kmGrid={};}
 function saveKm(){try{localStorage.setItem('kmGrid',JSON.stringify(kmGrid));}catch(e){}}
 function kmGet(loc,mes,campo){const k=loc+'|'+mes;return kmGrid[k]?(+kmGrid[k][campo]||0):0;}
+// KM REAL por categoria: combustível no MARANHÃO tem km próprio (só as operações com diesel — Copergás/Gás Local);
+// manutenção e pneus rodam TODAS as operações (km geral)
+function kmRealDe(loc,mes,cat){
+  if(cat==='combustivel'&&loc==='Maranhão') return kmGet(loc,mes,'kmComb');
+  return kmGet(loc,mes,'km');
+}
+// KM ORÇADO automático = viagens orçadas × KM ida-e-volta (base Orçamento de Receita 2026)
+function kmOrcAuto(loc,mes,cat){
+  if(!ORCREC.length) return 0;
+  const rates={}; ORCREC.forEach(o=>{ if(o.tipo==='km') rates[norm(o.contrato)]=o.valor; });
+  const rateDe=c=>{ const n=norm(c); if(rates[n]!=null) return rates[n];
+    const kk=Object.keys(rates).find(x=>x.slice(0,10)===n.slice(0,10)); return kk?rates[kk]:0; };
+  let s=0;
+  ORCREC.forEach(o=>{ if(o.tipo!=='viagens'||o.mes!==mes) return; if(loc&&o.regiao!==loc) return;
+    const n=norm(o.contrato);
+    if(n.includes('transf')) return;                                    // transferência = frete terceirizado (sem km próprio)
+    if(cat==='combustivel'&&loc==='Maranhão'&&!/petrolina|garanhu|gas local/.test(n)) return;   // diesel MA: só essas operações
+    s+=o.valor*rateDe(o.contrato); });
+  return Math.round(s);
+}
+// KM orçado a usar: automático quando a base permite; senão o digitado
+function kmOrcDe(loc,mes,cat){ return kmOrcAuto(loc,mes,cat)||kmGet(loc,mes,'kmOrc'); }
+// contratos com viagens orçadas mas SEM a linha 'KM ida e volta' (ficam fora do km automático)
+function kmSemRate(){
+  const rates=new Set(); ORCREC.forEach(o=>{ if(o.tipo==='km') rates.add(norm(o.contrato).slice(0,10)); });
+  const falta=new Set();
+  ORCREC.forEach(o=>{ if(o.tipo==='viagens'&&!norm(o.contrato).includes('transf')&&!rates.has(norm(o.contrato).slice(0,10))) falta.add(o.contrato); });
+  return [...falta];
+}
 function setKm(loc,mes,campo,val){const k=loc+'|'+mes;kmGrid[k]=kmGrid[k]||{km:0,kmOrc:0};kmGrid[k][campo]=num(val);saveKm();renderOpsCalc();}
 function opsMeses(){return uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));}
 function renderOps(){ if(!DADOS.length) return; renderKmTable(); renderOpsCalc(); }
 function renderKmTable(){
   const meses=opsMeses();
-  document.querySelector('#tabKm thead').innerHTML='<tr><th class="txt">Mês</th><th>Amazonas · KM real</th><th>Amazonas · KM orçado</th><th>Maranhão · KM real</th><th>Maranhão · KM orçado</th></tr>';
+  const orcCell=(loc,m,cat)=>{ const a=kmOrcAuto(loc,m,cat);
+    return a?`<span title="automático: viagens orçadas × KM ida-e-volta (base Orçamento de Receita)" style="color:var(--accent);font-weight:600">✨ ${INT.format(a)}</span>`
+      :`<input type="number" min="0" value="${kmGet(loc,m,'kmOrc')||''}" placeholder="orçado" oninput="setKm('${loc}','${m}','kmOrc',this.value)">`; };
+  document.querySelector('#tabKm thead').innerHTML='<tr><th class="txt">Mês</th><th>Amazonas · KM real</th><th>Amazonas · KM orçado</th><th>Maranhão · KM real <span class="small">(manut./pneus — todas as operações)</span></th><th>Maranhão · KM orçado</th><th>Maranhão · KM COMBUSTÍVEL real <span class="small">(só Copergás/Gás Local)</span></th><th>Maranhão · KM comb. orçado</th></tr>';
   document.querySelector('#tabKm tbody').innerHTML=meses.map(m=>`<tr>
     <td class="txt">${m}</td>
     <td><input type="number" min="0" value="${kmGet('Amazonas',m,'km')||''}" placeholder="real" oninput="setKm('Amazonas','${m}','km',this.value)"></td>
-    <td><input type="number" min="0" value="${kmGet('Amazonas',m,'kmOrc')||''}" placeholder="orçado" oninput="setKm('Amazonas','${m}','kmOrc',this.value)"></td>
+    <td>${orcCell('Amazonas',m,'')}</td>
     <td><input type="number" min="0" value="${kmGet('Maranhão',m,'km')||''}" placeholder="real" oninput="setKm('Maranhão','${m}','km',this.value)"></td>
-    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'kmOrc')||''}" placeholder="orçado" oninput="setKm('Maranhão','${m}','kmOrc',this.value)"></td></tr>`).join('');
+    <td>${orcCell('Maranhão',m,'')}</td>
+    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'kmComb')||''}" placeholder="real combustível" oninput="setKm('Maranhão','${m}','kmComb',this.value)"></td>
+    <td>${orcCell('Maranhão',m,'combustivel')}</td></tr>`).join('');
+  const falta=kmSemRate();
+  const nota=document.getElementById('kmNota');
+  if(nota) nota.innerHTML=(falta.length?'⚠️ Contratos com viagens orçadas mas <b>sem a linha "KM ida e volta"</b> no Orçamento de Receita (ficam fora do km automático): <b>'+falta.join(' · ')+'</b> — adicione a linha no Excel e recarregue. ':'')+
+    '✨ = calculado automaticamente (viagens orçadas × km ida-e-volta). O KM real continua digitado: geral (manutenção/pneus) e o de combustível do Maranhão separado.';
 }
 const OPS_ORC={combustivel:['comb'],manutencao:['manut'],pneus:['pneu'],lubrificantes:['lubrif'],transporte:[]};
-function opsSerie(loc,meses,costReal,orcCost){
-  const real=meses.map(m=>{const km=kmGet(loc,m,'km');const c=costReal[loc+'|'+m]||0;return km?c/km:null;});
-  const orc=meses.map(m=>{const kmO=kmGet(loc,m,'kmOrc');const oc=orcCost[loc+'|'+m];if(!oc||!kmO)return null;return oc/kmO;});
+function opsSerie(loc,meses,costReal,orcCost,cat){
+  const real=meses.map(m=>{const km=kmRealDe(loc,m,cat);const c=costReal[loc+'|'+m]||0;return km?c/km:null;});
+  const orc=meses.map(m=>{const kmO=kmOrcDe(loc,m,cat);const oc=orcCost[loc+'|'+m];if(!oc||!kmO)return null;return oc/kmO;});
   const dif=meses.map((m,i)=>(real[i]!=null&&orc[i]!=null)?real[i]-orc[i]:null);
   return {real,orc,dif};
 }
@@ -1374,8 +1413,8 @@ function renderOpsCalc(){
   const costReal={};DADOS.forEach(d=>{if(inc.has(catDeLinha(d))){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
   // orçado do ORÇAMENTO consolidado (Custos Variáveis) por categoria×região×mês, com crédito PIS/Cofins (-9,25%)
   const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+orcVal(o);}});
-  opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcCost),tipo,{id:'chOpsAM',loc:'Amazonas',inc,catName:GRUPO_NOME[cat]});
-  opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcCost),tipo,{id:'chOpsMA',loc:'Maranhão',inc,catName:GRUPO_NOME[cat]});
+  opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcCost,cat),tipo,{id:'chOpsAM',loc:'Amazonas',inc,catName:GRUPO_NOME[cat]});
+  opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcCost,cat),tipo,{id:'chOpsMA',loc:'Maranhão',inc,catName:GRUPO_NOME[cat]});
   document.getElementById('opsTag').textContent=GRUPO_NOME[cat]+' · R$/km por região';
   const agg=loc=>{let c=0,kmR=0,cOrc=0,kmO=0;meses.forEach(m=>{const km=kmGet(loc,m,'km');if(km){c+=costReal[loc+'|'+m]||0;kmR+=km;}const kmo=kmGet(loc,m,'kmOrc');const oc=orcCost[loc+'|'+m];if(kmo&&oc){cOrc+=oc;kmO+=kmo;}});return{c,kmR,cOrc,kmO};};
   const A=agg('Amazonas'),M=agg('Maranhão');
@@ -1446,7 +1485,7 @@ function renderKpiPage(){
   el.innerHTML=html;
   KPI_CATS.forEach(([cat])=>{ const {costReal,orcCost}=kpiSeries(cat);
     const inc=new Set(cat==='manutencao'?['manutencao','lubrificantes']:[cat]);
-    ['Amazonas','Maranhão'].forEach(loc=>{ const id='kpi_'+cat+'_'+(loc==='Amazonas'?'AM':'MA'); kpiChart(id,meses,opsSerie(loc,meses,costReal,orcCost),{id,loc,inc,catName:GRUPO_NOME[cat]}); }); });
+    ['Amazonas','Maranhão'].forEach(loc=>{ const id='kpi_'+cat+'_'+(loc==='Amazonas'?'AM':'MA'); kpiChart(id,meses,opsSerie(loc,meses,costReal,orcCost,cat),{id,loc,inc,catName:GRUPO_NOME[cat]}); }); });
 }
 // imagem única da página KPI (título + 6 gráficos compostos num canvas só)
 function exportarKpiPNG(){
@@ -1486,7 +1525,7 @@ function exportarKpiPPT(){
     const y=1.05+r*1.52;
     s.addText(nomes[cat],{x:0.15,y:y+0.35,w:1.35,h:0.8,fontSize:11,bold:true,color:'02585C',align:'center'});
     ['Amazonas','Maranhão'].forEach((loc,c)=>{
-      const sr=opsSerie(loc,meses,costReal,orcCost);
+      const sr=opsSerie(loc,meses,costReal,orcCost,cat);
       const clean=a=>a.map(v=>v==null?null:Math.round(v*100)/100);
       // igual ao slide oficial do CA: barra escura = orçado, barra clara = real, rótulos 2 casas em cima,
       // linha âmbar da diferença com rótulos, sem legenda e sem eixo da direita
@@ -2625,8 +2664,8 @@ function renderResumoExe(dd,loc,mesQ){
     const linha={nome};
     ['Maranhão','Amazonas'].forEach(l2=>{
       let c=0,k=0,co=0,ko=0;
-      meses.forEach(m=>{ const km=kmGet(l2,m,'km'); if(km){c+=costReal[l2+'|'+m]||0;k+=km;}
-        const kmo=kmGet(l2,m,'kmOrc'); const oc=orcCost[l2+'|'+m]; if(kmo&&oc){co+=oc;ko+=kmo;} });
+      meses.forEach(m=>{ const km=kmRealDe(l2,m,cat); if(km){c+=costReal[l2+'|'+m]||0;k+=km;}
+        const kmo=kmOrcDe(l2,m,cat); const oc=orcCost[l2+'|'+m]; if(kmo&&oc){co+=oc;ko+=kmo;} });
       linha[l2]={r:k?c/k:null,o:ko?co/ko:null};
     });
     kmTab.push(linha);
