@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v61 · Pareto recorrente (sem a mão/NR/zerados) + período por mês isolado · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v62 · PPT com rótulos de dados e barras grossas (igual ao dash) · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1147,31 +1147,48 @@ function exportarGraficoPPT(id,nome){
   const secAxis=(info.find(x=>x.axis!==primAxis)||{}).axis;   // eixo secundário (ex.: % acumulado do Pareto)
   const temSec=!!secAxis;
   const cores=['00A0A8','FCB316','02585C','6CBDC4','E4562E'];   // paleta GNL — igual ao dashboard
+  // formato conforme a ESCALA dos valores: R$/km com 2 casas · milhares em "k" · resto inteiro
+  const fmtDe=vals=>{ const mx=Math.max(0,...vals.filter(v=>v!=null).map(Math.abs));
+    return mx>=100000?'#,##0,"k"':(mx>=1000?'#,##0':'#,##0.00'); };
   const opts={x:0.4,y:0.95,w:9.2,h:4.45,showLegend:true,legendPos:'b',legendColor:'E2E8F0',legendFontSize:10,
     catAxisLabelColor:'94A3B8',catAxisLabelFontSize:9,valAxisLabelColor:'94A3B8',valAxisLabelFontSize:9,
     valGridLine:{color:'334155',style:'solid',size:0.5},catGridLine:{style:'none'},
-    barGapWidthPct:40,chartColors:cores,dataBorder:{pt:0,color:'1E293B'},fontFace:'Segoe UI'};
+    barGapWidthPct:22,chartColors:cores,dataBorder:{pt:0,color:'1E293B'},fontFace:'Segoe UI'};   // barras grossas como no dash
   // agrupa por tipo (preservando ordem: barras antes de linha) para combo
   const ordem=[],grupos={};
   info.forEach(x=>{ if(!grupos[x.tipo]){grupos[x.tipo]=[];ordem.push(x.tipo);} grupos[x.tipo].push(x); });
   if(ordem.length===1 && !temSec){
     const k=ordem[0];
     const T=k==='line'?pptx.ChartType.line:k==='pie'?pptx.ChartType.doughnut:pptx.ChartType.bar;
+    if(k!=='pie'){                                              // RÓTULOS DE DADOS (igual ao dashboard)
+      Object.assign(opts,{showValue:true,dataLabelColor:'E2E8F0',dataLabelFontSize:8.5,
+        dataLabelPosition:k==='line'?'t':'outEnd',dataLabelFormatCode:fmtDe(grupos[k].flatMap(x=>x.serie.values))});
+      if(k==='line') Object.assign(opts,{lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:7});
+      opts.valAxisLabelFormatCode=fmtDe(grupos[k].flatMap(x=>x.serie.values));
+    }
     slide.addChart(T,grupos[k].map(x=>x.serie),opts);
   } else {
+    const secVals=temSec?info.filter(x=>x.axis===secAxis).flatMap(x=>x.serie.values).filter(v=>v!=null):[];
+    const ehPct=secVals.length && Math.max(...secVals)<=100 && Math.max(...secVals)>1;   // eixo secundário é % (0–100)
     const combo=ordem.filter(k=>k!=='pie').map(k=>{
       const arr=grupos[k];
       const noSec=temSec && arr.every(x=>x.axis===secAxis);   // este grupo vai no eixo secundário
-      const o={chartColors:k==='line'?['FCB316']:cores};
+      const vals=arr.flatMap(x=>x.serie.values);
+      const o={chartColors:k==='line'?['FCB316']:cores,
+        showValue:true,dataLabelFontSize:8.5,                  // rótulos de dados em todas as séries
+        dataLabelColor:k==='line'?'FCB316':'E2E8F0',
+        dataLabelPosition:k==='line'?'t':'outEnd',
+        dataLabelFormatCode:(noSec&&ehPct)?'0"%"':fmtDe(vals)};
+      if(k==='line') Object.assign(o,{lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:7});
       if(noSec){o.secondaryValAxis=true;o.secondaryCatAxis=true;}
       return {type:k==='line'?pptx.ChartType.line:pptx.ChartType.bar,data:arr.map(x=>x.serie),options:o};
     });
     if(temSec){
-      const secVals=info.filter(x=>x.axis===secAxis).flatMap(x=>x.serie.values).filter(v=>v!=null);
-      const ehPct=secVals.length && Math.max(...secVals)<=100 && Math.max(...secVals)>1;  // eixo secundário é % (0–100)
+      const primVals=info.filter(x=>x.axis===primAxis).flatMap(x=>x.serie.values).filter(v=>v!=null);
+      const fmtPrim=fmtDe(primVals), fmtSec=ehPct?'0"%"':fmtDe(secVals);
       opts.valAxes=[
-        {showValAxisTitle:false,valAxisLabelColor:'94A3B8',valAxisLabelFormatCode:'"R$ "#,##0,"k"'},
-        Object.assign({showValAxisTitle:false,valAxisLabelColor:'FCB316',valAxisLabelFormatCode:ehPct?'0"%"':'#,##0'},
+        {showValAxisTitle:false,valAxisLabelColor:'94A3B8',valAxisLabelFormatCode:fmtPrim==='#,##0,"k"'?'"R$ "#,##0,"k"':fmtPrim},
+        Object.assign({showValAxisTitle:false,valAxisLabelColor:'FCB316',valAxisLabelFormatCode:fmtSec},
           ehPct?{valAxisMinVal:0,valAxisMaxVal:100,valAxisMajorUnit:20}:{})
       ];
       opts.catAxes=[{catAxisLabelColor:'94A3B8'},{catAxisHidden:true}];
