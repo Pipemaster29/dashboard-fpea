@@ -514,7 +514,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v59 · Cascata no valor cheio: degraus = Δ real por categoria (fecha com a DRE) · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v60 · Transferência de Carreta = Transporte · Maranhão (3 linhas orçadas) · 15/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -873,9 +873,13 @@ function parseOrcamento(aoa){
       ?((proj.includes('manaus')&&!proj.includes('rj')&&!proj.includes('rio'))?'Manaus':'Rio de Janeiro')
       :(proj.includes('amazon')||proj.includes('manaus')?'Amazonas':(proj.includes('maranh')?'Maranhão':localidadeDe(cc)));
     const nt=norm(tipo);   // o Tipo do orçamento já separa: "Custos Fixos - Pessoal" × "Custos Fixos - O&M"
-    const cat=/fix/.test(nt)?(/pessoal/.test(nt)?'pessoal':'om_fixo'):classificarCusto(descrLinha+' '+nome, nome);
+    let cat=/fix/.test(nt)?(/pessoal/.test(nt)?'pessoal':'om_fixo'):classificarCusto(descrLinha+' '+nome, nome);
     const bloco=/fix/.test(nt)?((!cod&&/pessoal/.test(nt))?'pessoal':blocoFixoDe(cod,nome)):undefined;   // folha agregada (sem conta) → Pessoal
-    meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,mes,classeCod:cod,classeNome:nome,valor:v,regiao,cat,bloco,proj:iProj>=0?String(row[iProj]||'').trim():''}); });
+    // TRANSFERÊNCIA DE CARRETA: a operação inteira (frete + combustível + manutenção orçados) é executada como
+    // FRETE no realizado → as 3 linhas são categoria TRANSPORTE, região MARANHÃO (regra do usuário)
+    let regiaoFinal=regiao;
+    if(proj.includes('transf')&&!/fix/.test(nt)){ cat='transporte'; regiaoFinal='Maranhão'; }
+    meses.forEach(({i,mes})=>{ const v=row[i]; if(typeof v==='number'&&v!==0) out.push({tipo,mes,classeCod:cod,classeNome:nome,valor:v,regiao:regiaoFinal,cat,bloco,proj:iProj>=0?String(row[iProj]||'').trim():''}); });
   }
   return out;
 }
@@ -1005,9 +1009,10 @@ function migrarDados(){
   // transferência de carreta é MARANHÃO (receita real, receita orçada) — corrige bases salvas antes da regra
   RECEITA_RAW.forEach(d=>{ if(/transf/i.test(d.contrato||'')) d.regiao='Maranhão'; });
   ORCREC.forEach(o=>{ if(/transf/i.test(o.contrato||'')) o.regiao='Maranhão'; });
-  // custo orçado: diesel 4024* variável é sempre AMAZONAS (Azulão + transferência) — desfaz o período em que a
-  // regra 'transferência→Maranhão' moveu o combustível orçado junto (o realizado desse diesel cai no Amazonas)
-  ORCAMENTO.forEach(o=>{ if(/variav/.test(norm(o.tipo))&&String(o.classeCod||'').startsWith('4024')&&o.regiao==='Maranhão') o.regiao='Amazonas'; });
+  // TRANSFERÊNCIA DE CARRETA (variável): as 3 linhas orçadas são TRANSPORTE · Maranhão (a operação vira frete no real)
+  ORCAMENTO.forEach(o=>{ if(/transf/i.test(o.proj||'')&&!/fix/.test(norm(o.tipo))){ o.cat='transporte'; o.regiao='Maranhão'; } });
+  // diesel 4024* variável fora da transferência é sempre AMAZONAS (Azulão)
+  ORCAMENTO.forEach(o=>{ if(/variav/.test(norm(o.tipo))&&String(o.classeCod||'').startsWith('4024')&&o.regiao==='Maranhão'&&!/transf/i.test(o.proj||'')) o.regiao='Amazonas'; });
   // SG&A tem localizações próprias (Manaus + Rio de Janeiro) — migra bases salvas com AM/MA
   SGA_RAW.forEach(d=>{ if(d.loc==='Amazonas') d.loc='Manaus'; else if(d.loc==='Maranhão') d.loc='Rio de Janeiro'; });
   ratearSeguro();
