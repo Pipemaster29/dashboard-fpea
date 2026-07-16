@@ -199,7 +199,7 @@
   <h1><span class="brand"><img src="gnl-logo.png" alt="GNL Brasil Logística"></span><span class="dot"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge">carregando…</span></h1>
   <div class="actions">
     <span id="cloudInfo" class="small"></span>
-    <button class="btn-primary" onclick="document.getElementById('file').click()" title="Recarregar um arquivo SUBSTITUI a versão anterior daquela base (serviços, materiais ou orçamento) — não duplica. Salva na nuvem automaticamente.">📂 Carregar/atualizar base</button>
+    <button class="btn-primary" onclick="comSenhaUpload(()=>document.getElementById('file').click())" title="Exige a senha de atualização. Recarregar um arquivo SUBSTITUI a versão anterior daquela base — não duplica. Salva na nuvem automaticamente.">🔒 Carregar/atualizar base</button>
     <button class="btn-ghost" id="btnSalvar" onclick="salvarNaNuvem()" title="Forçar o salvamento na nuvem agora (já salva sozinho ao atualizar uma base)">☁️ Salvar na nuvem</button>
     <button class="btn-ghost" onclick="exportarBases()" title="Baixar um Excel com as bases (Realizado classificado + Orçamento) — uma aba cada, pronto pra dinâmica.">⬇️ Exportar bases (Excel)</button>
     <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple class="hidden">
@@ -515,7 +515,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v64 · KM por categoria no MA + KM orçado automático (viagens × km) · 15/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v65 · Senha para atualizar bases (verificada no servidor) · 16/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -644,10 +644,10 @@ function localidadeDe(cc){const m=String(cc||'').match(/([A-Za-z])(?=[^A-Za-z]*$
 
 document.getElementById('file').addEventListener('change',e=>{[...e.target.files].forEach(lerArquivo);e.target.value='';});
 const drop=document.getElementById('drop');
-drop.addEventListener('click',()=>document.getElementById('file').click());
+drop.addEventListener('click',()=>comSenhaUpload(()=>document.getElementById('file').click()));
 ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
-drop.addEventListener('drop',e=>{e.preventDefault();[...e.dataTransfer.files].forEach(lerArquivo);});
+drop.addEventListener('drop',e=>{e.preventDefault();const fs2=[...e.dataTransfer.files];comSenhaUpload(()=>fs2.forEach(lerArquivo));});
 
 function lerArquivo(file){
   const r=new FileReader();
@@ -2887,6 +2887,26 @@ const SB_KEY='sb_publishable_g_2RyjcUMHnvrjH2DpXEZg_o6-ybqj-';
 let sb=null;
 try{ sb=window.supabase.createClient(SB_URL,SB_KEY); }catch(e){ console.error('Supabase init falhou',e); }
 
+// ---- SENHA DE ATUALIZAÇÃO ----
+// A senha NÃO existe no código nem no GitHub: fica no Supabase como hash bcrypt numa tabela privada
+// (ilegível pela API). O site só pergunta e o SERVIDOR confere; a escrita direta na tabela é bloqueada
+// por RLS — sem a senha, nem quem tem o código consegue gravar. Visualização continua livre.
+function senhaCache(){ try{return sessionStorage.getItem('senhaUp')||'';}catch(e){return '';} }
+async function pedirSenhaUpload(){
+  let s=senhaCache(); if(s) return s;
+  s=prompt('🔒 Senha para ATUALIZAR as bases\n(a visualização é livre — só o envio/salvamento exige senha)');
+  if(s==null||s==='') return null;
+  try{
+    const {data,error}=await sb.rpc('verificar_senha',{p_senha:s});
+    if(error){ alert('Não consegui validar a senha agora: '+error.message); return null; }
+    if(data!==true){ alert('Senha incorreta.'); return null; }
+  }catch(e){ alert('Não consegui validar a senha agora: '+e.message); return null; }
+  try{ sessionStorage.setItem('senhaUp',s); }catch(e){}
+  flash('🔓 Senha ok — atualização liberada nesta sessão.');
+  return s;
+}
+async function comSenhaUpload(fn){ const s=await pedirSenhaUpload(); if(s) fn(); }
+
 async function carregarDaNuvem(){
   try{
     const {data,error}=await sb.from('dataset').select('payload,updated_at').eq('id','atual').maybeSingle();
@@ -2910,11 +2930,16 @@ async function carregarDaNuvem(){
 
 async function salvarNaNuvem(auto){
   if(!DADOS_RAW.length&&!ORCAMENTO.length&&!ORCKPI&&!ORCREC.length&&!RECEITA_RAW.length&&!SGA_RAW.length){ if(!auto)alert('Carregue as bases (Excel) antes de salvar na nuvem.'); return; }
-  const info=document.getElementById('cloudInfo'); info.innerHTML='<span class="spin"></span> salvando…';
+  const senha=await pedirSenhaUpload();
+  const info=document.getElementById('cloudInfo');
+  if(!senha){ (auto?flash('🔒 Base NÃO salva na nuvem — precisa da senha de atualização.'):alert('Salvamento cancelado — precisa da senha de atualização.')); return; }
+  info.innerHTML='<span class="spin"></span> salvando…';
   try{
     const payload=comprimir({DADOS:DADOS_RAW,ORCAMENTO,ORCKPI,ORCREC,RECEITA:RECEITA_RAW,SGA:SGA_RAW});   // sempre a base COMPLETA (o seletor de período é só visão)
-    const {error}=await sb.from('dataset').upsert({id:'atual',payload,updated_at:new Date().toISOString()});
+    const {data,error}=await sb.rpc('salvar_dataset',{p_senha:senha,p_payload:payload});   // escrita só via servidor, com senha
     if(error){ info.textContent=''; (auto?flash('⚠️ Erro ao salvar na nuvem: '+error.message):alert('Erro ao salvar na nuvem: '+error.message)); return; }
+    if(data!=='ok'){ try{sessionStorage.removeItem('senhaUp');}catch(e){}
+      info.textContent=''; (auto?flash('🔒 Senha incorreta — base NÃO salva na nuvem.'):alert('Senha incorreta — base NÃO salva na nuvem.')); return; }
     marcarAtualizado(new Date().toISOString());
     if(auto) flash('☁️ Base salva na nuvem automaticamente.');
   }catch(e){ info.textContent=''; (auto?flash('⚠️ Erro ao salvar: '+e.message):alert('Erro ao salvar: '+e.message)); }
