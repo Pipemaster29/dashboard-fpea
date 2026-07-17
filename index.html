@@ -394,35 +394,13 @@
   <div id="ops" class="ovrbox hidden">
     <div class="sectitle">🚚 Operações & Custo por KM <span class="tag" id="opsTag">R$/km por região</span></div>
     <div class="scope">
-      <label>Categoria</label>
-      <select id="opsCat" onchange="renderOpsCalc()">
-        <option value="combustivel">Combustível / Diesel</option>
-        <option value="manutencao">Manutenção (inclui Lubrificantes)</option>
-        <option value="pneus">Pneus</option>
-        <option value="transporte">Transporte / Frete</option>
-      </select>
-      <label>Gráfico</label>
-      <select id="opsTipo" onchange="renderOpsCalc()">
-        <option value="barlin">Barras + linha de diferença</option>
-        <option value="linhas">Linhas</option>
-        <option value="barras">Barras (orçado × real)</option>
-      </select>
-      <span class="small">Digite o <b>KM realizado</b> e o <b>KM orçado</b> por mês na tabela abaixo. R$/km = custo da categoria ÷ KM.</span>
+      <span class="small">R$/km = custo da categoria ÷ KM. O <b>KM realizado</b> é digitado na subpágina "KM por mês"; o <b>orçado</b> é automático ✨ (viagens × km ida-e-volta). Clique nos mini-gráficos para ver os lançamentos.</span>
     </div>
     <div class="subnav">
-      <button class="active" data-sp="rkm" onclick="showSub('ops','rkm')">📊 R$/km por região</button>
-      <button data-sp="kpi" onclick="showSub('ops','kpi')">📑 Página KPI</button>
+      <button class="active" data-sp="kpi" onclick="showSub('ops','kpi')">📑 Página KPI</button>
       <button data-sp="km" onclick="showSub('ops','km')">✏️ KM por mês</button>
     </div>
-    <div class="sp active" data-sp="rkm">
-    <div class="resumo" id="opsResumo" style="display:none"></div>
-    <div class="kpis" id="opsKpis"></div>
-    <div class="grid">
-      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOpsAM','Amazonas R$ por km')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOpsAM','Amazonas R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsAM','Amazonas R$ por km')">⬇ Excel</button></div><h3>Amazonas <span class="small" id="titAM">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsAM"></canvas></div></div>
-      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOpsMA','Maranhao R$ por km')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOpsMA','Maranhao R$ por km')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOpsMA','Maranhao R$ por km')">⬇ Excel</button></div><h3>Maranhão <span class="small" id="titMA">— R$/km mês a mês</span></h3><div class="wrap"><canvas id="chOpsMA"></canvas></div></div>
-    </div>
-    </div>
-    <div class="sp" data-sp="kpi">
+    <div class="sp active" data-sp="kpi">
     <div class="card full" style="margin-bottom:24px"><div class="expbar"><button class="xls ppt" onclick="exportarKpiPPT()">📊 PPT</button><button class="xls png" onclick="exportarKpiPNG()">🖼️ Imagem</button></div>
       <h3>📑 Página KPI — R$/km <span class="small">— Combustível, Manutenção e Pneus × Amazonas e Maranhão (formato do slide do CA)</span></h3>
       <div class="kpipage" id="kpiPage"></div>
@@ -463,7 +441,7 @@
       </select>
     </div>
     <div class="kpis" id="pareKpis"></div>
-    <div class="grid"><div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chPareto2','Pareto')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chPareto2','Pareto')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chPareto2','Pareto')">⬇ Excel</button></div><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
+    <div class="grid"><div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chPareto2','Pareto')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chPareto2','Pareto')">🖼️ Imagem</button><button class="xls" onclick="exportarParetoXls()" title="Excel com os itens do gráfico + uma aba com TODOS os lançamentos que compõem (a base).">⬇ Excel (com base)</button></div><h3 id="pareChartTit">Pareto do grupo</h3><div class="wrap" style="height:380px"><canvas id="chPareto2"></canvas></div></div></div>
     <div class="tablewrap"><table id="tabPareto2"><thead></thead><tbody></tbody></table></div>
     </div>
     <div class="note">Cada valor é a soma dos lançamentos SAP (KSB1) daquele grupo/localidade. Ordenado do maior para o menor, com % do grupo e % acumulado — os poucos itens que somam ~80% são o gargalo a atacar.</div>
@@ -515,7 +493,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v65 · Senha para atualizar bases (verificada no servidor) · 16/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v66 · Ops só com Página KPI · Pareto: drill no "Outros" + Excel com base · 16/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1402,44 +1380,9 @@ function opsChart(id,meses,s,tipo,ctx){
       y2:{display:temDif,position:'right',grid:{display:false},title:{display:true,text:'Diferença R$/km',color:'#E4562E',font:{size:10}},ticks:{color:'#E4562E',callback:v=>(v>=0?'+':'')+BRL.format(v)}}}}});
 }
 function renderOpsCalc(){
+  // a antiga página "R$/km por região" foi absorvida pela Página KPI (mesma análise, formato do slide do CA)
   if(!DADOS.length) return;
-  const cat=document.getElementById('opsCat').value;
-  const tipo=document.getElementById('opsTipo').value;
-  const fPC=fatorPisCofins();
-  const meses=opsMeses();
-  // nesta análise, Manutenção inclui Lubrificantes (orçado e real)
-  const inc=new Set(cat==='manutencao'?['manutencao','lubrificantes']:[cat]);
-  // realizado direto do KSB1 (a base já vem líquida de crédito PIS/Cofins)
-  const costReal={};DADOS.forEach(d=>{if(inc.has(catDeLinha(d))){const k=d.loc+'|'+d.mes;costReal[k]=(costReal[k]||0)+d.valor;}});
-  // orçado do ORÇAMENTO consolidado (Custos Variáveis) por categoria×região×mês, com crédito PIS/Cofins (-9,25%)
-  const orcCost={};ORCAMENTO.forEach(o=>{if(inc.has(o.cat)&&/variav/.test(norm(o.tipo))){const k=o.regiao+'|'+o.mes;orcCost[k]=(orcCost[k]||0)+orcVal(o);}});
-  opsChart('chOpsAM',meses,opsSerie('Amazonas',meses,costReal,orcCost,cat),tipo,{id:'chOpsAM',loc:'Amazonas',inc,catName:GRUPO_NOME[cat]});
-  opsChart('chOpsMA',meses,opsSerie('Maranhão',meses,costReal,orcCost,cat),tipo,{id:'chOpsMA',loc:'Maranhão',inc,catName:GRUPO_NOME[cat]});
-  document.getElementById('opsTag').textContent=GRUPO_NOME[cat]+' · R$/km por região';
-  const agg=loc=>{let c=0,kmR=0,cOrc=0,kmO=0;meses.forEach(m=>{const km=kmGet(loc,m,'km');if(km){c+=costReal[loc+'|'+m]||0;kmR+=km;}const kmo=kmGet(loc,m,'kmOrc');const oc=orcCost[loc+'|'+m];if(kmo&&oc){cOrc+=oc;kmO+=kmo;}});return{c,kmR,cOrc,kmO};};
-  const A=agg('Amazonas'),M=agg('Maranhão');
-  const cR=A.c+M.c,kR=A.kmR+M.kmR,cO=A.cOrc+M.cOrc,kO=A.kmO+M.kmO;
-  const rkmR=kR?cR/kR:0,rkmO=kO?cO/kO:0;
-  const kpis=[
-    {lbl:'R$/km realizado',val:kR?BRL.format(rkmR):'—',sub:kR?INT.format(Math.round(kR))+' km · '+BRL.format(cR):'preencha o KM real'},
-    {lbl:'R$/km orçado',val:kO?BRL.format(rkmO):'—',sub:kO?INT.format(Math.round(kO))+' km orçado':'informe KM orçado + OBZ'}
-  ];
-  if(kR&&kO){const dv=rkmR-rkmO,dp=rkmO?dv/rkmO*100:0,cls=dv>0?'pos':'neg';kpis.push({lbl:'Variação R$/km',val:(dv>=0?'+':'')+BRL.format(dv),cls,sub:PCT(dp)+(dv>0?' acima':' abaixo')});}
-  document.getElementById('opsKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub" title="${String(c.sub).replace(/"/g,'')}">${c.sub}</div>`:''}</div>`).join('');
-  // reconciliação com o Pareto: custo realizado acumulado da categoria em TODOS os meses/regiões
-  const totRealCat=Object.values(costReal).reduce((s,v)=>s+v,0);
-  let recon='';
-  if(cat==='manutencao'){
-    let lub=0;DADOS.forEach(d=>{if(catDeLinha(d)==='lubrificantes')lub+=d.valor;});
-    const manutPura=totRealCat-lub;
-    recon=`<div class="small" style="margin-top:8px;opacity:.9">🔎 Conferência: aqui <b>Manutenção inclui Lubrificantes</b> = <b>${BRL.format(totRealCat)}</b> acumulado `+
-          `(Manutenção ${BRL.format(manutPura)} + Lubrificantes ${BRL.format(lub)}). No <b>Pareto</b> elas aparecem separadas — por isso o número lá é ${BRL.format(manutPura)}, não ${BRL.format(totRealCat)}.</div>`;
-  } else {
-    recon=`<div class="small" style="margin-top:8px;opacity:.9">🔎 Conferência: custo realizado acumulado de <b>${GRUPO_NOME[cat]}</b> (todos os meses/regiões) = <b>${BRL.format(totRealCat)}</b> — deve bater com o Pareto deste grupo.</div>`;
-  }
-  const pr=document.getElementById('opsResumo');pr.style.display='';
-  if(kR)pr.innerHTML=`📌 <b>${GRUPO_NOME[cat]}</b>: R$/km realizado <b>${BRL.format(rkmR)}</b>`+(kO?` vs orçado <b>${BRL.format(rkmO)}</b> (${PCT(rkmO?(rkmR-rkmO)/rkmO*100:0)}).`:` — informe o KM orçado e carregue a OBZ para comparar.`)+recon;
-  else pr.innerHTML='✏️ Preencha o KM realizado na tabela abaixo para ver o R$/km por região.'+recon;
+  const tag=document.getElementById('opsTag'); if(tag) tag.textContent='R$/km — Página KPI';
   renderKpiPage();
 }
 
@@ -1600,7 +1543,7 @@ function pareKey(d,dim){
   if(dim==='mes') return d.mes||'—';
   let k=d.material; if(!k||k==='—'||k==='') k=d.objeto||'—'; return k||'—';
 }
-let _pareItems=[], _pareCtx={};
+let _pareItems=[], _pareResto=[], _pareCtx={};
 function renderPareto2(){
   if(!DADOS.length) return;
   const g=document.getElementById('pareGrupo').value;const loc=document.getElementById('pareLoc').value;const dim=document.getElementById('pareDim').value;
@@ -1613,7 +1556,8 @@ function renderPareto2(){
   const estornos=Object.values(agg).filter(v=>v<0).reduce((s,v)=>s+v,0);   // baixas/estornos
   let items=Object.entries(agg).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const nItens=items.length;const tot=items.reduce((s,x)=>s+x[1],0);       // bruto (base das % das barras)
-  const TOPN=15;let cauda=0,nCauda=0;if(items.length>TOPN){const resto=items.slice(TOPN);cauda=resto.reduce((s,x)=>s+x[1],0);nCauda=resto.length;items=items.slice(0,TOPN);}
+  const TOPN=15;let cauda=0,nCauda=0;_pareResto=[];
+  if(items.length>TOPN){const resto=items.slice(TOPN);cauda=resto.reduce((s,x)=>s+x[1],0);nCauda=resto.length;_pareResto=resto.map(([k,v])=>({key:k,val:v}));items=items.slice(0,TOPN);}
   _pareItems=items.map(([k,v])=>({key:k,val:v}));
   let a=0;const cumItems=items.map(([,v])=>{a+=v;return tot?a/tot*100:0;});
   const n80=cumItems.findIndex(p=>p>=80)+1;
@@ -1633,19 +1577,42 @@ function renderPareto2(){
   charts.chPareto2=new Chart('chPareto2',{data:{labels,datasets:[
     {type:'bar',label:'Custo',data:vals,backgroundColor:'#00A0A8',yAxisID:'y',order:2,datalabels:{display:false}},
     {type:'line',label:'% acumulado',data:cumAll,borderColor:'#FCB316',backgroundColor:'#FCB316',yAxisID:'y2',tension:.2,pointRadius:3,order:1,datalabels:{display:false}}
-  ]},options:{responsive:true,maintainAspectRatio:false,onClick:(e,el)=>{if(el&&el.length&&el[0].index<_pareItems.length)abrirDrill(el[0].index);},
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    onClick:(e,el)=>{if(!el||!el.length)return; if(el[0].index<_pareItems.length)abrirDrill(el[0].index); else if(_pareResto.length)abrirDrillOutros();},
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.type==='line'?'Acum: '+c.parsed.y.toFixed(1).replace('.',',')+'%':BRL.format(c.parsed.y)+' ('+(tot?c.parsed.y/tot*100:0).toFixed(1).replace('.',',')+'%)'}}},
     scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',maxRotation:55,minRotation:30,font:{size:10}}},
       y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},
       y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#FCB316',callback:v=>v+'%'}}}}});
   document.querySelector('#tabPareto2 thead').innerHTML='<tr><th class="txt">Item <span class="small">(clique para ver os lançamentos)</span></th><th>Custo (R$)</th><th>% do grupo</th><th>% acumulado</th></tr>';
   let a3=0;const tb=items.map(([k,v],i)=>{a3+=v;return `<tr style="cursor:pointer" onclick="abrirDrill(${i})"><td class="txt" title="${String(k).replace(/"/g,'')}">🔍 ${String(k).slice(0,60)}</td><td>${BRL.format(v)}</td><td>${(tot?v/tot*100:0).toFixed(1).replace('.',',')}%</td><td>${(tot?a3/tot*100:0).toFixed(1).replace('.',',')}%</td></tr>`;}).join('');
-  const rowCauda=nCauda?`<tr><td class="txt small">Outros ${nCauda} itens</td><td>${BRL.format(cauda)}</td><td>${(tot?cauda/tot*100:0).toFixed(1).replace('.',',')}%</td><td>100,0%</td></tr>`:'';
+  const rowCauda=nCauda?`<tr style="cursor:pointer" onclick="abrirDrillOutros()"><td class="txt small">🔍 Outros ${nCauda} itens <span class="small">(clique p/ ver a composição)</span></td><td>${BRL.format(cauda)}</td><td>${(tot?cauda/tot*100:0).toFixed(1).replace('.',',')}%</td><td>100,0%</td></tr>`:'';
   const rowEstorno=temEstorno?`<tr style="color:var(--good)"><td class="txt">↩︎ Estornos / baixas</td><td>${BRL.format(estornos)}</td><td>—</td><td>—</td></tr><tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt">= Líquido do grupo</td><td>${BRL.format(totNet)}</td><td>—</td><td>—</td></tr>`:'';
   document.querySelector('#tabPareto2 tbody').innerHTML=tb+rowCauda+rowEstorno;
 }
 // drill-down: mostra todos os lançamentos do item clicado
 let DRILL_LAST=null;   // lançamentos do drill aberto, para exportar
+// composição da barra "Outros (N)" do Pareto — todos os itens fora do top 15
+function abrirDrillOutros(){
+  if(!_pareResto.length) return;
+  const {g,loc,dim}=_pareCtx;
+  const keys=new Set(_pareResto.map(x=>x.key));
+  const linhas=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr&&keys.has(pareKey(d,dim)));
+  drillReal('Outros ('+_pareResto.length+' itens) · '+(GRUPO_NOME[g]||g)+(loc?' · '+loc:''),linhas);
+}
+// Excel do Pareto: aba 1 = itens do gráfico · aba 2 = TODOS os lançamentos que compõem (recorrente)
+function exportarParetoXls(){
+  if(!_pareItems.length){ alert('Gere o Pareto primeiro.'); return; }
+  const {g,loc,dim}=_pareCtx;
+  const nomeG=(GRUPO_NOME[g]||g)+(loc?' · '+loc:'');
+  const tot=_pareItems.reduce((s,x)=>s+x.val,0)+_pareResto.reduce((s,x)=>s+x.val,0);
+  let ac=0;
+  const a1=[['Pareto — '+nomeG+' (recorrente: sem NR e sem lançamentos a mão)'],['Item','Custo (R$)','% do grupo','% acumulado']];
+  _pareItems.concat(_pareResto).forEach(x=>{ ac+=x.val; a1.push([x.key,x.val,tot?x.val/tot:0,tot?ac/tot:0]); });
+  const rows=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr);
+  const a2=[['Mês','Localidade','Centro de custo','Conta','Classe','Fornecedor','Material/Serviço','Objeto','Item do Pareto','Valor (R$)']]
+    .concat(rows.map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',d.forn||'',d.material||'',d.objeto||'',pareKey(d,dim),d.valor]));
+  baixarXlsx('Pareto_'+nomeG.replace(/[^\w]+/g,'_').slice(0,40),[{nome:'Pareto (itens)',aoa:a1},{nome:'Lançamentos (base)',aoa:a2}]);
+}
 function abrirDrill(idx){
   const it=_pareItems[idx]; if(!it) return; const {g,loc,dim}=_pareCtx;
   const linhas=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr&&pareKey(d,dim)===it.key).sort((a,b)=>b.valor-a.valor);   // mesmo filtro do Pareto (recorrente)
