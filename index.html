@@ -144,6 +144,7 @@
   td:first-child,th:first-child,td.txt,th.txt{text-align:left}
   tbody tr{transition:background-color .12s var(--ease-out)}
   tbody tr:hover{background:var(--panel2)}
+  tbody tr[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;background:var(--panel2)}
   #tabPareto2 tbody tr:hover,#tabResumo tbody tr:hover{box-shadow:inset 3px 0 0 var(--accent)}
   tr.gargalo td{background:rgba(228,86,46,.10)}
   tr.gargalo td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
@@ -523,7 +524,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v68 · Auditoria Web Interface Guidelines (a11y + performance) · 16/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v69 · Deep-link (aba/período na URL) + drills por teclado · 18/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -548,8 +549,23 @@ try{ if(window.ChartDataLabels){ Chart.register(window.ChartDataLabels); Chart.d
 try{ Chart.defaults.onHover=(e,els)=>{ const t=e.native&&e.native.target; if(t) t.style.cursor=(els&&els.length)?'pointer':'default'; }; }catch(e){}
 
 // ---------- ABAS ----------
-let activeTab=localStorage.getItem('activeTab')||'ovr';
-setTimeout(restoreSubs,0);   // reaplica a subpágina escolhida em cada aba (depois do parse do HTML)
+// estado na URL (?tab=&sub=&p=): permite deep-link direto para uma aba/subpágina/período
+const _q=new URLSearchParams(location.search);
+const TAB_IDS=['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash'];
+const _urlTab=TAB_IDS.includes(_q.get('tab'))?_q.get('tab'):null;
+let _urlSub=_q.get('sub'), _urlPer=_q.get('p');
+let activeTab=_urlTab||localStorage.getItem('activeTab')||'ovr';
+function syncUrl(){ try{
+  const q=new URLSearchParams();
+  q.set('tab',activeTab);
+  const s=localStorage.getItem('sub:'+activeTab); if(s) q.set('sub',s);
+  const p=document.getElementById('ytdAte')?.value; if(p) q.set('p',p);
+  history.replaceState(null,'','?'+q.toString());
+}catch(e){} }
+setTimeout(()=>{ restoreSubs(); if(_urlTab&&_urlSub){ showSub(_urlTab,_urlSub); _urlSub=null; } },0);   // reaplica a subpágina escolhida em cada aba (depois do parse do HTML); a URL ganha do localStorage
+// acessibilidade: linhas de drill (tr com onclick) também funcionam por teclado — Tab foca, Enter/Espaço abre
+new MutationObserver(()=>{ document.querySelectorAll('tr[onclick]:not([tabindex])').forEach(tr=>tr.setAttribute('tabindex','0')); }).observe(document.body,{childList:true,subtree:true});
+document.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.tagName==='TR'&&e.target.hasAttribute('onclick')){ e.preventDefault(); e.target.click(); } });
 setTimeout(()=>{ try{                             // reaplica a última visão da cascata (Fixos/Variáveis + região)
   const n=localStorage.getItem('wfNat'), l=localStorage.getItem('wfLoc');
   if(n&&document.getElementById('wfNat')) document.getElementById('wfNat').value=n;
@@ -559,12 +575,14 @@ let _has={ovr:false};
 function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; if(id==='fixo') return DADOS.some(d=>natDe(d)==='fixo'); if(id==='rec') return RECEITA.length>0; if(id==='dre') return RECEITA.length>0&&DADOS.length>0; if(id==='sga') return SGA.length>0||ORCAMENTO.some(o=>/sg/.test(norm(o.tipo))); return DADOS.length>0; }
 function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs();
   renderTab(activeTab);   // render preguiçoso: a aba renderiza na primeira abertura após os dados mudarem
+  syncUrl();
   const el=document.getElementById(t); if(el){ el.classList.remove('tab-enter'); void el.offsetWidth; el.classList.add('tab-enter'); } }
 // subpáginas dentro da aba (segmented control) — lembra a escolha por aba
 function showSub(tab,key){
   try{localStorage.setItem('sub:'+tab,key);}catch(e){}
   document.querySelectorAll('#'+tab+' .sp').forEach(d=>d.classList.toggle('active',d.dataset.sp===key));
   document.querySelectorAll('#'+tab+' .subnav button').forEach(b=>b.classList.toggle('active',b.dataset.sp===key));
+  if(tab===activeTab) syncUrl();
 }
 function restoreSubs(){
   document.querySelectorAll('.subnav').forEach(nav=>{
@@ -604,6 +622,7 @@ function montarYtd(){
 }
 function aplicarPeriodo(){
   const sel=document.getElementById('ytdAte');
+  if(_urlPer!==null&&sel){ montarYtd(); if([...sel.options].some(o=>o.value===_urlPer)) sel.value=_urlPer; _urlPer=null; }   // período vindo da URL (deep-link), só na 1ª carga
   const cut=sel?sel.value:'';
   let f=null;                                                         // sem corte = tudo
   if(cut.startsWith('M:')){ const m=cut.slice(2); f=d=>d.mes===m; }   // mês isolado
@@ -612,6 +631,7 @@ function aplicarPeriodo(){
   RECEITA=f?RECEITA_RAW.filter(f):RECEITA_RAW.slice();
   SGA=f?SGA_RAW.filter(f):SGA_RAW.slice();
   atualizarUI();
+  syncUrl();
 }
 
 // aviso visual rápido (não-bloqueante)
