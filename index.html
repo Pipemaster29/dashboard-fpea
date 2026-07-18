@@ -3,8 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#02585C">
 <title>Dashboard FP&A — GNL Brasil</title>
 <link rel="icon" type="image/png" href="gnl-logo.png">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://mzbwxyqfmruxaytfrimp.supabase.co" crossorigin>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
@@ -16,6 +19,8 @@
     --accent:#00A0A8;--accent2:#0a6b71;--good:#00B050;--bad:#E4562E;--warn:#FCB316;
     --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-in-out:cubic-bezier(0.77,0,0.175,1);}
   *{box-sizing:border-box;margin:0;padding:0}
+  html{color-scheme:dark}
+  button,select,input,a{touch-action:manipulation}
   body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.4}
   header{background:linear-gradient(90deg,#02585C 0%,#00A0A8 100%);border-bottom:1px solid #013b3e;padding:10px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
   header h1{font-size:20px;font-weight:600;display:flex;align-items:center;gap:12px;color:#fff}
@@ -35,7 +40,7 @@
   @media(hover:hover){.btn-primary:hover{background:#00b9c2;box-shadow:0 4px 14px rgba(0,160,168,.3)}.btn-ghost:hover{border-color:var(--accent);color:#fff}
     header .btn-primary:hover{background:#ffc23d;box-shadow:0 4px 14px rgba(252,179,22,.32)}}
   main{padding:24px 28px;max-width:1480px;margin:0 auto}
-  #drop{border:2px dashed var(--line);border-radius:14px;padding:44px 24px;text-align:center;background:var(--panel);transition:.2s;cursor:pointer;margin-bottom:24px}
+  #drop{border:2px dashed var(--line);border-radius:14px;padding:44px 24px;text-align:center;background:var(--panel);transition:border-color .2s var(--ease-out),background-color .2s var(--ease-out);cursor:pointer;margin-bottom:24px}
   #drop:hover,#drop.drag{border-color:var(--accent);background:var(--panel2)}
   #drop h2{font-size:17px;margin-bottom:6px}#drop p{color:var(--muted);font-size:14px;margin-top:4px}#drop .big{font-size:42px;margin-bottom:10px}
   .hidden{display:none!important}
@@ -153,7 +158,8 @@
   #flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
   #drillModal{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;visibility:hidden;transition:opacity .2s var(--ease-out),background-color .2s var(--ease-out),visibility 0s linear .2s}
   #drillModal.show{opacity:1;visibility:visible;background:rgba(0,0,0,.62);transition:opacity .2s var(--ease-out),background-color .2s var(--ease-out)}
-  .drillbox{background:var(--panel);border:1px solid var(--accent2);border-radius:14px;padding:18px;width:min(1100px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.55);transform:scale(.96);transition:transform .22s var(--ease-out)}
+  .drillbox{background:var(--panel);border:1px solid var(--accent2);border-radius:14px;padding:18px;width:min(1100px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.55);transform:scale(.96);transition:transform .22s var(--ease-out);overscroll-behavior:contain}
+  .tablewrap{overscroll-behavior:contain}
   #drillModal.show .drillbox{transform:scale(1)}
   .drillhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;font-size:13.5px}
   .drillhead button{flex:none}
@@ -196,13 +202,13 @@
 </head>
 <body>
 <header>
-  <h1><span class="brand"><img src="gnl-logo.png" alt="GNL Brasil Logística"></span><span class="dot"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge">carregando…</span></h1>
+  <h1><span class="brand"><img src="gnl-logo.png" alt="GNL Brasil Logística" width="239" height="164"></span><span class="dot" aria-hidden="true"></span>Dashboard FP&amp;A <span class="badge" id="fileBadge" aria-live="polite">carregando…</span></h1>
   <div class="actions">
     <span id="cloudInfo" class="small"></span>
     <button class="btn-primary" onclick="comSenhaUpload(()=>document.getElementById('file').click())" title="Exige a senha de atualização. Recarregar um arquivo SUBSTITUI a versão anterior daquela base — não duplica. Salva na nuvem automaticamente.">🔒 Carregar/atualizar base</button>
     <button class="btn-ghost" id="btnSalvar" onclick="salvarNaNuvem()" title="Forçar o salvamento na nuvem agora (já salva sozinho ao atualizar uma base)">☁️ Salvar na nuvem</button>
     <button class="btn-ghost" onclick="exportarBases()" title="Baixar um Excel com as bases (Realizado classificado + Orçamento) — uma aba cada, pronto pra dinâmica.">⬇️ Exportar bases (Excel)</button>
-    <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple class="hidden">
+    <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple class="hidden" aria-hidden="true" tabindex="-1">
   </div>
 </header>
 
@@ -225,14 +231,14 @@
     <button class="tabbtn" data-t="ops" onclick="showTab('ops')">🚚 Operações & R$/KM</button>
     <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')">🔎 Pareto & Gargalos</button>
     <button class="tabbtn" data-t="dash" onclick="showTab('dash')">📈 Análise de Custos</button>
-    <span class="ytdbox"><label>Período</label><select id="ytdAte" onchange="aplicarPeriodo()" title="Acumulado (YTD) de janeiro até o mês escolhido, OU um mês isolado — vale para TODAS as análises, drills e exports. Na nuvem fica sempre a base completa."></select></span>
+    <span class="ytdbox"><label for="ytdAte">Período</label><select id="ytdAte" onchange="aplicarPeriodo()" title="Acumulado (YTD) de janeiro até o mês escolhido, OU um mês isolado — vale para TODAS as análises, drills e exports. Na nuvem fica sempre a base completa."></select></span>
   </nav>
 
   <!-- ORÇADO vs REAL -->
   <div id="ovr" class="ovrbox hidden">
     <div class="sectitle">🎯 Orçado vs Real <span class="tag" id="ovrTag">Custos Variáveis</span></div>
     <div class="scope">
-      <label>Escopo (Tipo do orçamento)</label>
+      <label for="ovrTipo">Escopo (Tipo do orçamento)</label>
       <select id="ovrTipo" onchange="renderOVR()"></select>
       <label style="display:flex;align-items:center;gap:7px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt);margin-left:8px">
         <input type="checkbox" id="pisCofins" checked onchange="recalcOrc()" style="width:16px;height:16px;cursor:pointer">
@@ -245,11 +251,11 @@
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chOVR','Orcado vs Real por mes')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chOVR','Orcado vs Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chOVR','Orcado vs Real por mes')">⬇ Excel</button></div><h3>Orçado vs Realizado por Mês</h3><div class="wrap"><canvas id="chOVR"></canvas></div></div>
       <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarWaterfallPPT()">📊 PPT</button><button class="xls png" onclick="exportarWaterfallPNG()">🖼️ Imagem</button><button class="xls" onclick="exportarWaterfall()">⬇ Excel</button></div>
         <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Cascata Orçado → Real <span class="small">— Δ real − orçado por categoria, no valor cheio (NR e lançamentos a mão se anulam dentro de cada categoria) — fecha com a DRE</span>
-          <select id="wfNat" onchange="renderWaterfall()" style="margin-left:auto;min-width:140px">
+          <select id="wfNat" aria-label="Natureza da cascata (fixos ou variáveis)" onchange="renderWaterfall()" style="margin-left:auto;min-width:140px">
             <option value="variavel">Custos Variáveis</option>
             <option value="fixo">Custos Fixos</option>
           </select>
-          <select id="wfLoc" onchange="renderWaterfall()" style="min-width:150px">
+          <select id="wfLoc" aria-label="Região da cascata" onchange="renderWaterfall()" style="min-width:150px">
             <option value="">Geral (AM + MA)</option>
             <option value="Amazonas">Amazonas</option>
             <option value="Maranhão">Maranhão</option>
@@ -265,7 +271,7 @@
   <div id="rec" class="ovrbox hidden">
     <div class="sectitle">💰 Receita & Viagens <span class="tag" id="recTag">real × orçado por contrato</span></div>
     <div class="scope">
-      <label>Região</label>
+      <label for="recLoc">Região</label>
       <select id="recLoc" onchange="renderReceita()"><option value="">Geral (AM + MA)</option><option>Amazonas</option><option>Maranhão</option></select>
       <span class="small">Fixa = contas 3101030002 + 3101020001 · Variável = 3101020003 (fretes, 1 linha por CTe). Receita entra positiva (o razão traz negativa). Clique nos gráficos e na tabela para ver os lançamentos.</span>
     </div>
@@ -283,11 +289,11 @@
   <div id="dre" class="ovrbox hidden">
     <div class="sectitle">🏦 DRE até o EBITDA <span class="tag" id="dreTag">real × orçado</span></div>
     <div class="scope">
-      <label>Região</label>
+      <label for="dreLoc">Região</label>
       <select id="dreLoc" onchange="renderDre()"><option value="">Geral (AM + MA)</option><option>Amazonas</option><option>Maranhão</option></select>
-      <label>Mês do quadro</label>
+      <label for="dreMes">Mês do quadro</label>
       <select id="dreMes" onchange="renderDre()"></select>
-      <label>Matriz mensal</label>
+      <label for="dreVis">Matriz mensal</label>
       <select id="dreVis" onchange="renderDre()"><option value="real">Realizado</option><option value="orc">Orçado</option></select>
       <span class="small">Valores em R$ mil. YTD segue o Período lá em cima. Custos pelo valor CHEIO (os lançamentos a mão neutralizam os NR dentro do custo); (+/−) Não Recorrente devolve o efeito real e soma no EBITDA.</span>
     </div>
@@ -374,7 +380,7 @@
   <div id="fixo" class="ovrbox hidden">
     <div class="sectitle">🏢 Custos Fixos por Bloco <span class="tag">divisão da DRE — Pessoal, Serviços, Materiais, Viagens, Seguros, Aluguéis, Outros O&M</span></div>
     <div class="scope">
-      <label>Localidade</label>
+      <label for="fixoLoc">Localidade</label>
       <select id="fixoLoc" onchange="renderFixo()"><option value="">Geral (AM + MA)</option><option>Amazonas</option><option>Maranhão</option></select>
       <span class="small">Real inclui não recorrentes e lançamentos a mão (que se zeram). Clique num bloco para ver os lançamentos.</span>
       <button class="btn-ghost" style="margin-left:auto" onclick="exportarFixoXls()" title="Excel com o resumo dos blocos + uma aba por bloco com o mês a mês e as maiores contas.">⬇ Excel dos blocos</button>
@@ -395,7 +401,7 @@
   <div id="sga" class="ovrbox hidden">
     <div class="sectitle">💼 SG&amp;A — Despesas Gerais e Administrativas <span class="tag" id="sgaTag">orçado × real</span></div>
     <div class="scope">
-      <label>Localização</label>
+      <label for="sgaLoc">Localização</label>
       <select id="sgaLoc" onchange="renderSga()"><option value="">Todas (Manaus + RJ)</option><option>Manaus</option><option>Rio de Janeiro</option></select>
       <span class="small">SG&amp;A é corporativo (não é alocado às operações AM/MA). Real da base SG&amp;A; orçado dos tipos "Despesas - SG&amp;A" da folha (bruto, sem crédito PIS/Cofins). Clique nas barras e nas contas para ver os lançamentos.</span>
     </div>
@@ -451,11 +457,11 @@
     </div>
     <div class="sp" data-sp="detalhe">
     <div class="scope">
-      <label>Grupo (gargalo)</label>
+      <label for="pareGrupo">Grupo (gargalo)</label>
       <select id="pareGrupo" onchange="renderPareto2()"></select>
-      <label>Localidade</label>
+      <label for="pareLoc">Localidade</label>
       <select id="pareLoc" onchange="renderPareto2()"><option value="">Todas</option><option>Amazonas</option><option>Maranhão</option></select>
-      <label>Detalhar por</label>
+      <label for="pareDim">Detalhar por</label>
       <select id="pareDim" onchange="renderPareto2()">
         <option value="marca">Fornecedor / Marca</option>
         <option value="conta">Conta (Diesel/ARLA/…)</option>
@@ -517,7 +523,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v67 · Nova aba SG&A (orçado × real, Manaus + RJ, abertura por conta) · 16/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v68 · Auditoria Web Interface Guidelines (a11y + performance) · 16/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1360,11 +1366,11 @@ function renderKmTable(){
   document.querySelector('#tabKm thead').innerHTML='<tr><th class="txt">Mês</th><th>Amazonas · KM real</th><th>Amazonas · KM orçado</th><th>Maranhão · KM real <span class="small">(manut./pneus — todas as operações)</span></th><th>Maranhão · KM orçado</th><th>Maranhão · KM COMBUSTÍVEL real <span class="small">(só Copergás/Gás Local)</span></th><th>Maranhão · KM comb. orçado</th></tr>';
   document.querySelector('#tabKm tbody').innerHTML=meses.map(m=>`<tr>
     <td class="txt">${m}</td>
-    <td><input type="number" min="0" value="${kmGet('Amazonas',m,'km')||''}" placeholder="real" oninput="setKm('Amazonas','${m}','km',this.value)"></td>
+    <td><input type="number" min="0" value="${kmGet('Amazonas',m,'km')||''}" placeholder="real" aria-label="KM real Amazonas ${m}" oninput="setKm('Amazonas','${m}','km',this.value)"></td>
     <td>${orcCell('Amazonas',m,'')}</td>
-    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'km')||''}" placeholder="real" oninput="setKm('Maranhão','${m}','km',this.value)"></td>
+    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'km')||''}" placeholder="real" aria-label="KM real Maranhão ${m}" oninput="setKm('Maranhão','${m}','km',this.value)"></td>
     <td>${orcCell('Maranhão',m,'')}</td>
-    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'kmComb')||''}" placeholder="real combustível" oninput="setKm('Maranhão','${m}','kmComb',this.value)"></td>
+    <td><input type="number" min="0" value="${kmGet('Maranhão',m,'kmComb')||''}" placeholder="real combustível" aria-label="KM combustível Maranhão ${m}" oninput="setKm('Maranhão','${m}','kmComb',this.value)"></td>
     <td>${orcCell('Maranhão',m,'combustivel')}</td></tr>`).join('');
   const falta=kmSemRate();
   const nota=document.getElementById('kmNota');
