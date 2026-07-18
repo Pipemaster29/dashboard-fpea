@@ -221,6 +221,7 @@
     <button class="tabbtn" data-t="dre" onclick="showTab('dre')">🏦 DRE / EBITDA</button>
     <button class="tabbtn" data-t="exec" onclick="showTab('exec')">📋 Execução por Área</button>
     <button class="tabbtn" data-t="fixo" onclick="showTab('fixo')">🏢 Custos Fixos (Blocos)</button>
+    <button class="tabbtn" data-t="sga" onclick="showTab('sga')">💼 SG&amp;A</button>
     <button class="tabbtn" data-t="ops" onclick="showTab('ops')">🚚 Operações & R$/KM</button>
     <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')">🔎 Pareto & Gargalos</button>
     <button class="tabbtn" data-t="dash" onclick="showTab('dash')">📈 Análise de Custos</button>
@@ -390,6 +391,29 @@
     <div class="note">Seguros (conta 4022*): o realizado é rateado <b>50% Amazonas / 50% Maranhão</b> (a apólice é lançada toda no CC do Maranhão) — cada lançamento aparece como duas metades no drill. Blocos pela divisão de contas da DRE: 4001* = Pessoal · 4007* = Materiais · 4011*/4013010001 = Viagens · 4022010001 = Seguros · contas com "aluguel" no nome = Aluguéis · listas específicas p/ Serviços Prestados e Outros O&M. Orçado = tipos "Custos Fixos" do orçamento, mesmos blocos, meses com realizado, sempre BRUTO (crédito PIS/Cofins não se aplica ao fixo — igual à análise do EBITDA).</div>
   </div>
 
+  <!-- SG&A -->
+  <div id="sga" class="ovrbox hidden">
+    <div class="sectitle">💼 SG&amp;A — Despesas Gerais e Administrativas <span class="tag" id="sgaTag">orçado × real</span></div>
+    <div class="scope">
+      <label>Localização</label>
+      <select id="sgaLoc" onchange="renderSga()"><option value="">Todas (Manaus + RJ)</option><option>Manaus</option><option>Rio de Janeiro</option></select>
+      <span class="small">SG&amp;A é corporativo (não é alocado às operações AM/MA). Real da base SG&amp;A; orçado dos tipos "Despesas - SG&amp;A" da folha (bruto, sem crédito PIS/Cofins). Clique nas barras e nas contas para ver os lançamentos.</span>
+    </div>
+    <div class="resumo" id="sgaResumo"></div>
+    <div class="kpis" id="sgaKpis"></div>
+    <div class="grid">
+      <div class="card full"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chSgaMes','SGA Orcado x Real por mes')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chSgaMes','SGA Orcado x Real por mes')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chSgaMes','SGA Orcado x Real por mes')">⬇ Excel</button></div>
+        <h3>SG&amp;A por mês <span class="small">— orçado × real (clique p/ lançamentos)</span></h3><div class="wrap" style="height:300px"><canvas id="chSgaMes"></canvas></div></div>
+      <div class="card"><div class="expbar"><button class="xls ppt" onclick="exportarGraficoPPT('chSgaLoc','SGA por localizacao')">📊 PPT</button><button class="xls png" onclick="exportarGraficoPNG('chSgaLoc','SGA por localizacao')">🖼️ Imagem</button><button class="xls" onclick="exportarGrafico('chSgaLoc','SGA por localizacao')">⬇ Excel</button></div>
+        <h3>Por localização <span class="small">— Manaus × Rio de Janeiro (período)</span></h3><div class="wrap" style="height:280px"><canvas id="chSgaLoc"></canvas></div></div>
+      <div class="card"><h3>Maiores desvios <span class="small">— contas mais acima do orçado no período</span></h3><div class="tablewrap" style="max-height:300px"><table id="tabSgaDesv"><thead></thead><tbody></tbody></table></div></div>
+    </div>
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Abertura por conta <span class="small">— orçado × real · clique na conta p/ ver os lançamentos</span>
+      <button class="btn-ghost" style="margin-left:12px;padding:5px 12px" onclick="exportarSgaAbXls()">⬇ Excel da abertura</button></h3>
+    <div class="tablewrap" style="max-height:430px;margin-bottom:16px"><table id="tabSgaAb"><thead></thead><tbody></tbody></table></div>
+    <div class="note">Comparação nos meses com realizado (o Período lá em cima vale aqui também). Contas do real sem par no orçado aparecem com orçado "—"; o nome da conta vem da folha de orçamento.</div>
+  </div>
+
   <!-- OPERAÇÕES & R$/KM -->
   <div id="ops" class="ovrbox hidden">
     <div class="sectitle">🚚 Operações & Custo por KM <span class="tag" id="opsTag">R$/km por região</span></div>
@@ -493,7 +517,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v66 · Ops só com Página KPI · Pareto: drill no "Outros" + Excel com base · 16/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v67 · Nova aba SG&A (orçado × real, Manaus + RJ, abertura por conta) · 16/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -526,7 +550,7 @@ setTimeout(()=>{ try{                             // reaplica a última visão d
   if(l!=null&&document.getElementById('wfLoc')&&[...document.getElementById('wfLoc').options].some(o=>o.value===l)) document.getElementById('wfLoc').value=l;
 }catch(e){} },0);
 let _has={ovr:false};
-function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; if(id==='fixo') return DADOS.some(d=>natDe(d)==='fixo'); if(id==='rec') return RECEITA.length>0; if(id==='dre') return RECEITA.length>0&&DADOS.length>0; return DADOS.length>0; }
+function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; if(id==='fixo') return DADOS.some(d=>natDe(d)==='fixo'); if(id==='rec') return RECEITA.length>0; if(id==='dre') return RECEITA.length>0&&DADOS.length>0; if(id==='sga') return SGA.length>0||ORCAMENTO.some(o=>/sg/.test(norm(o.tipo))); return DADOS.length>0; }
 function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs();
   renderTab(activeTab);   // render preguiçoso: a aba renderiza na primeira abertura após os dados mudarem
   const el=document.getElementById(t); if(el){ el.classList.remove('tab-enter'); void el.offsetWidth; el.classList.add('tab-enter'); } }
@@ -546,14 +570,14 @@ function restoreSubs(){
 function applyTabs(){
   const nav=document.getElementById('tabs');
   const temDados=DADOS.length||ORCAMENTO.length||ORCKPI||ORCREC.length||RECEITA.length;
-  const avail=['ovr','rec','dre','exec','fixo','ops','pareto','dash'].filter(tabHasContent);
+  const avail=['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash'].filter(tabHasContent);
   nav.classList.toggle('hidden', !temDados || !avail.length);
   if(!avail.includes(activeTab)) activeTab=avail[0]||'ovr';
   document.querySelectorAll('#tabs .tabbtn').forEach(b=>{
     b.style.display=avail.includes(b.dataset.t)?'':'none';
     b.classList.toggle('active', b.dataset.t===activeTab);
   });
-  ['ovr','rec','dre','exec','fixo','ops','pareto','dash'].forEach(id=>{
+  ['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash'].forEach(id=>{
     document.getElementById(id).classList.toggle('hidden', !(id===activeTab && avail.includes(id)));
   });
 }
@@ -1042,7 +1066,7 @@ function atualizarUI(){
 // ---------- RENDER PREGUIÇOSO: só a aba visível renderiza; as outras ao serem abertas ----------
 const _dirty={};
 const RENDER_TAB={ ovr:()=>renderOVR(), rec:()=>renderReceita(), dre:()=>renderDre(), exec:()=>renderExec(),
-  fixo:()=>renderFixo(), ops:()=>renderOps(), pareto:()=>renderParetoTab(), dash:()=>{ if(DADOS.length) render(); } };
+  fixo:()=>renderFixo(), sga:()=>renderSga(), ops:()=>renderOps(), pareto:()=>renderParetoTab(), dash:()=>{ if(DADOS.length) render(); } };
 function marcarTudoSujo(){ Object.keys(RENDER_TAB).forEach(t=>_dirty[t]=true); }
 function renderTab(t){ if(RENDER_TAB[t]&&_dirty[t]){ _dirty[t]=false; RENDER_TAB[t](); } }
 
@@ -1948,6 +1972,103 @@ function exportarPesAbXls(){
     rows.map(x=>[x.cod,x.nome,x.orc,x.real,x.real-x.orc,x.orc?(x.real-x.orc)/x.orc:'']));
   baixarXlsx('Pessoal_abertura'+(loc?'_'+loc:''),[{nome:'Pessoal por conta',aoa}]);
 }
+
+// ---------- ABA SG&A (orçado × real · Manaus + Rio de Janeiro) ----------
+let SGAAB_LAST=null;
+const sgaDrillMap=d=>({mes:d.mes,loc:d.loc,centro:'',ccod:d.conta,classe:'SG&A',material:d.texto||d.forn,nr:d.nr,mao:d.mao,valor:d.valor});
+function renderSga(){
+  const el=document.getElementById('sgaResumo'); if(!el) return;
+  if(!SGA.length&&!ORCAMENTO.some(o=>/sg/.test(norm(o.tipo)))) return;
+  const loc=(document.getElementById('sgaLoc')||{}).value||'';
+  const R=SGA.filter(d=>!loc||d.loc===loc);
+  const Otodos=ORCAMENTO.filter(o=>/sg/.test(norm(o.tipo)));
+  const O=Otodos.filter(o=>!loc||o.regiao===loc);
+  const temReal=R.length>0;
+  const meses=temReal?uniq(R.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b))
+                     :uniq(O.map(o=>o.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));
+  const setM=new Set(meses);
+  const rm={},om={};
+  R.forEach(d=>{rm[d.mes]=(rm[d.mes]||0)+d.valor;});
+  O.forEach(o=>{ if(setM.has(o.mes)) om[o.mes]=(om[o.mes]||0)+o.valor; });
+  const totR=meses.reduce((s,m)=>s+(rm[m]||0),0), totO=meses.reduce((s,m)=>s+(om[m]||0),0);
+  const dv=totR-totO, dp=totO?dv/totO*100:0;
+  const orcAno=O.reduce((s,o)=>s+o.valor,0);
+  document.getElementById('sgaTag').textContent=(loc||'Manaus + RJ')+' · '+(meses[0]||'—')+'–'+(meses[meses.length-1]||'—');
+  document.getElementById('sgaResumo').innerHTML=temReal
+    ?`📌 <b>SG&A${loc?' · '+loc:''}</b> (${meses[0]}–${meses[meses.length-1]}): realizado <b>${BRL.format(totR)}</b> vs orçado <b>${BRL.format(totO)}</b> (<b>${PCT(dp)}</b> ${dv>0?'acima':'abaixo'}). Do orçamento do ano (<b>${BRL.format(orcAno)}</b>), já foram consumidos <b>${orcAno?(totR/orcAno*100).toFixed(0):'—'}%</b>.`
+    :`📌 Ainda sem base de SG&A realizado — mostrando só o orçado (<b>${BRL.format(orcAno)}</b> no ano). Carregue a base SGA_Real para comparar.`;
+  const kpis=[
+    {lbl:'Orçado (período)',val:BRL.format(totO)},
+    {lbl:'Realizado',val:temReal?BRL.format(totR):'—'},
+    {lbl:'Variação',val:temReal?(dv>=0?'+':'')+BRL.format(dv):'—',cls:dv>0?'pos':'neg',sub:temReal&&totO?PCT(dp)+(dv>0?' acima':' abaixo'):''},
+    {lbl:'Consumo do ano',val:orcAno&&temReal?(totR/orcAno*100).toFixed(0)+'%':'—',sub:'orçado ano: '+kBRL(orcAno)}
+  ];
+  document.getElementById('sgaKpis').innerHTML=kpis.map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
+  // gráfico mensal
+  destroy('chSgaMes');
+  charts.chSgaMes=new Chart('chSgaMes',{type:'bar',data:{labels:meses.map(mesCurto),datasets:[
+    {label:'Orçado',data:meses.map(m=>om[m]||0),backgroundColor:'#FCB316',
+      datalabels:{anchor:'end',align:'top',color:'#FCB316',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}},
+    {label:'Realizado',data:meses.map(m=>rm[m]||0),backgroundColor:'#00A0A8',
+      datalabels:{anchor:'end',align:'top',color:'#e2e8f0',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}}
+  ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},
+    onClick:(e,els)=>{ if(!els.length) return; const m=meses[els[0].index];
+      if(els[0].datasetIndex===1) drillReal('SG&A realizado · '+m+(loc?' · '+loc:''),R.filter(d=>d.mes===m).map(sgaDrillMap));
+      else drillOrcam('SG&A orçado · '+m+(loc?' · '+loc:''),O.filter(o=>o.mes===m)); },
+    plugins:{legend:{labels:{color:'#cbd5e1'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
+    scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+  // por localização (sempre as duas, no período)
+  destroy('chSgaLoc');
+  const locs=['Manaus','Rio de Janeiro'];
+  const locOrc=locs.map(l2=>Otodos.filter(o=>o.regiao===l2&&setM.has(o.mes)).reduce((s,o)=>s+o.valor,0));
+  const locReal=locs.map(l2=>SGA.filter(d=>d.loc===l2&&setM.has(d.mes)).reduce((s,d)=>s+d.valor,0));
+  charts.chSgaLoc=new Chart('chSgaLoc',{type:'bar',data:{labels:locs,datasets:[
+    {label:'Orçado',data:locOrc,backgroundColor:'#FCB316',datalabels:{anchor:'end',align:'top',color:'#FCB316',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}},
+    {label:'Realizado',data:locReal,backgroundColor:'#00A0A8',datalabels:{anchor:'end',align:'top',color:'#e2e8f0',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}}
+  ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},
+    onClick:(e,els)=>{ if(!els.length) return; const l2=locs[els[0].index];
+      if(els[0].datasetIndex===1) drillReal('SG&A realizado · '+l2,SGA.filter(d=>d.loc===l2&&setM.has(d.mes)).map(sgaDrillMap));
+      else drillOrcam('SG&A orçado · '+l2,Otodos.filter(o=>o.regiao===l2&&setM.has(o.mes))); },
+    plugins:{legend:{labels:{color:'#cbd5e1'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
+    scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+  // abertura por conta (orçado × real)
+  const A={}; const ent=k=>A[k]||(A[k]={cod:k,nome:'',real:0,orc:0});
+  R.forEach(d=>{ ent(d.conta||'?').real+=d.valor; });
+  O.forEach(o=>{ if(!setM.has(o.mes)) return; const x=ent(o.classeCod||'?'); x.orc+=o.valor; if(o.classeNome&&!x.nome) x.nome=o.classeNome; });
+  const rows=Object.values(A).filter(x=>Math.abs(x.real)>0.005||Math.abs(x.orc)>0.005).sort((a,b)=>Math.abs(b.real)-Math.abs(a.real));
+  SGAAB_LAST={rows,loc,meses};
+  const tb=document.getElementById('tabSgaAb');
+  tb.querySelector('thead').innerHTML='<tr><th class="txt">Conta</th><th class="txt">Descrição</th><th>Orçado</th><th>Realizado</th><th>Δ R$</th><th>Δ %</th><th class="txt">Farol</th></tr>';
+  tb.querySelector('tbody').innerHTML=rows.map(x=>{
+    const d=x.real-x.orc,p=x.orc?d/x.orc*100:null,cls=d>0?'pos':'neg';
+    const farol=execFarol(x.orc?x.real/x.orc*100:null);
+    return `<tr style="cursor:pointer" onclick="drillSgaConta('${x.cod}')"><td class="txt">${x.cod}</td><td class="txt" title="${(x.nome||'').replace(/"/g,'')}">${(x.nome||'—').slice(0,42)}</td>`+
+      `<td>${x.orc?BRL.format(x.orc):'—'}</td><td><b>${BRL.format(x.real)}</b></td><td class="${cls}">${(d>=0?'+':'')+BRL.format(d)}</td><td class="${cls}">${x.orc?PCT(p):'—'}</td><td class="txt">${farol.ico} ${farol.txt}</td></tr>`;
+  }).join('')+`<tr style="font-weight:700;border-top:2px solid var(--accent2)"><td class="txt" colspan="2">TOTAL SG&A</td><td>${BRL.format(totO)}</td><td>${BRL.format(totR)}</td><td class="${dv>0?'pos':'neg'}">${(dv>=0?'+':'')+BRL.format(dv)}</td><td class="${dv>0?'pos':'neg'}">${totO?PCT(dp):'—'}</td><td></td></tr>`;
+  // maiores desvios (acima do orçado)
+  const desv=rows.filter(x=>x.orc>0&&x.real-x.orc>0).sort((a,b)=>(b.real-b.orc)-(a.real-a.orc)).slice(0,7);
+  const td=document.getElementById('tabSgaDesv');
+  td.querySelector('thead').innerHTML='<tr><th class="txt">Conta</th><th>Δ R$</th><th>Δ %</th></tr>';
+  td.querySelector('tbody').innerHTML=desv.length?desv.map(x=>{
+    const d=x.real-x.orc;
+    return `<tr style="cursor:pointer" onclick="drillSgaConta('${x.cod}')"><td class="txt" title="${(x.nome||x.cod).replace(/"/g,'')}">🔍 ${(x.nome||x.cod).slice(0,34)}</td><td class="pos">+${BRL.format(d)}</td><td class="pos">${PCT(d/x.orc*100)}</td></tr>`;
+  }).join(''):'<tr><td class="txt" colspan="3">✅ Nenhuma conta acima do orçado no período.</td></tr>';
+}
+function drillSgaConta(cod){
+  const loc=(document.getElementById('sgaLoc')||{}).value||'';
+  const linhas=SGA.filter(d=>(d.conta||'?')===cod&&(!loc||d.loc===loc)).map(sgaDrillMap);
+  drillReal('SG&A · conta '+cod+(loc?' · '+loc:''),linhas);
+}
+function exportarSgaAbXls(){
+  if(!SGAAB_LAST||!SGAAB_LAST.rows.length){ alert('Abra a aba SG&A primeiro.'); return; }
+  const {rows,loc,meses}=SGAAB_LAST;
+  const a1=[['SG&A — abertura por conta'+(loc?' · '+loc:'')+' · '+(meses[0]||'')+'–'+(meses[meses.length-1]||'')],
+    ['Conta','Descrição','Orçado (período)','Realizado','Δ R$','Δ %']].concat(
+    rows.map(x=>[x.cod,x.nome,x.orc,x.real,x.real-x.orc,x.orc?(x.real-x.orc)/x.orc:'']));
+  const a2=[['Mês','Localização','Conta','Texto','Fornecedor','Valor (R$)']].concat(
+    SGA.filter(d=>!loc||d.loc===loc).map(d=>[d.mes,d.loc,d.conta,d.texto,d.forn,d.valor]));
+  baixarXlsx('SGA_abertura'+(loc?'_'+loc.replace(/\s+/g,'_'):''),[{nome:'Por conta',aoa:a1},{nome:'Lançamentos (base)',aoa:a2}]);
+}
 function abrirDrillBloco(b){
   const loc=(document.getElementById('fixoLoc')||{}).value||'';
   const linhas=DADOS.filter(d=>natDe(d)==='fixo'&&blocoDe(d)===b&&(!loc||d.loc===loc)).sort((x,y)=>y.valor-x.valor);
@@ -2843,7 +2964,7 @@ function exportarWaterfall(){
 
 function limpar(){
   DADOS_RAW=[];DADOS=[];ORCAMENTO=[];ORCKPI=null;ORCREC=[];RECEITA_RAW=[];RECEITA=[];SGA_RAW=[];SGA=[];_has.ovr=false;Object.keys(charts).forEach(destroy);
-  ['dash','ovr','rec','dre','exec','fixo','ops','pareto','tabs'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  ['dash','ovr','rec','dre','exec','fixo','sga','ops','pareto','tabs'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('drop').classList.remove('hidden');
   document.getElementById('fileBadge').textContent='nenhum arquivo carregado';
 }
