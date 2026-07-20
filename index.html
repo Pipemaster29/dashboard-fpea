@@ -524,7 +524,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v73 · Base em Excel com Texto breve material, Descrição e Denominação separados · 20/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v74 · Pareto anula pares lançamento×estorno pelo Texto do pedido (caso SWILE) · 20/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -960,6 +960,7 @@ function mapear(json,nome){
       material: material || (kDescr?String(row[kDescr]):''),
       descr:(kDescr?String(row[kDescr]??''):'').slice(0,80),   // Descrição (nome do fornecedor no KSB1)
       denom:(kDen?String(row[kDen]??''):'').slice(0,80),       // Denominação (texto do lançamento)
+      ped:(kPedido?String(row[kPedido]??''):'').slice(0,60),   // Texto do pedido — casa lançamento × estorno/reclassificação
       nat, bloco,
       nr:/nao recorrente/.test(nb)||undefined,                                        // marcado como não recorrente
       mao:/lancad[oa] a mao|lancamento a mao|adicionado a mao/.test(nb)||undefined,   // lançamento manual p/ zerar os NR
@@ -1234,8 +1235,8 @@ function exportarBases(){
   if(!DADOS.length&&!ORCAMENTO.length){ alert('Nenhuma base carregada.'); return; }
   const abas=[];
   if(DADOS.length){
-    const h=['Mês','Localidade','Centro de custo','Classe (cód)','Classe de custo','Natureza','Categoria','Obs','Fornecedor','Texto breve material','Descrição','Denominação','Denominação objeto','Origem','Valor (R$)'];
-    const rows=DADOS.map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',natDe(d)==='fixo'?'Fixo':'Variável',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.forn||'',d.material||'',d.descr||'',d.denom||'',(d.objeto&&d.objeto!=='—'?d.objeto:''),d.origem||'',d.valor]);
+    const h=['Mês','Localidade','Centro de custo','Classe (cód)','Classe de custo','Natureza','Categoria','Obs','Fornecedor','Texto breve material','Descrição','Denominação','Texto do pedido','Denominação objeto','Origem','Valor (R$)'];
+    const rows=DADOS.map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',natDe(d)==='fixo'?'Fixo':'Variável',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.forn||'',d.material||'',d.descr||'',d.denom||'',d.ped||'',(d.objeto&&d.objeto!=='—'?d.objeto:''),d.origem||'',d.valor]);
     abas.push({nome:'Realizado (KSB1)',aoa:[h,...rows]});
   }
   if(ORCAMENTO.length){
@@ -1597,13 +1598,32 @@ function pareKey(d,dim){
   if(dim==='mes') return d.mes||'—';
   let k=d.material; if(!k||k==='—'||k==='') k=d.objeto||'—'; return k||'—';
 }
-let _pareItems=[], _pareResto=[], _pareCtx={};
+let _pareItems=[], _pareResto=[], _pareCtx={}, _pareAnulado=0;
+// lançamentos recorrentes do Pareto: sem NR / a mão E sem os grupos de pedido que se anulam.
+// Grupos com o MESMO "Texto do pedido" cuja soma ~zera são reclassificações/estornos (ex.: SWILE
+// reclassificada em janeiro) — o par positivo+negativo sai INTEIRO, senão o positivo vira barra falsa
+// (os textos de material diferem entre o lançamento e o estorno, então a chave do gráfico não anula).
+function pareRows(g,loc){
+  let rows=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr);
+  _pareAnulado=0;
+  const varre=key=>{                     // remove grupos cuja soma ~zera (tolerância 1% do bruto do grupo)
+    const G={};
+    rows.forEach(d=>{ const p=key(d); if(!p) return; const x=G[p]||(G[p]={net:0,abs:0}); x.net+=d.valor; x.abs+=Math.abs(d.valor); });
+    const mortos=new Set(Object.keys(G).filter(p=>G[p].abs>1&&Math.abs(G[p].net)<=Math.max(1,G[p].abs*0.01)));
+    rows=rows.filter(d=>{ const p=key(d);
+      if(p&&mortos.has(p)){ if(d.valor>0)_pareAnulado+=d.valor; return false; } return true; });
+  };
+  varre(d=>norm(d.ped||''));     // 1º passe: pares exatos lançamento × estorno (mesmo Texto do pedido)
+  varre(d=>norm(d.descr||''));   // 2º passe: sobras que zeram dentro do MESMO fornecedor (o texto do
+                                 // pedido do estorno às vezes vem digitado diferente — caso SWILE)
+  return rows;
+}
 function renderPareto2(){
   if(!DADOS.length) return;
   const g=document.getElementById('pareGrupo').value;const loc=document.getElementById('pareLoc').value;const dim=document.getElementById('pareDim').value;
   _pareCtx={g,loc,dim};
   // Pareto = concentração RECORRENTE: lançamentos a mão e NR ficam de fora (os pares se anulam e só poluem o ranking)
-  const rows=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr);
+  const rows=pareRows(g,loc);
   const agg={};rows.forEach(d=>{const k=pareKey(d,dim);agg[k]=(agg[k]||0)+d.valor;});
   Object.keys(agg).forEach(k=>{ if(Math.abs(agg[k])<1) delete agg[k]; });   // itens que zeram saem do ranking
   const totNet=Object.values(agg).reduce((s,v)=>s+v,0);                    // líquido recorrente do grupo
@@ -1617,7 +1637,7 @@ function renderPareto2(){
   const n80=cumItems.findIndex(p=>p>=80)+1;
   const temEstorno=estornos<-1;
   document.getElementById('pareKpis').innerHTML=[
-    {lbl:'Custo recorrente do grupo'+(loc?' · '+loc:''),val:BRL.format(totNet),sub:(temEstorno?'bruto '+kBRL(tot)+' · estornos '+kBRL(estornos)+' · ':'')+'sem NR / a mão'},
+    {lbl:'Custo recorrente do grupo'+(loc?' · '+loc:''),val:BRL.format(totNet),sub:(temEstorno?'bruto '+kBRL(tot)+' · estornos '+kBRL(estornos)+' · ':'')+'sem NR / a mão'+(_pareAnulado>1?' · reclassificações anuladas '+kBRL(_pareAnulado):'')},
     {lbl:'Itens p/ 80% do bruto',val:n80>0?INT.format(n80):'—',sub:'de '+INT.format(nItens)+' itens'},
     {lbl:'Maior item',val:items.length?BRL.format(items[0][1]):'—',sub:items.length?String(items[0][0]).slice(0,30):''}
   ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub" title="${String(c.sub).replace(/"/g,'')}">${c.sub}</div>`:''}</div>`).join('');
@@ -1650,7 +1670,7 @@ function abrirDrillOutros(){
   if(!_pareResto.length) return;
   const {g,loc,dim}=_pareCtx;
   const keys=new Set(_pareResto.map(x=>x.key));
-  const linhas=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr&&keys.has(pareKey(d,dim)));
+  const linhas=pareRows(g,loc).filter(d=>keys.has(pareKey(d,dim)));
   drillReal('Outros ('+_pareResto.length+' itens) · '+(GRUPO_NOME[g]||g)+(loc?' · '+loc:''),linhas);
 }
 // Excel do Pareto: aba 1 = itens do gráfico · aba 2 = TODOS os lançamentos que compõem (recorrente)
@@ -1662,14 +1682,14 @@ function exportarParetoXls(){
   let ac=0;
   const a1=[['Pareto — '+nomeG+' (recorrente: sem NR e sem lançamentos a mão)'],['Item','Custo (R$)','% do grupo','% acumulado']];
   _pareItems.concat(_pareResto).forEach(x=>{ ac+=x.val; a1.push([x.key,x.val,tot?x.val/tot:0,tot?ac/tot:0]); });
-  const rows=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr);
-  const a2=[['Mês','Localidade','Centro de custo','Conta','Classe','Fornecedor','Material/Serviço','Objeto','Item do Pareto','Valor (R$)']]
-    .concat(rows.map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',d.forn||'',d.material||'',d.objeto||'',pareKey(d,dim),d.valor]));
+  const rows=pareRows(g,loc);
+  const a2=[['Mês','Localidade','Centro de custo','Conta','Classe','Fornecedor','Material/Serviço','Texto do pedido','Objeto','Item do Pareto','Valor (R$)']]
+    .concat(rows.map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',d.forn||'',d.material||'',d.ped||'',d.objeto||'',pareKey(d,dim),d.valor]));
   baixarXlsx('Pareto_'+nomeG.replace(/[^\w]+/g,'_').slice(0,40),[{nome:'Pareto (itens)',aoa:a1},{nome:'Lançamentos (base)',aoa:a2}]);
 }
 function abrirDrill(idx){
   const it=_pareItems[idx]; if(!it) return; const {g,loc,dim}=_pareCtx;
-  const linhas=DADOS.filter(d=>catDeLinha(d)===g&&(!loc||d.loc===loc)&&!d.mao&&!d.nr&&pareKey(d,dim)===it.key).sort((a,b)=>b.valor-a.valor);   // mesmo filtro do Pareto (recorrente)
+  const linhas=pareRows(g,loc).filter(d=>pareKey(d,dim)===it.key).sort((a,b)=>b.valor-a.valor);   // mesmo filtro do Pareto (recorrente)
   const tot=linhas.reduce((s,d)=>s+d.valor,0);
   DRILL_LAST={linhas,nome:(GRUPO_NOME[g]||g)+' '+(loc?loc+' ':'')+String(it.key)};
   document.getElementById('drillTit').innerHTML=`<b>${String(it.key).slice(0,70)}</b> · ${GRUPO_NOME[g]||g}${loc?' · '+loc:''} · ${INT.format(linhas.length)} lançamentos · ${BRL.format(tot)}`;
