@@ -524,7 +524,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v70 · Correção da logo esticada no cabeçalho · 20/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v71 · Exports com nº da classe de custo + colunas de check no SG&amp;A (doc/item/referência) · 20/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -736,7 +736,8 @@ function parseSGA(aoa){
   const h=(aoa[0]||[]).map(norm);
   const ix=n=>h.findIndex(x=>x===n), ixI=n=>h.findIndex(x=>x.includes(n));
   const cMes=ix('ano/mes'), cVal=ixI('montante em moeda'), cConta=ix('conta'), cTexto=ix('texto'),
-        cRef=ixI('referencia'), cCL=ixI('centro de lucro'), cForn=ixI('fornecedor');
+        cRef=ixI('referencia'), cCL=ixI('centro de lucro'), cForn=ixI('fornecedor'),
+        cNdoc=h.findIndex(x=>/^n.{0,2}\s*documento/.test(x)), cItem=ix('item'), cCC=ixI('centro custo');   // "Nº documento" (não confundir com "Data do documento")
   const out=[];
   for(let i=1;i<aoa.length;i++){ const r=aoa[i]||[];
     const vm=r[cMes], v=r[cVal];
@@ -750,6 +751,7 @@ function parseSGA(aoa){
     const cl=String(r[cCL]||'');
     out.push({mes,conta:String(r[cConta]||''),texto:String(r[cTexto]||'').slice(0,80),forn:String(r[cForn]||'').slice(0,40),
       loc:/amz|manaus/i.test(cl)?'Manaus':'Rio de Janeiro',   // SG&A só tem estas 2 localizações
+      ndoc:String(r[cNdoc]??'').slice(0,20),item:String(r[cItem]??'').slice(0,10),ref:String(r[cRef]??'').slice(0,40),cc:String(r[cCC]??'').slice(0,20),   // p/ checks de duplicidade (doc SAP + item)
       nr:blob.includes('nao recorrente'),mao:blob.includes('lancado a mao'),valor:v});
   }
   return out;
@@ -1230,8 +1232,8 @@ function exportarBases(){
   if(!DADOS.length&&!ORCAMENTO.length){ alert('Nenhuma base carregada.'); return; }
   const abas=[];
   if(DADOS.length){
-    const h=['Mês','Localidade','Centro de custo','Classe de custo','Natureza','Categoria','Obs','Fornecedor','Material/Objeto','Origem','Valor (R$)'];
-    const rows=DADOS.map(d=>[d.mes,d.loc,d.centro||'',d.classe||'',natDe(d)==='fixo'?'Fixo':'Variável',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.forn||'',(d.material||d.objeto||''),d.origem||'',d.valor]);
+    const h=['Mês','Localidade','Centro de custo','Classe (cód)','Classe de custo','Natureza','Categoria','Obs','Fornecedor','Material/Objeto','Origem','Valor (R$)'];
+    const rows=DADOS.map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',natDe(d)==='fixo'?'Fixo':'Variável',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.forn||'',(d.material||d.objeto||''),d.origem||'',d.valor]);
     abas.push({nome:'Realizado (KSB1)',aoa:[h,...rows]});
   }
   if(ORCAMENTO.length){
@@ -1240,8 +1242,8 @@ function exportarBases(){
     abas.push({nome:'Orçamento',aoa:[h,...rows]});
   }
   if(SGA.length){
-    const h=['Mês','Localidade','Conta','Texto','Fornecedor','Obs','Valor (R$)'];
-    abas.push({nome:'SG&A (real)',aoa:[h,...SGA.map(d=>[d.mes,d.loc,d.conta,d.texto,d.forn,d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.valor])]});
+    const h=['Mês','Localidade','Conta','Texto','Fornecedor','Nº documento','Item','Referência','Centro de custo','Obs','Valor (R$)'];
+    abas.push({nome:'SG&A (real)',aoa:[h,...SGA.map(d=>[d.mes,d.loc,d.conta,d.texto,d.forn,d.ndoc||'',d.item||'',d.ref||'',d.cc||'',d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.valor])]});
   }
   baixarXlsx('bases_dashboard_fpea',abas);
 }
@@ -2091,8 +2093,8 @@ function exportarSgaAbXls(){
   const a1=[['SG&A — abertura por conta'+(loc?' · '+loc:'')+' · '+(meses[0]||'')+'–'+(meses[meses.length-1]||'')],
     ['Conta','Descrição','Orçado (período)','Realizado','Δ R$','Δ %']].concat(
     rows.map(x=>[x.cod,x.nome,x.orc,x.real,x.real-x.orc,x.orc?(x.real-x.orc)/x.orc:'']));
-  const a2=[['Mês','Localização','Conta','Texto','Fornecedor','Valor (R$)']].concat(
-    SGA.filter(d=>!loc||d.loc===loc).map(d=>[d.mes,d.loc,d.conta,d.texto,d.forn,d.valor]));
+  const a2=[['Mês','Localização','Conta','Texto','Fornecedor','Nº documento','Item','Referência','Centro de custo','Valor (R$)']].concat(
+    SGA.filter(d=>!loc||d.loc===loc).map(d=>[d.mes,d.loc,d.conta,d.texto,d.forn,d.ndoc||'',d.item||'',d.ref||'',d.cc||'',d.valor]));
   baixarXlsx('SGA_abertura'+(loc?'_'+loc.replace(/\s+/g,'_'):''),[{nome:'Por conta',aoa:a1},{nome:'Lançamentos (base)',aoa:a2}]);
 }
 function abrirDrillBloco(b){
