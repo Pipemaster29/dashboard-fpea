@@ -524,7 +524,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v71 · Exports com nº da classe de custo + colunas de check no SG&amp;A (doc/item/referência) · 20/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v72 · Excel de Pessoal e Blocos agora com a base de lançamentos que compõe a análise · 20/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1978,7 +1978,7 @@ function renderPessoalAb(loc,mesesReal){
     const x=ent(o.classeCod||'?'); x.orc+=orcVal(o); if(o.classeNome) x.nome=o.classeNome; });
   const rows=Object.values(A).filter(x=>Math.abs(x.real)>0.005||Math.abs(x.orc)>0.005).sort((a,b)=>Math.abs(b.real)-Math.abs(a.real));
   rows.forEach(x=>{ if(x.cod==='?') x.nome=x.nome||'(sem conta na folha do orçamento)'; });
-  PESAB_LAST={rows,loc};
+  PESAB_LAST={rows,loc,mesesReal};
   const totR=rows.reduce((s,x)=>s+x.real,0), totO=rows.reduce((s,x)=>s+x.orc,0), dv=totR-totO;
   el.querySelector('thead').innerHTML='<tr><th class="txt">Conta</th><th class="txt">Descrição</th><th>Orçado</th><th>Realizado</th><th>Δ R$</th><th>Δ %</th><th class="txt">Farol</th></tr>';
   el.querySelector('tbody').innerHTML=rows.map(x=>{
@@ -1995,10 +1995,18 @@ function drillPesConta(cod){
 }
 function exportarPesAbXls(){
   if(!PESAB_LAST||!PESAB_LAST.rows.length){ alert('Abra a aba Custos Fixos primeiro.'); return; }
-  const {rows,loc}=PESAB_LAST;
+  const {rows,loc,mesesReal}=PESAB_LAST;
   const aoa=[['Conta','Descrição','Orçado (meses realizados)','Realizado','Δ R$','Δ %']].concat(
     rows.map(x=>[x.cod,x.nome,x.orc,x.real,x.real-x.orc,x.orc?(x.real-x.orc)/x.orc:'']));
-  baixarXlsx('Pessoal_abertura'+(loc?'_'+loc:''),[{nome:'Pessoal por conta',aoa}]);
+  // base que compõe a análise: lançamentos do realizado + linhas da folha do orçamento (mesmos filtros da tabela)
+  const lan=[['Mês','Localidade','Centro de custo','Conta','Classe de custo','Fornecedor','Material/Serviço','Obs','Origem','Valor (R$)']].concat(
+    DADOS.filter(d=>natDe(d)==='fixo'&&blocoDe(d)==='pessoal'&&(!loc||d.loc===loc))
+      .map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',d.forn||'',(d.material||d.objeto||''),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.origem||'',d.valor]));
+  const setM=new Set(mesesReal||[]);
+  const orc=[['Tipo','Mês','Região','Conta','Classe (nome)','Valor orçado (R$)']].concat(
+    ORCAMENTO.filter(o=>/fix/.test(norm(o.tipo))&&(o.bloco||blocoFixoDe(o.classeCod,o.classeNome))==='pessoal'&&(!loc||o.regiao===loc)&&(!setM.size||setM.has(o.mes)))
+      .map(o=>[o.tipo,o.mes,o.regiao,o.classeCod||'',o.classeNome||'',orcVal(o)]));
+  baixarXlsx('Pessoal_abertura'+(loc?'_'+loc:''),[{nome:'Pessoal por conta',aoa},{nome:'Lançamentos (base)',aoa:lan},{nome:'Orçado (base)',aoa:orc}]);
 }
 
 // ---------- ABA SG&A (orçado × real · Manaus + Rio de Janeiro) ----------
@@ -2123,6 +2131,10 @@ function exportarFixoXls(){
     aoa.push([],['Maiores contas','Valor (R$)']);
     Object.entries(x.contas).sort((p,q)=>Math.abs(q[1])-Math.abs(p[1])).slice(0,12).forEach(([n,v])=>aoa.push([n,v]));
     abas.push({nome:BLOCO_NOME[b].replace(/[–\/]/g,'-').slice(0,31),aoa});});
+  // base completa dos lançamentos fixos que compõem os blocos (mesmos filtros da análise)
+  abas.push({nome:'Lançamentos (base)',aoa:[['Mês','Localidade','Bloco','Centro de custo','Conta','Classe de custo','Fornecedor','Material/Serviço','Obs','Origem','Valor (R$)']].concat(
+    DADOS.filter(d=>natDe(d)==='fixo'&&(!loc||d.loc===loc))
+      .map(d=>[d.mes,d.loc,BLOCO_NOME[blocoDe(d)]||blocoDe(d)||'',d.centro||'',d.ccod||'',d.classe||'',d.forn||'',(d.material||d.objeto||''),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.origem||'',d.valor]))});
   baixarXlsx('Custos_Fixos_Blocos'+(loc?'_'+loc:''),abas);
 }
 
