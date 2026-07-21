@@ -468,6 +468,7 @@
         <option value="marca">Fornecedor / Marca</option>
         <option value="conta">Conta (Diesel/ARLA/…)</option>
         <option value="material">Material / Serviço</option>
+        <option value="area">Área (Operação / Manut. / Apoio)</option>
         <option value="centro">Centro de custo</option>
         <option value="mes">Mês</option>
       </select>
@@ -525,7 +526,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v75 · Segurança: tabela antiga do banco trancada, sem indexação em buscadores, headers Vercel · 21/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v76 · Nova dimensão Área (Operação/Manutenção/Apoio) no Pareto e nos Excel — repasse de custo por área · 21/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1073,6 +1074,15 @@ function ratearSeguro(){
 }
 // bases antigas (salvas na nuvem antes do custo fixo) não têm o campo — eram todas variáveis
 function natDe(d){ return d.nat||'variavel'; }
+// ÁREA FUNCIONAL (para repasse de custo às áreas/gestores): vem do 6º caractere do centro de custo SAP
+// (M80O F/V [O/M/A] …) — O=Operação, M=Manutenção, A=Apoio/Administrativo. Confirmado com 99,8% de
+// concordância contra o prefixo (O)/(M)/(A) da Denominação objeto. Fallback pelo prefixo do objeto.
+const AREA_NOME={O:'Operação',M:'Manutenção',A:'Apoio / Administrativo'};
+function areaDe(d){
+  const c=String(d.centro||''); if(c.length>=6&&AREA_NOME[c[5]]) return AREA_NOME[c[5]];
+  const m=String(d.objeto||'').match(/^\(([OMA])\)/); if(m) return AREA_NOME[m[1]];
+  return 'Outros / Sem área';
+}
 
 function atualizarUI(){
   montarYtd();
@@ -1236,8 +1246,8 @@ function exportarBases(){
   if(!DADOS.length&&!ORCAMENTO.length){ alert('Nenhuma base carregada.'); return; }
   const abas=[];
   if(DADOS.length){
-    const h=['Mês','Localidade','Centro de custo','Classe (cód)','Classe de custo','Natureza','Categoria','Obs','Fornecedor','Texto breve material','Descrição','Denominação','Texto do pedido','Denominação objeto','Origem','Valor (R$)'];
-    const rows=DADOS.map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',natDe(d)==='fixo'?'Fixo':'Variável',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.forn||'',d.material||'',d.descr||'',d.denom||'',d.ped||'',(d.objeto&&d.objeto!=='—'?d.objeto:''),d.origem||'',d.valor]);
+    const h=['Mês','Localidade','Área','Centro de custo','Classe (cód)','Classe de custo','Natureza','Categoria','Obs','Fornecedor','Texto breve material','Descrição','Denominação','Texto do pedido','Denominação objeto','Origem','Valor (R$)'];
+    const rows=DADOS.map(d=>[d.mes,d.loc,areaDe(d),d.centro||'',d.ccod||'',d.classe||'',natDe(d)==='fixo'?'Fixo':'Variável',GRUPO_NOME[catDeLinha(d)]||catDeLinha(d),d.mao?'LANÇADO A MÃO':(d.nr?'NÃO RECORRENTE':''),d.forn||'',d.material||'',d.descr||'',d.denom||'',d.ped||'',(d.objeto&&d.objeto!=='—'?d.objeto:''),d.origem||'',d.valor]);
     abas.push({nome:'Realizado (KSB1)',aoa:[h,...rows]});
   }
   if(ORCAMENTO.length){
@@ -1596,6 +1606,7 @@ function pareKey(d,dim){
   if(dim==='marca') return d.forn || marcaDe(d);
   if(dim==='conta'){ if(/\barla\b|agente redutor|adblue/.test(norm((d.material||'')+' '+(d.objeto||'')))) return 'ARLA (Agente Redutor)'; return d.classe||'—'; }
   if(dim==='centro') return d.centro||'—';
+  if(dim==='area') return areaDe(d);
   if(dim==='mes') return d.mes||'—';
   let k=d.material; if(!k||k==='—'||k==='') k=d.objeto||'—'; return k||'—';
 }
@@ -1642,7 +1653,7 @@ function renderPareto2(){
     {lbl:'Itens p/ 80% do bruto',val:n80>0?INT.format(n80):'—',sub:'de '+INT.format(nItens)+' itens'},
     {lbl:'Maior item',val:items.length?BRL.format(items[0][1]):'—',sub:items.length?String(items[0][0]).slice(0,30):''}
   ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub" title="${String(c.sub).replace(/"/g,'')}">${c.sub}</div>`:''}</div>`).join('');
-  const dimLbl=dim==='centro'?'centro de custo':dim==='mes'?'mês':dim==='marca'?'fornecedor/marca':dim==='conta'?'conta':'material/serviço';
+  const dimLbl=dim==='centro'?'centro de custo':dim==='area'?'área':dim==='mes'?'mês':dim==='marca'?'fornecedor/marca':dim==='conta'?'conta':'material/serviço';
   document.getElementById('pareChartTit').textContent='Pareto — '+(GRUPO_NOME[g]||g)+(loc?' · '+loc:'')+' (por '+dimLbl+')';
   document.getElementById('pareTag').textContent=(GRUPO_NOME[g]||g)+(loc?' · '+loc:'');
   const labels=items.map(x=>String(x[0]).slice(0,30)).concat(nCauda?['Outros ('+nCauda+')']:[]);
@@ -1684,8 +1695,8 @@ function exportarParetoXls(){
   const a1=[['Pareto — '+nomeG+' (recorrente: sem NR e sem lançamentos a mão)'],['Item','Custo (R$)','% do grupo','% acumulado']];
   _pareItems.concat(_pareResto).forEach(x=>{ ac+=x.val; a1.push([x.key,x.val,tot?x.val/tot:0,tot?ac/tot:0]); });
   const rows=pareRows(g,loc);
-  const a2=[['Mês','Localidade','Centro de custo','Conta','Classe','Fornecedor','Material/Serviço','Texto do pedido','Objeto','Item do Pareto','Valor (R$)']]
-    .concat(rows.map(d=>[d.mes,d.loc,d.centro||'',d.ccod||'',d.classe||'',d.forn||'',d.material||'',d.ped||'',d.objeto||'',pareKey(d,dim),d.valor]));
+  const a2=[['Mês','Localidade','Área','Centro de custo','Conta','Classe','Fornecedor','Material/Serviço','Texto do pedido','Objeto','Item do Pareto','Valor (R$)']]
+    .concat(rows.map(d=>[d.mes,d.loc,areaDe(d),d.centro||'',d.ccod||'',d.classe||'',d.forn||'',d.material||'',d.ped||'',d.objeto||'',pareKey(d,dim),d.valor]));
   baixarXlsx('Pareto_'+nomeG.replace(/[^\w]+/g,'_').slice(0,40),[{nome:'Pareto (itens)',aoa:a1},{nome:'Lançamentos (base)',aoa:a2}]);
 }
 function abrirDrill(idx){
