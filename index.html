@@ -340,7 +340,10 @@
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">DRE — Mês × YTD <span class="small">(R$ mil · igual ao quadro do CA)</span>
       <button class="btn-primary" style="margin-left:12px;padding:5px 12px" onclick="exportarDrePPT()" title="Gera um slide de PowerPoint com o quadro DRE (tabela nativa editável, paleta GNL).">📊 PPT do quadro</button>
       <button class="btn-ghost" style="margin-left:6px;padding:5px 12px" onclick="exportarDreXls()">⬇ Excel da DRE</button></h3>
-    <div class="tablewrap dreq" style="margin-bottom:20px"><table id="tabDre"><thead></thead><tbody></tbody></table></div>
+    <div class="tablewrap dreq" style="margin-bottom:20px"><table id="tabDre"><thead>
+      <tr><th class="txt" rowspan="2" style="vertical-align:middle" id="dreHdTit">DRE</th><th colspan="3" id="dreHdMes">Mês</th><th colspan="4" id="dreHdYtd">YTD</th></tr>
+      <tr><th>Orçado</th><th>Real</th><th>Δ</th><th>Orçado</th><th>Real</th><th>Δ</th><th>Δ %</th></tr>
+    </thead><tbody></tbody></table></div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Mês a mês <span class="small" id="dreVisLbl"></span></h3>
     <div class="tablewrap"><table id="tabDreMes"><thead></thead><tbody></tbody></table></div>
     </div>
@@ -532,7 +535,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v77 · SG&amp;A: não recorrentes (Atribuição) vão p/ a linha NR da EBITDA e saem das análises + Radar de anomalias mês a mês · 21/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v78 · Corrige cabeçalho "Mês —" do quadro DRE que não trocava de mês (texto fantasma da célula mesclada) · 21/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -2424,10 +2427,11 @@ function renderDre(){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
-  // QUADRO: Mês × YTD (R$ mil)
-  document.querySelector('#tabDre thead').innerHTML=
-    '<tr><th class="txt" rowspan="2" style="vertical-align:middle">DRE'+(loc?' · '+loc:'')+'</th><th colspan="3">Mês — '+mesQ+'</th><th colspan="4">YTD — '+meses[meses.length-1]+'</th></tr>'+
-    '<tr><th>Orçado</th><th>Real</th><th>Δ</th><th>Orçado</th><th>Real</th><th>Δ</th><th>Δ %</th></tr>';
+  // QUADRO: Mês × YTD (R$ mil) — cabeçalho é estrutura FIXA (célula mesclada), só o TEXTO muda,
+  // pra não deixar texto fantasma ao trocar o mês (recriar o thead inteiro às vezes não refaz o rowspan/colspan)
+  document.getElementById('dreHdTit').textContent='DRE'+(loc?' · '+loc:'');
+  document.getElementById('dreHdMes').textContent='Mês — '+mesQ;
+  document.getElementById('dreHdYtd').textContent='YTD — '+meses[meses.length-1];
   document.querySelector('#tabDre tbody').innerHTML=linhas.map((l,ix)=>{
     const eMg=l.k==='mg';
     const mo=l.f(mesQ,'o'), mr=l.f(mesQ,'r');
