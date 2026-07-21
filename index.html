@@ -416,6 +416,12 @@
         <h3>Por localização <span class="small">— Manaus × Rio de Janeiro (período)</span></h3><div class="wrap" style="height:280px"><canvas id="chSgaLoc"></canvas></div></div>
       <div class="card"><h3>Maiores desvios <span class="small">— contas mais acima do orçado no período</span></h3><div class="tablewrap" style="max-height:300px"><table id="tabSgaDesv"><thead></thead><tbody></tbody></table></div></div>
     </div>
+    <div class="card full" style="margin-bottom:18px">
+      <h3>🔎 Radar de anomalias <span class="small">— mês a mês por conta (recorrente): acha meses fora da curva e as contas que explicam</span></h3>
+      <div class="resumo" id="sgaAnomResumo" style="margin:8px 0"></div>
+      <div class="tablewrap" style="max-height:420px"><table id="tabSgaAnom"><thead></thead><tbody></tbody></table></div>
+      <div class="note">🟥 vermelho = mês bem <b>abaixo</b> da média daquela conta · 🟩 verde = bem <b>acima</b>. A média é dos meses em que a conta teve lançamento. Clique numa conta p/ ver os lançamentos. Serve p/ caçar não recorrentes escondidos, faltas de provisão ou erros de competência.</div>
+    </div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Abertura por conta <span class="small">— orçado × real · clique na conta p/ ver os lançamentos</span>
       <button class="btn-ghost" style="margin-left:12px;padding:5px 12px" onclick="exportarSgaAbXls()">⬇ Excel da abertura</button></h3>
     <div class="tablewrap" style="max-height:430px;margin-bottom:16px"><table id="tabSgaAb"><thead></thead><tbody></tbody></table></div>
@@ -526,7 +532,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v76 · Nova dimensão Área (Operação/Manutenção/Apoio) no Pareto e nos Excel — repasse de custo por área · 21/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v77 · SG&amp;A: não recorrentes (Atribuição) vão p/ a linha NR da EBITDA e saem das análises + Radar de anomalias mês a mês · 21/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -739,7 +745,7 @@ function parseSGA(aoa){
   const ix=n=>h.findIndex(x=>x===n), ixI=n=>h.findIndex(x=>x.includes(n));
   const cMes=ix('ano/mes'), cVal=ixI('montante em moeda'), cConta=ix('conta'), cTexto=ix('texto'),
         cRef=ixI('referencia'), cCL=ixI('centro de lucro'), cForn=ixI('fornecedor'),
-        cNdoc=h.findIndex(x=>/^n.{0,2}\s*documento/.test(x)), cItem=ix('item'), cCC=ixI('centro custo');   // "Nº documento" (não confundir com "Data do documento")
+        cNdoc=h.findIndex(x=>/^n.{0,2}\s*documento/.test(x)), cItem=ix('item'), cCC=ixI('centro custo'), cAtrib=ixI('atribuicao');   // "Atribuição" marca NÃO RECORRENTE na base nova
   const out=[];
   for(let i=1;i<aoa.length;i++){ const r=aoa[i]||[];
     const vm=r[cMes], v=r[cVal];
@@ -749,12 +755,13 @@ function parseSGA(aoa){
     else { const s2=String(vm||'').trim(); let m1=s2.match(/^(\d{4})[\/\-](\d{1,2})$/); if(m1) mes=m1[2].padStart(2,'0')+'/'+m1[1];
       else { m1=s2.match(/^(\d{1,2})[\/\-](\d{4})$/); if(m1) mes=m1[1].padStart(2,'0')+'/'+m1[2]; } }
     if(!mes) continue;
-    const blob=norm(String(r[cTexto]||'')+' '+String(r[cRef]||''));
+    const atrib=norm(cAtrib>=0?r[cAtrib]:'');
+    const blob=norm(String(r[cTexto]||'')+' '+String(r[cRef]||'')+' '+atrib);
     const cl=String(r[cCL]||'');
     out.push({mes,conta:String(r[cConta]||''),texto:String(r[cTexto]||'').slice(0,80),forn:String(r[cForn]||'').slice(0,40),
       loc:/amz|manaus/i.test(cl)?'Manaus':'Rio de Janeiro',   // SG&A só tem estas 2 localizações
       ndoc:String(r[cNdoc]??'').slice(0,20),item:String(r[cItem]??'').slice(0,10),ref:String(r[cRef]??'').slice(0,40),cc:String(r[cCC]??'').slice(0,20),   // p/ checks de duplicidade (doc SAP + item)
-      nr:blob.includes('nao recorrente'),mao:blob.includes('lancado a mao'),valor:v});
+      nr:atrib==='nao recorrente'||blob.includes('nao recorrente'),mao:blob.includes('lancado a mao'),valor:v});
   }
   return out;
 }
@@ -1773,7 +1780,7 @@ function renderOVR(){
   const temReal = (!!fReal && DADOS.some(fReal)) || (ehSga && SGA.length>0);   // SG&A real vem da base própria
   const rm={};
   if(temReal&&fReal) DADOS.forEach(d=>{ if(fReal(d)) rm[d.mes]=(rm[d.mes]||0)+d.valor; });
-  if(temReal&&ehSga) SGA.forEach(d=>{ rm[d.mes]=(rm[d.mes]||0)+d.valor; });
+  if(temReal&&ehSga) SGA.forEach(d=>{ if(!d.nr) rm[d.mes]=(rm[d.mes]||0)+d.valor; });   // SG&A recorrente (NR fora, igual à DRE)
   // folha orçada parece incompleta? (orçado de pessoal muito menor que o realizado)
   let avisoFolha='';
   if(/fix/.test(nt)&&/pessoal/.test(nt)&&temReal){
@@ -1818,7 +1825,7 @@ function renderOVR(){
   charts.chOVR=new Chart('chOVR',{type:'bar',data:{labels:meses,datasets:dsOVR},options:{responsive:true,maintainAspectRatio:false,
     onClick:(e,els)=>{ if(!els.length) return; const m=meses[els[0].index];
       if(dsOVR[els[0].datasetIndex].label==='Realizado'&&ehSga) drillReal('Realizado SG&A · '+m,
-        SGA.filter(d=>d.mes===m).map(d=>({mes:d.mes,loc:d.loc,centro:'',ccod:d.conta,classe:'SG&A',material:d.texto||d.forn,nr:d.nr,mao:d.mao,valor:d.valor})));
+        SGA.filter(d=>d.mes===m&&!d.nr).map(d=>({mes:d.mes,loc:d.loc,centro:'',ccod:d.conta,classe:'SG&A',material:d.texto||d.forn,nr:d.nr,mao:d.mao,valor:d.valor})));
       else if(dsOVR[els[0].datasetIndex].label==='Realizado'&&fReal) drillReal('Realizado · '+tipo+' · '+m, DADOS.filter(d=>fReal(d)&&d.mes===m));
       else drillOrcam('Orçado · '+tipo+' · '+m, ORCAMENTO.filter(o=>(!tipo||o.tipo===tipo)&&o.mes===m)); },
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
@@ -2050,7 +2057,10 @@ function renderSga(){
   const el=document.getElementById('sgaResumo'); if(!el) return;
   if(!SGA.length&&!ORCAMENTO.some(o=>/sg/.test(norm(o.tipo)))) return;
   const loc=(document.getElementById('sgaLoc')||{}).value||'';
-  const R=SGA.filter(d=>!loc||d.loc===loc);
+  const RtudoLoc=SGA.filter(d=>!loc||d.loc===loc);
+  const R=RtudoLoc.filter(d=>!d.nr);                 // análise = SÓ recorrente (NR tratado à parte, como nos custos)
+  const Rnr=RtudoLoc.filter(d=>d.nr);                // não recorrentes → linha própria da EBITDA, fora das análises
+  const nrTot=Rnr.reduce((s,d)=>s+d.valor,0);
   const Otodos=ORCAMENTO.filter(o=>/sg/.test(norm(o.tipo)));
   const O=Otodos.filter(o=>!loc||o.regiao===loc);
   const temReal=R.length>0;
@@ -2065,7 +2075,7 @@ function renderSga(){
   const orcAno=O.reduce((s,o)=>s+o.valor,0);
   document.getElementById('sgaTag').textContent=(loc||'Manaus + RJ')+' · '+(meses[0]||'—')+'–'+(meses[meses.length-1]||'—');
   document.getElementById('sgaResumo').innerHTML=temReal
-    ?`📌 <b>SG&A${loc?' · '+loc:''}</b> (${meses[0]}–${meses[meses.length-1]}): realizado <b>${BRL.format(totR)}</b> vs orçado <b>${BRL.format(totO)}</b> (<b>${PCT(dp)}</b> ${dv>0?'acima':'abaixo'}). Do orçamento do ano (<b>${BRL.format(orcAno)}</b>), já foram consumidos <b>${orcAno?(totR/orcAno*100).toFixed(0):'—'}%</b>.`
+    ?`📌 <b>SG&A${loc?' · '+loc:''}</b> (${meses[0]}–${meses[meses.length-1]}): realizado recorrente <b>${BRL.format(totR)}</b> vs orçado <b>${BRL.format(totO)}</b> (<b>${PCT(dp)}</b> ${dv>0?'acima':'abaixo'}). Do orçamento do ano (<b>${BRL.format(orcAno)}</b>), já foram consumidos <b>${orcAno?(totR/orcAno*100).toFixed(0):'—'}%</b>.`+(Math.abs(nrTot)>1?` <span class="small">· ${INT.format(Rnr.length)} lançamentos <b>não recorrentes</b> (${kBRL(nrTot)}) foram separados p/ a linha (+/−) Não Recorrente da EBITDA e estão fora desta análise.</span>`:'')
     :`📌 Ainda sem base de SG&A realizado — mostrando só o orçado (<b>${BRL.format(orcAno)}</b> no ano). Carregue a base SGA_Real para comparar.`;
   const kpis=[
     {lbl:'Orçado (período)',val:BRL.format(totO)},
@@ -2091,13 +2101,13 @@ function renderSga(){
   destroy('chSgaLoc');
   const locs=['Manaus','Rio de Janeiro'];
   const locOrc=locs.map(l2=>Otodos.filter(o=>o.regiao===l2&&setM.has(o.mes)).reduce((s,o)=>s+o.valor,0));
-  const locReal=locs.map(l2=>SGA.filter(d=>d.loc===l2&&setM.has(d.mes)).reduce((s,d)=>s+d.valor,0));
+  const locReal=locs.map(l2=>SGA.filter(d=>d.loc===l2&&setM.has(d.mes)&&!d.nr).reduce((s,d)=>s+d.valor,0));
   charts.chSgaLoc=new Chart('chSgaLoc',{type:'bar',data:{labels:locs,datasets:[
     {label:'Orçado',data:locOrc,backgroundColor:'#FCB316',datalabels:{anchor:'end',align:'top',color:'#FCB316',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}},
     {label:'Realizado',data:locReal,backgroundColor:'#00A0A8',datalabels:{anchor:'end',align:'top',color:'#e2e8f0',font:{weight:'700',size:10},formatter:v=>fmtMil(v)}}
   ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},
     onClick:(e,els)=>{ if(!els.length) return; const l2=locs[els[0].index];
-      if(els[0].datasetIndex===1) drillReal('SG&A realizado · '+l2,SGA.filter(d=>d.loc===l2&&setM.has(d.mes)).map(sgaDrillMap));
+      if(els[0].datasetIndex===1) drillReal('SG&A realizado · '+l2,SGA.filter(d=>d.loc===l2&&setM.has(d.mes)&&!d.nr).map(sgaDrillMap));
       else drillOrcam('SG&A orçado · '+l2,Otodos.filter(o=>o.regiao===l2&&setM.has(o.mes))); },
     plugins:{legend:{labels:{color:'#cbd5e1'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
     scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
@@ -2123,10 +2133,55 @@ function renderSga(){
     const d=x.real-x.orc;
     return `<tr style="cursor:pointer" onclick="drillSgaConta('${x.cod}')"><td class="txt" title="${(x.nome||x.cod).replace(/"/g,'')}">🔍 ${(x.nome||x.cod).slice(0,34)}</td><td class="pos">+${BRL.format(d)}</td><td class="pos">${PCT(d/x.orc*100)}</td></tr>`;
   }).join(''):'<tr><td class="txt" colspan="3">✅ Nenhuma conta acima do orçado no período.</td></tr>';
+  renderSgaAnomalias(R,meses,A);
+}
+// Radar de anomalias: acha meses fora da curva e as contas que os explicam (recorrente).
+function renderSgaAnomalias(R,meses,A){
+  const th=document.querySelector('#tabSgaAnom thead'), tb=document.querySelector('#tabSgaAnom tbody'),
+        res=document.getElementById('sgaAnomResumo');
+  if(!R.length||meses.length<2){ if(th)th.innerHTML=''; if(tb)tb.innerHTML=''; if(res)res.innerHTML='Carregue o SG&A realizado (2+ meses) para o radar.'; return; }
+  // matriz conta × mês
+  const M={};   // cod -> {nome, mes->valor}
+  R.forEach(d=>{ const k=d.conta||'?'; const o=M[k]||(M[k]={cod:k,nome:(A&&A[k]&&A[k].nome)||'',m:{}}); o.m[d.mes]=(o.m[d.mes]||0)+d.valor; });
+  // total por mês e média dos demais meses (para achar o mês fora da curva)
+  const totM={}; meses.forEach(m=>totM[m]=R.filter(d=>d.mes===m).reduce((s,d)=>s+d.valor,0));
+  const totGeral=meses.reduce((s,m)=>s+totM[m],0), mediaMes=totGeral/meses.length;
+  // mês foco = o que mais desvia (em módulo) da média dos OUTROS meses
+  let foco=meses[0], focoDesv=0;
+  meses.forEach(m=>{ const outros=meses.filter(x=>x!==m); const med=outros.reduce((s,x)=>s+totM[x],0)/outros.length; const dv=totM[m]-med; if(Math.abs(dv)>Math.abs(focoDesv)){ focoDesv=dv; foco=m; } });
+  const medFocoOutros=meses.filter(x=>x!==foco).reduce((s,x)=>s+totM[x],0)/(meses.length-1);
+  // anomalias por conta-mês: desvio da MÉDIA da própria conta (nos meses ativos), material (>R$ 5k)
+  const anom=[];
+  Object.values(M).forEach(o=>{ const ativos=meses.filter(m=>Math.abs(o.m[m]||0)>0.005);
+    if(ativos.length<2) return; const med=ativos.reduce((s,m)=>s+o.m[m],0)/ativos.length;
+    const regular=ativos.length>=meses.length-1;   // lança em quase todo mês (aí um mês zerado É anomalia)
+    meses.forEach(m=>{ const v=o.m[m]||0; const dv=v-med;
+      const material=Math.abs(dv)>=5000&&Math.abs(med)>0.005&&Math.abs(dv)/Math.abs(med)>=0.4;
+      if(!material) return;
+      if(Math.abs(v)<0.005&&!regular) return;   // conta esporádica sem lançamento no mês não é anomalia (é só o padrão dela)
+      anom.push({cod:o.cod,nome:o.nome,mes:m,v,med,dv,pct:dv/Math.abs(med)}); }); });
+  anom.sort((a,b)=>Math.abs(b.dv)-Math.abs(a.dv));
+  // headline: por que o mês foco desviou — contas que mais contribuíram no mesmo sentido
+  const driversFoco=anom.filter(a=>a.mes===foco&&Math.sign(a.dv)===Math.sign(focoDesv)).slice(0,4);
+  const dir=focoDesv<0?'ABAIXO':'ACIMA';
+  // faixa com o desvio de CADA mês vs a média geral (verde acima, vermelho abaixo) — para ver ex. maio baixo
+  const faixa=meses.map(m=>{ const dv=totM[m]-mediaMes; const forte=Math.abs(dv)>=mediaMes*0.12;
+    const cor=Math.abs(dv)<mediaMes*0.05?'var(--muted)':(dv<0?'var(--bad)':'var(--good)');
+    return `<span title="${BRL.format(totM[m])} · ${(dv>=0?'+':'')+BRL.format(dv)} vs média" style="color:${cor};font-weight:${forte?'700':'400'}">${mesCurto(m)} ${kBRL(totM[m])}${forte?(dv<0?' ▼':' ▲'):''}</span>`;
+  }).join(' &nbsp;·&nbsp; ');
+  res.innerHTML=`📉 <b>${mesCurto(foco)}/${foco.slice(3)}</b> foi o mês mais fora da curva: <b>${BRL.format(totM[foco])}</b> vs média dos outros meses <b>${BRL.format(medFocoOutros)}</b> (<b>${kBRL(focoDesv)}</b> ${dir}).`+
+    (driversFoco.length?` Puxaram para ${focoDesv<0?'baixo':'cima'}: `+driversFoco.map(a=>`<b>${(a.nome||a.cod).slice(0,26)}</b> (${kBRL(a.dv)})`).join(' · ')+'.':' Nenhuma conta isolada explica — foi difuso.')+
+    (anom.length?` <span class="small">${anom.length} anomalia(s) conta-mês detectada(s) abaixo.</span>`:'')+
+    `<div style="margin-top:8px;font-size:12px">Cada mês vs média (${kBRL(mediaMes)}): ${faixa}</div>`;
+  th.innerHTML='<tr><th class="txt">Conta</th><th class="txt">Mês</th><th>Valor</th><th>Média da conta</th><th>Δ vs média</th><th>Δ %</th><th class="txt">Sinal</th></tr>';
+  tb.innerHTML=anom.slice(0,25).map(a=>{
+    const cls=a.dv<0?'neg':'pos', ico=a.dv<0?'🟥 queda':'🟩 pico';
+    return `<tr style="cursor:pointer" onclick="drillSgaConta('${a.cod}')"><td class="txt" title="${(a.nome||a.cod).replace(/"/g,'')}">🔍 ${(a.nome||a.cod).slice(0,30)} <span class="small">${a.cod}</span></td><td class="txt">${mesCurto(a.mes)}/${a.mes.slice(3)}</td><td>${BRL.format(a.v)}</td><td>${BRL.format(a.med)}</td><td class="${cls}">${(a.dv>=0?'+':'')+BRL.format(a.dv)}</td><td class="${cls}">${PCT(a.pct*100)}</td><td class="txt">${ico}</td></tr>`;
+  }).join('')||'<tr><td class="txt" colspan="7">✅ Nenhuma conta desviou fortemente da própria média no período.</td></tr>';
 }
 function drillSgaConta(cod){
   const loc=(document.getElementById('sgaLoc')||{}).value||'';
-  const linhas=SGA.filter(d=>(d.conta||'?')===cod&&(!loc||d.loc===loc)).map(sgaDrillMap);
+  const linhas=SGA.filter(d=>(d.conta||'?')===cod&&(!loc||d.loc===loc)&&!d.nr).map(sgaDrillMap);   // recorrente (bate com a análise)
   drillReal('SG&A · conta '+cod+(loc?' · '+loc:''),linhas);
 }
 function exportarSgaAbXls(){
@@ -2135,8 +2190,8 @@ function exportarSgaAbXls(){
   const a1=[['SG&A — abertura por conta'+(loc?' · '+loc:'')+' · '+(meses[0]||'')+'–'+(meses[meses.length-1]||'')],
     ['Conta','Descrição','Orçado (período)','Realizado','Δ R$','Δ %']].concat(
     rows.map(x=>[x.cod,x.nome,x.orc,x.real,x.real-x.orc,x.orc?(x.real-x.orc)/x.orc:'']));
-  const a2=[['Mês','Localização','Conta','Texto','Fornecedor','Nº documento','Item','Referência','Centro de custo','Valor (R$)']].concat(
-    SGA.filter(d=>!loc||d.loc===loc).map(d=>[d.mes,d.loc,d.conta,d.texto,d.forn,d.ndoc||'',d.item||'',d.ref||'',d.cc||'',d.valor]));
+  const a2=[['Mês','Localização','Conta','Texto','Fornecedor','Nº documento','Item','Referência','Centro de custo','Obs','Valor (R$)']].concat(
+    SGA.filter(d=>!loc||d.loc===loc).map(d=>[d.mes,d.loc,d.conta,d.texto,d.forn,d.ndoc||'',d.item||'',d.ref||'',d.cc||'',d.nr?'NÃO RECORRENTE':'',d.valor]));
   baixarXlsx('SGA_abertura'+(loc?'_'+loc.replace(/\s+/g,'_'):''),[{nome:'Por conta',aoa:a1},{nome:'Lançamentos (base)',aoa:a2}]);
 }
 function abrirDrillBloco(b){
@@ -2285,10 +2340,12 @@ function dreDados(loc){
     if(d.nr&&!d.mao) add('cNR',d.mes,'r',d.valor);
     if(natDe(d)==='fixo') add(catDeLinha(d)==='pessoal'?'cfPes':'cfOM',d.mes,'r',d.valor);
     else add('cv',d.mes,'r',d.valor); });
-  // SG&A REALIZADO (base própria) — corporativo (Manaus + Rio de Janeiro): entra apenas na visão GERAL
+  // SG&A REALIZADO (base própria) — corporativo (Manaus + Rio de Janeiro): entra apenas na visão GERAL.
+  // Os NÃO RECORRENTES (marcados na Atribuição) saem da linha do SG&A e vão para a linha (+/−) Não
+  // Recorrente (via cNR), igual aos custos NR — assim o SG&A das análises mostra só o recorrente.
   SGA.forEach(d=>{ if(loc) return; if(!setM.has(d.mes)) return;
-    add('sga',d.mes,'r',d.valor);
-    if(d.nr&&!d.mao) add('cNR',d.mes,'r',d.valor); });
+    if(d.nr&&!d.mao) add('cNR',d.mes,'r',d.valor);   // NR → linha própria
+    else add('sga',d.mes,'r',d.valor); });           // recorrente → linha do SG&A
   ORCAMENTO.forEach(o=>{ if(!setM.has(o.mes)) return; const t=norm(o.tipo);
     if(/sg/.test(t)){ if(!loc) add('sga',o.mes,'o',orcVal(o)); return; }   // SG&A corporativo (Manaus+RJ): só no Geral
     if(loc&&o.regiao!==loc) return;
@@ -2630,6 +2687,8 @@ function renderCheckup(){
   const cvDre=Y('cv','r'), cfDre=Y('cfPes','r')+Y('cfOM','r'), cNR=Y('cNR','r');
   const recRec=Y('recF','r')+Y('recV','r'), recNR=Y('recNR','r');
   const recTudo=s(RECEITA);
+  const setMdd=new Set(dd.meses);
+  const sgaNR=s(SGA.filter(d=>setMdd.has(d.mes)&&d.nr&&!d.mao));   // SG&A não recorrente também vai para a linha (+/−) NR
   const ok=(a,b)=>Math.abs(a-b)<=1;
   const chip=b=>b?'<span style="color:var(--good);font-weight:700">✓ bate</span>':'<span style="color:var(--bad);font-weight:700">✗ NÃO BATE</span>';
   const chipZero=v=>Math.abs(v)<=1?chip(true):'<span style="color:var(--warn);font-weight:700">⚠ sobra '+fmtMil(v)+'</span>';
@@ -2643,13 +2702,13 @@ function renderCheckup(){
     ['&nbsp;&nbsp;a mão + NR (ideal = 0 — se sobrar, veja os alertas)',dV.mao+dV.nr,'',chipZero(dV.mao+dV.nr)],
     ['Custos Fixos — valor cheio (Custos Fixos / Execução) = linha "(−) Custos Fixos" da DRE',dF.tudo,cfDre,chip(ok(dF.tudo,cfDre))],
     ['&nbsp;&nbsp;a mão + NR dentro do fixo (ideal = 0)',dF.mao+dF.nr,'',chipZero(dF.mao+dF.nr)],
-    ['Custos NR (variável + fixo) → linha (+/−) NR da DRE (custos)',dV.nr+dF.nr,cNR,chip(ok(dV.nr+dF.nr,cNR))],
+    ['Custos NR (variável + fixo'+(Math.abs(sgaNR)>1?' + SG&A':'')+') → linha (+/−) NR da DRE',dV.nr+dF.nr+sgaNR,cNR,chip(ok(dV.nr+dF.nr+sgaNR,cNR))],
     ['Receita — tudo (base) = DRE (bruta recorrente + receita NR)',recTudo,recRec+recNR,chip(ok(recTudo,recRec+recNR))],
     ['EBITDA Ajustado + linha (+/−) NR = EBITDA',ajY+nrY,ebY,chip(ok(ajY+nrY,ebY))]
   ];
-  if(SGA.length){ const setM2=new Set(dd.meses);
-    const sgaBase=s(SGA.filter(d=>setM2.has(d.mes))), sgaDre=Y('sga','r');
-    linhas.splice(8,0,['SG&A — realizado (base SG&A) = linha "(−) SG&A" da DRE',sgaBase,sgaDre,chip(ok(sgaBase,sgaDre))]); }
+  if(SGA.length){
+    const sgaBase=s(SGA.filter(d=>setMdd.has(d.mes)&&!d.nr)), sgaDre=Y('sga','r');
+    linhas.splice(8,0,['SG&A recorrente (base SG&A, sem NR) = linha "(−) SG&A" da DRE',sgaBase,sgaDre,chip(ok(sgaBase,sgaDre))]); }
   // cascata × DRE: o total da cascata (degraus por categoria + degrau NR) tem que fechar com a linha da DRE,
   // e a soma das cascatas por operação (AM + MA) tem que dar o Geral — no real, no orçado e na diferença
   const wfV=wfDados('','variavel'), wfF=wfDados('','fixo');
