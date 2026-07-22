@@ -581,7 +581,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v83 · Consumo: gráfico e tabela clicáveis — abre os lançamentos de combustível do mês (soma + Excel) · 22/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v84 · Consumo: coluna de litros consumidos no mês (custo ÷ R$/L) · 22/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1508,33 +1508,37 @@ function renderOps(){ if(!DADOS.length) return; renderKmTable(); renderOpsCalc()
 // ---------- CONSUMO DE COMBUSTÍVEL (km/L e L/km a partir do R$/km e do R$/L informado) ----------
 const fmtKmL=v=>v.toFixed(2).replace('.',',')+' km/L';
 const fmtLkm=v=>v.toFixed(3).replace('.',',')+' L/km';
+const fmtLit=v=>INT.format(Math.round(v))+' L';
 function consumoCustoComb(){ // custo de combustível real por loc|mes (mesma base da Página KPI)
   const cost={}; DADOS.forEach(d=>{ if(catDeLinha(d)==='combustivel'){ const k=d.loc+'|'+d.mes; cost[k]=(cost[k]||0)+d.valor; } }); return cost; }
 function consumoCalc(loc,mes,cost){
+  const custo=cost[loc+'|'+mes]||0;           // custo total de combustível no mês
   const km=kmRealDe(loc,mes,'combustivel');
-  const rkm=km?(cost[loc+'|'+mes]||0)/km:0;   // R$/km (real) do combustível
+  const rkm=km?custo/km:0;                     // R$/km (real) do combustível
   const rl=kmGet(loc,mes,'rl');               // R$/L informado
   const kmL=(rkm>0&&rl>0)?rl/rkm:null;        // km/L = (R$/L) ÷ (R$/km)
   const Lkm=(rkm>0&&rl>0)?rkm/rl:null;        // L/km = (R$/km) ÷ (R$/L)
-  return {rkm,rl,kmL,Lkm,km}; }
+  const litros=(rl>0&&custo>0)?custo/rl:null; // litros consumidos = custo ÷ (R$/L)
+  return {rkm,rl,kmL,Lkm,km,custo,litros}; }
 function drillConsumo(loc,mes){ drillReal('⛽ Combustível · '+loc+' · '+mes+' · base do R$/km', DADOS.filter(d=>catDeLinha(d)==='combustivel'&&d.loc===loc&&d.mes===mes)); }
 function setRL(loc,mes,val){ const k=loc+'|'+mes; kmGrid[k]=kmGrid[k]||{km:0,kmOrc:0}; kmGrid[k].rl=num(val); saveKm(); atualizaConsumoLinha(loc,mes); renderConsumoCharts(); }
 function atualizaConsumoLinha(loc,mes){ const c=consumoCalc(loc,mes,consumoCustoComb()); const sfx=(loc==='Amazonas'?'AM':'MA')+'_'+mes.replace('/','-');
-  const a=document.getElementById('cs_kmL_'+sfx), b=document.getElementById('cs_Lkm_'+sfx);
-  if(a)a.textContent=c.kmL!=null?fmtKmL(c.kmL):'—'; if(b)b.textContent=c.Lkm!=null?fmtLkm(c.Lkm):'—'; }
+  const a=document.getElementById('cs_kmL_'+sfx), b=document.getElementById('cs_Lkm_'+sfx), l=document.getElementById('cs_lit_'+sfx);
+  if(a)a.textContent=c.kmL!=null?fmtKmL(c.kmL):'—'; if(b)b.textContent=c.Lkm!=null?fmtLkm(c.Lkm):'—'; if(l)l.textContent=c.litros!=null?fmtLit(c.litros):'—'; }
 function renderConsumo(){
   const box=document.getElementById('tabConsumo'); if(!box) return;
   if(!DADOS.length){ box.querySelector('thead').innerHTML=''; box.querySelector('tbody').innerHTML=''; return; }
   const meses=opsMeses(), cost=consumoCustoComb();
   box.querySelector('thead').innerHTML='<tr><th class="txt">Mês</th>'+
-    ['Amazonas','Maranhão'].map(l=>`<th>${l} · R$/km</th><th>${l} · R$/L <span class="small">(preço pago)</span></th><th>${l} · km/L</th><th>${l} · L/km</th>`).join('')+'</tr>';
+    ['Amazonas','Maranhão'].map(l=>`<th>${l} · R$/km</th><th>${l} · R$/L <span class="small">(preço pago)</span></th><th>${l} · km/L</th><th>${l} · L/km</th><th>${l} · L consumidos</th>`).join('')+'</tr>';
   box.querySelector('tbody').innerHTML=meses.map(m=>{
     let tds='<td class="txt">'+m+'</td>';
     ['Amazonas','Maranhão'].forEach(loc=>{ const c=consumoCalc(loc,m,cost); const sfx=(loc==='Amazonas'?'AM':'MA')+'_'+m.replace('/','-');
       tds+=`<td class="txt" ${c.rkm?`style="cursor:pointer" onclick="drillConsumo('${loc}','${m}')" title="clique p/ ver os lançamentos e exportar"`:''}>${c.rkm?'🔍 '+BRL.format(c.rkm)+'<span class="small">/km</span>':'—'}</td>`+
         `<td><input type="text" inputmode="decimal" value="${kmGet(loc,m,'rl')||''}" placeholder="R$/L" aria-label="Preço R$/L ${loc} ${m}" style="width:82px" oninput="setRL('${loc}','${m}',this.value)"></td>`+
         `<td id="cs_kmL_${sfx}"><b>${c.kmL!=null?fmtKmL(c.kmL):'—'}</b></td>`+
-        `<td id="cs_Lkm_${sfx}">${c.Lkm!=null?fmtLkm(c.Lkm):'—'}</td>`; });
+        `<td id="cs_Lkm_${sfx}">${c.Lkm!=null?fmtLkm(c.Lkm):'—'}</td>`+
+        `<td id="cs_lit_${sfx}"><b>${c.litros!=null?fmtLit(c.litros):'—'}</b></td>`; });
     return '<tr>'+tds+'</tr>';
   }).join('');
   renderConsumoCharts();
