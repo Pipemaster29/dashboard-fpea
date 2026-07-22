@@ -40,6 +40,15 @@
   .btn-ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
   @media(hover:hover){.btn-primary:hover{background:#00b9c2;box-shadow:0 4px 14px rgba(0,160,168,.3)}.btn-ghost:hover{border-color:var(--accent);color:#fff}
     header .btn-primary:hover{background:#ffc23d;box-shadow:0 4px 14px rgba(252,179,22,.32)}}
+  /* layout BI: barra lateral + conteúdo */
+  .layout{display:flex;align-items:flex-start}
+  .sidebar{position:sticky;top:0;align-self:flex-start;flex:0 0 226px;width:226px;height:100vh;overflow-y:auto;
+    background:var(--panel);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:14px;z-index:40}
+  .sidebar.hidden{display:none!important}
+  .side-period{margin-top:auto;border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:6px}
+  .side-period label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .side-period select{width:100%;padding:8px 10px;border-color:var(--accent);border-radius:10px}
+  .content{flex:1;min-width:0;padding:24px 28px;max-width:1480px}
   main{padding:24px 28px;max-width:1480px;margin:0 auto}
   #drop{border:2px dashed var(--line);border-radius:14px;padding:44px 24px;text-align:center;background:var(--panel);transition:border-color .2s var(--ease-out),background-color .2s var(--ease-out);cursor:pointer;margin-bottom:24px}
   #drop:hover,#drop.drag{border-color:var(--accent);background:var(--panel2)}
@@ -50,15 +59,14 @@
   .ovrbox{background:transparent;border:none;border-radius:0;padding:0;margin-bottom:30px}
   .resumo{background:rgba(0,160,168,.10);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
   .resumo b{color:#fff}
-  .tabs{display:flex;gap:8px;margin:0 -28px 22px;padding:10px 28px;flex-wrap:wrap;align-items:center;
-    position:sticky;top:0;z-index:60;background:rgba(15,23,42,.82);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);border-bottom:1px solid rgba(51,65,85,.6)}
-  .ytdbox{margin-left:auto;display:flex;align-items:center;gap:8px}
-  .ytdbox label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-  .ytdbox select{min-width:150px;padding:6px 10px;border-color:var(--accent);border-radius:20px}
-  .tabbtn{background:var(--panel);color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:8px 15px;font-size:13px;font-weight:600;transition:background-color .16s var(--ease-out),color .16s var(--ease-out),border-color .16s var(--ease-out)}
-  @media(hover:hover){.tabbtn:hover{color:var(--txt);border-color:#46587a}}
-  .tabbtn:active{transform:scale(.97)}
-  .tabbtn.active{background:var(--accent);color:#04252a;border-color:var(--accent);box-shadow:0 2px 10px rgba(0,160,168,.35)}
+  .tabs{display:flex;flex-direction:column;gap:5px;align-items:stretch}
+  .tabbtn{background:transparent;color:var(--muted);border:1px solid transparent;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;
+    display:flex;align-items:center;gap:10px;text-align:left;width:100%;transition:background-color .16s var(--ease-out),color .16s var(--ease-out),border-color .16s var(--ease-out)}
+  .tabbtn .ti{font-size:15px;width:20px;text-align:center;flex:none}
+  .tabbtn .tl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  @media(hover:hover){.tabbtn:hover{color:var(--txt);background:var(--panel2)}}
+  .tabbtn:active{transform:scale(.98)}
+  .tabbtn.active{background:var(--accent);color:#04252a;border-color:var(--accent);box-shadow:0 2px 10px rgba(0,160,168,.30);font-weight:700}
   /* subnav — "páginas dentro da página" (segmented control) */
   .subnav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:4px;margin-bottom:18px;width:max-content;max-width:100%;overflow-x:auto;scrollbar-width:none}
   .subnav::-webkit-scrollbar{display:none}
@@ -86,12 +94,12 @@
   #tabKm td{padding:6px 8px}
   #tabKm input:focus{outline:none;border-color:var(--accent)}
   .delbtn{background:transparent;color:var(--bad);border:1px solid var(--line);padding:3px 9px;border-radius:6px;font-size:14px;font-weight:700}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:22px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(184px,1fr));gap:16px;margin-bottom:22px}
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;transition:border-color .18s var(--ease-out),box-shadow .18s var(--ease-out);box-shadow:0 1px 2px rgba(0,0,0,.25)}
   .kpi.glass{background:rgba(255,255,255,.04)}
   @media(hover:hover){.kpi:hover{border-color:#3f5170}}
   .kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
-  .kpi .val{font-size:22px;font-weight:700;overflow-wrap:anywhere}
+  .kpi .val{font-size:clamp(17px,1.5vw,22px);font-weight:700;white-space:nowrap}
   .kpi .sub{font-size:12px;margin-top:5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:24px}
   .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;transition:border-color .18s var(--ease-out);min-width:0;box-shadow:0 1px 2px rgba(0,0,0,.25)}
@@ -189,9 +197,18 @@
     .kpi .val{font-size:18px}
     .kpi .sub{white-space:normal}
     select{min-width:120px}
-    .ytdbox{margin-left:0;width:100%;justify-content:flex-start}
-    .tabbtn{padding:8px 12px;font-size:12.5px}
-    .tabs{margin:0 -12px 16px;padding:8px 12px}
+    .content{padding:14px 12px}
+    /* no celular a barra vira uma faixa horizontal rolável no topo; layout vira bloco simples
+       (sem flex) pra o conteúdo respeitar a largura da tela e as tabelas rolarem no .tablewrap */
+    .layout{display:block}
+    .sidebar{position:static;flex:none;width:100%;min-width:0;max-width:100%;box-sizing:border-box;height:auto;overflow:visible;border-right:none;
+      border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column;gap:8px}
+    .tabs{flex-direction:row;overflow-x:auto;flex-wrap:nowrap;gap:6px;min-width:0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .tabs::-webkit-scrollbar{display:none}
+    .tabbtn{width:auto;flex:none;padding:8px 12px;font-size:12.5px;border:1px solid var(--line);border-radius:20px}
+    .tabbtn .tl{max-width:none}
+    .side-period{margin-top:0;border-top:none;padding-top:0;flex-direction:row;align-items:center;gap:8px}
+    .side-period select{width:auto;min-width:150px}
     .subnav button{padding:7px 12px;font-size:12.5px}
     .sectitle{flex-wrap:wrap}
     th,td{padding:7px 8px;font-size:12px}
@@ -214,27 +231,30 @@
   </div>
 </header>
 
-<main>
+<div class="layout">
+  <!-- BARRA LATERAL DE NAVEGAÇÃO (estilo BI) -->
+  <aside class="sidebar hidden" id="sidebar">
+    <nav id="tabs" class="tabs" aria-label="Seções do dashboard">
+      <button class="tabbtn" data-t="ovr" onclick="showTab('ovr')"><span class="ti" aria-hidden="true">🎯</span><span class="tl">Orçado vs Real</span></button>
+      <button class="tabbtn" data-t="rec" onclick="showTab('rec')"><span class="ti" aria-hidden="true">💰</span><span class="tl">Receita & Viagens</span></button>
+      <button class="tabbtn" data-t="dre" onclick="showTab('dre')"><span class="ti" aria-hidden="true">🏦</span><span class="tl">DRE / EBITDA</span></button>
+      <button class="tabbtn" data-t="exec" onclick="showTab('exec')"><span class="ti" aria-hidden="true">📋</span><span class="tl">Execução por Área</span></button>
+      <button class="tabbtn" data-t="fixo" onclick="showTab('fixo')"><span class="ti" aria-hidden="true">🏢</span><span class="tl">Custos Fixos</span></button>
+      <button class="tabbtn" data-t="sga" onclick="showTab('sga')"><span class="ti" aria-hidden="true">💼</span><span class="tl">SG&amp;A</span></button>
+      <button class="tabbtn" data-t="ops" onclick="showTab('ops')"><span class="ti" aria-hidden="true">🚚</span><span class="tl">Operações & R$/KM</span></button>
+      <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')"><span class="ti" aria-hidden="true">🔎</span><span class="tl">Pareto & Gargalos</span></button>
+      <button class="tabbtn" data-t="dash" onclick="showTab('dash')"><span class="ti" aria-hidden="true">📈</span><span class="tl">Análise de Custos</span></button>
+    </nav>
+    <div class="side-period"><label for="ytdAte">Período</label><select id="ytdAte" onchange="aplicarPeriodo()" title="Acumulado (YTD) de janeiro até o mês escolhido, OU um mês isolado — vale para TODAS as análises, drills e exports. Na nuvem fica sempre a base completa."></select></div>
+  </aside>
+
+  <main class="content">
   <div id="drop">
     <div class="big">📊</div>
     <h2>Arraste suas planilhas aqui ou clique para selecionar</h2>
     <p><b>Realizado:</b> extrações SAP/KSB1 (serviços + materiais). &nbsp; <b>Orçado:</b> a planilha de orçamento de custos.</p>
     <p>Pode soltar todas de uma vez. Ao recarregar um arquivo, ele <b>substitui</b> a versão anterior daquela base (não soma) e <b>salva na nuvem automaticamente</b>.</p>
   </div>
-
-  <!-- ABAS DE NAVEGAÇÃO -->
-  <nav id="tabs" class="tabs hidden">
-    <button class="tabbtn" data-t="ovr" onclick="showTab('ovr')">🎯 Orçado vs Real</button>
-    <button class="tabbtn" data-t="rec" onclick="showTab('rec')">💰 Receita & Viagens</button>
-    <button class="tabbtn" data-t="dre" onclick="showTab('dre')">🏦 DRE / EBITDA</button>
-    <button class="tabbtn" data-t="exec" onclick="showTab('exec')">📋 Execução por Área</button>
-    <button class="tabbtn" data-t="fixo" onclick="showTab('fixo')">🏢 Custos Fixos (Blocos)</button>
-    <button class="tabbtn" data-t="sga" onclick="showTab('sga')">💼 SG&amp;A</button>
-    <button class="tabbtn" data-t="ops" onclick="showTab('ops')">🚚 Operações & R$/KM</button>
-    <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')">🔎 Pareto & Gargalos</button>
-    <button class="tabbtn" data-t="dash" onclick="showTab('dash')">📈 Análise de Custos</button>
-    <span class="ytdbox"><label for="ytdAte">Período</label><select id="ytdAte" onchange="aplicarPeriodo()" title="Acumulado (YTD) de janeiro até o mês escolhido, OU um mês isolado — vale para TODAS as análises, drills e exports. Na nuvem fica sempre a base completa."></select></span>
-  </nav>
 
   <!-- ORÇADO vs REAL -->
   <div id="ovr" class="ovrbox hidden">
@@ -526,7 +546,8 @@
       <div class="tablewrap"><table id="tabela"><thead></thead><tbody></tbody></table></div>
     </div>
   </div>
-</main>
+  </main>
+</div>
 
 <div id="drillModal" onclick="if(event.target===this)fecharDrill()">
   <div class="drillbox">
@@ -535,7 +556,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v78 · Corrige cabeçalho "Mês —" do quadro DRE que não trocava de mês (texto fantasma da célula mesclada) · 21/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v79 · Novo layout de BI: navegação em barra lateral (esquerda), colapsa em faixa no celular · 21/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -606,7 +627,8 @@ function applyTabs(){
   const nav=document.getElementById('tabs');
   const temDados=DADOS.length||ORCAMENTO.length||ORCKPI||ORCREC.length||RECEITA.length;
   const avail=['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash'].filter(tabHasContent);
-  nav.classList.toggle('hidden', !temDados || !avail.length);
+  const esconder=!temDados || !avail.length;
+  const sb=document.getElementById('sidebar'); if(sb) sb.classList.toggle('hidden', esconder);   // some a barra lateral inteira quando não há dados (só o #drop aparece)
   if(!avail.includes(activeTab)) activeTab=avail[0]||'ovr';
   document.querySelectorAll('#tabs .tabbtn').forEach(b=>{
     b.style.display=avail.includes(b.dataset.t)?'':'none';
