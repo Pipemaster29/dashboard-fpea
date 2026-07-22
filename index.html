@@ -569,7 +569,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v80 · Importação com pré-visualização + snapshot seguro + Check-up como trava de publicação · 21/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v81 · Controle de versão (evita sobrescrever quem publicou depois) + histórico de versões na nuvem · 22/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -3223,15 +3223,21 @@ async function pedirSenhaUpload(){
 }
 async function comSenhaUpload(fn){ const s=await pedirSenhaUpload(); if(s) fn(); }
 
+let DATASET_VERSION=0;   // versão do dataset carregado — usada no controle de concorrência (evita sobrescrever quem publicou depois)
 async function carregarDaNuvem(){
   try{
-    const {data,error}=await sb.from('dataset').select('payload,updated_at').eq('id','atual').maybeSingle();
+    // tenta ler a versão (coluna nova); se o banco ainda não tiver, cai no select sem versão
+    let {data,error}=await sb.from('dataset').select('payload,updated_at,version').eq('id','atual').maybeSingle();
+    if(error&&/column .*version|version.* does not exist/i.test(error.message||'')){
+      ({data,error}=await sb.from('dataset').select('payload,updated_at').eq('id','atual').maybeSingle());
+    }
     if(error){
       if(/relation|does not exist|schema cache|not find the table/i.test(error.message))
         document.getElementById('cloudInfo').textContent='⚠ tabela "dataset" ainda não criada no Supabase';
       else console.error('Leitura nuvem:',error);
     }
     if(data&&data.payload){
+      DATASET_VERSION=(typeof data.version==='number')?data.version:0;
       const obj=descomprimir(data.payload);
       DADOS_RAW=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null; ORCREC=obj.ORCREC||[]; RECEITA_RAW=obj.RECEITA||[]; SGA_RAW=obj.SGA||[];
       migrarDados();   // bases salvas antes dos blocos do fixo ganham bloco/categoria corretos
@@ -3252,12 +3258,28 @@ async function salvarNaNuvem(auto){
   info.innerHTML='<span class="spin"></span> salvando…';
   try{
     const payload=comprimir({DADOS:DADOS_RAW,ORCAMENTO,ORCKPI,ORCREC,RECEITA:RECEITA_RAW,SGA:SGA_RAW});   // sempre a base COMPLETA (o seletor de período é só visão)
-    const {data,error}=await sb.rpc('salvar_dataset',{p_senha:senha,p_payload:payload});   // escrita só via servidor, com senha
+    const meta={by:(localStorage.getItem('dsUser')||'').slice(0,60),rows:String(DADOS_RAW.length+RECEITA_RAW.length+SGA_RAW.length),
+      checkup:(CK_LAST&&typeof CK_LAST.falhas==='number')?(CK_LAST.falhas?('com_falhas('+CK_LAST.falhas+')'):'verde'):''};
+    // controle OTIMISTA: só grava se a versão que carreguei ainda for a atual na nuvem
+    let {data,error}=await sb.rpc('salvar_dataset_v2',{p_senha:senha,p_payload:payload,p_versao_esperada:DATASET_VERSION,p_meta:meta});
+    if(error&&/function|does not exist|schema cache|not find/i.test(error.message||'')){   // banco antigo: usa a RPC anterior
+      const r=await sb.rpc('salvar_dataset',{p_senha:senha,p_payload:payload}); data=(r.data==='ok'?{status:'ok'}:{status:r.data}); error=r.error;
+    }
     if(error){ info.textContent=''; (auto?flash('⚠️ Erro ao salvar na nuvem: '+error.message):alert('Erro ao salvar na nuvem: '+error.message)); return; }
-    if(data!=='ok'){ try{sessionStorage.removeItem('senhaUp');}catch(e){}
+    const st=data&&data.status;
+    if(st==='senha_incorreta'){ try{sessionStorage.removeItem('senhaUp');}catch(e){}
       info.textContent=''; (auto?flash('🔒 Senha incorreta — base NÃO salva na nuvem.'):alert('Senha incorreta — base NÃO salva na nuvem.')); return; }
+    if(st==='conflito'){
+      info.innerHTML='<span class="cloudbadge" style="border-color:var(--bad);color:var(--bad)">⚠️ conflito — não salvo</span>';
+      const msg='A base foi atualizada por OUTRA pessoa depois que você abriu o sistema (versão na nuvem: '+(data.versao_atual)+', a sua: '+DATASET_VERSION+').\n\nSua importação NÃO foi publicada, para não apagar o trabalho da outra pessoa.\n\nRecarregue o dashboard, confira os dados mais recentes e repita a importação.';
+      if(!auto){ if(confirm(msg+'\n\nRecarregar agora? (a importação atual em tela será perdida)')) location.reload(); }
+      else flash('⚠️ Conflito: outra pessoa atualizou a base. Sua importação NÃO foi salva — recarregue e refaça.');
+      return;
+    }
+    if(st!=='ok'){ info.textContent=''; (auto?flash('⚠️ Não salvo: '+st):alert('Não salvo: '+st)); return; }
+    if(typeof data.versao==='number') DATASET_VERSION=data.versao;
     marcarAtualizado(new Date().toISOString());
-    if(auto) flash('☁️ Base salva na nuvem automaticamente.');
+    if(auto) flash('☁️ Base salva na nuvem automaticamente'+(data.versao?' (v'+data.versao+')':'')+'.');
   }catch(e){ info.textContent=''; (auto?flash('⚠️ Erro ao salvar: '+e.message):alert('Erro ao salvar: '+e.message)); }
 }
 
@@ -3272,7 +3294,7 @@ function descomprimir(p){
   return JSON.parse(p);
 }
 function marcarAtualizado(ts){ const d=ts?new Date(ts):new Date();
-  document.getElementById('cloudInfo').innerHTML='<span class="cloudbadge">☁️ na nuvem · '+d.toLocaleString('pt-BR')+'</span>'; }
+  document.getElementById('cloudInfo').innerHTML='<span class="cloudbadge">☁️ na nuvem · '+d.toLocaleString('pt-BR')+(DATASET_VERSION?' · v'+DATASET_VERSION:'')+'</span>'; }
 
 // inicialização: carrega direto da nuvem (sem login)
 (async function(){
