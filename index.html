@@ -463,12 +463,24 @@
     </div>
     <div class="subnav">
       <button class="active" data-sp="kpi" onclick="showSub('ops','kpi')">📑 Página KPI</button>
+      <button data-sp="consumo" onclick="showSub('ops','consumo')">⛽ Consumo (combustível)</button>
       <button data-sp="km" onclick="showSub('ops','km')">✏️ KM por mês</button>
     </div>
     <div class="sp active" data-sp="kpi">
     <div class="card full" style="margin-bottom:24px"><div class="expbar"><button class="xls ppt" onclick="exportarKpiPPT()">📊 PPT</button><button class="xls png" onclick="exportarKpiPNG()">🖼️ Imagem</button></div>
       <h3>📑 Página KPI — R$/km <span class="small">— Combustível, Manutenção e Pneus × Amazonas e Maranhão (formato do slide do CA)</span></h3>
       <div class="kpipage" id="kpiPage"></div>
+    </div>
+    </div>
+    <div class="sp" data-sp="consumo">
+    <div class="card full" style="margin-bottom:18px">
+      <h3>⛽ Consumo de combustível <span class="small">— informe o preço pago (R$/L, ANP) e o app calcula km/L e L/km</span></h3>
+      <div class="grid" style="margin-top:12px">
+        <div class="card"><h4>Amazonas — km/L <span class="small">(rendimento)</span></h4><div class="wrap" style="height:240px"><canvas id="cons_AM"></canvas></div></div>
+        <div class="card"><h4>Maranhão — km/L <span class="small">(rendimento)</span></h4><div class="wrap" style="height:240px"><canvas id="cons_MA"></canvas></div></div>
+      </div>
+      <div class="tablewrap" style="margin-top:14px"><table id="tabConsumo"><thead></thead><tbody></tbody></table></div>
+      <div class="note">R$/km = custo de combustível ÷ KM (os mesmos KM da Página KPI — preencha em "KM por mês"). <b>km/L = (R$/L) ÷ (R$/km)</b> · <b>L/km = (R$/km) ÷ (R$/L)</b> — o R$ se cancela. Quanto <b>maior o km/L</b>, mais eficiente. O preço R$/L fica salvo no navegador (por mês e região).</div>
     </div>
     </div>
     <div class="sp" data-sp="km">
@@ -569,7 +581,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v81 · Controle de versão (evita sobrescrever quem publicou depois) + histórico de versões na nuvem · 22/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v82 · Nova subpágina ⛽ Consumo: informe R$/L e o app calcula km/L e L/km (a partir do R$/km) · 22/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1492,7 +1504,54 @@ function kmSemRate(){
 }
 function setKm(loc,mes,campo,val){const k=loc+'|'+mes;kmGrid[k]=kmGrid[k]||{km:0,kmOrc:0};kmGrid[k][campo]=num(val);saveKm();renderOpsCalc();}
 function opsMeses(){return uniq(DADOS.map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));}
-function renderOps(){ if(!DADOS.length) return; renderKmTable(); renderOpsCalc(); }
+function renderOps(){ if(!DADOS.length) return; renderKmTable(); renderOpsCalc(); renderConsumo(); }
+// ---------- CONSUMO DE COMBUSTÍVEL (km/L e L/km a partir do R$/km e do R$/L informado) ----------
+const fmtKmL=v=>v.toFixed(2).replace('.',',')+' km/L';
+const fmtLkm=v=>v.toFixed(3).replace('.',',')+' L/km';
+function consumoCustoComb(){ // custo de combustível real por loc|mes (mesma base da Página KPI)
+  const cost={}; DADOS.forEach(d=>{ if(catDeLinha(d)==='combustivel'){ const k=d.loc+'|'+d.mes; cost[k]=(cost[k]||0)+d.valor; } }); return cost; }
+function consumoCalc(loc,mes,cost){
+  const km=kmRealDe(loc,mes,'combustivel');
+  const rkm=km?(cost[loc+'|'+mes]||0)/km:0;   // R$/km (real) do combustível
+  const rl=kmGet(loc,mes,'rl');               // R$/L informado
+  const kmL=(rkm>0&&rl>0)?rl/rkm:null;        // km/L = (R$/L) ÷ (R$/km)
+  const Lkm=(rkm>0&&rl>0)?rkm/rl:null;        // L/km = (R$/km) ÷ (R$/L)
+  return {rkm,rl,kmL,Lkm,km}; }
+function setRL(loc,mes,val){ const k=loc+'|'+mes; kmGrid[k]=kmGrid[k]||{km:0,kmOrc:0}; kmGrid[k].rl=num(val); saveKm(); atualizaConsumoLinha(loc,mes); renderConsumoCharts(); }
+function atualizaConsumoLinha(loc,mes){ const c=consumoCalc(loc,mes,consumoCustoComb()); const sfx=(loc==='Amazonas'?'AM':'MA')+'_'+mes.replace('/','-');
+  const a=document.getElementById('cs_kmL_'+sfx), b=document.getElementById('cs_Lkm_'+sfx);
+  if(a)a.textContent=c.kmL!=null?fmtKmL(c.kmL):'—'; if(b)b.textContent=c.Lkm!=null?fmtLkm(c.Lkm):'—'; }
+function renderConsumo(){
+  const box=document.getElementById('tabConsumo'); if(!box) return;
+  if(!DADOS.length){ box.querySelector('thead').innerHTML=''; box.querySelector('tbody').innerHTML=''; return; }
+  const meses=opsMeses(), cost=consumoCustoComb();
+  box.querySelector('thead').innerHTML='<tr><th class="txt">Mês</th>'+
+    ['Amazonas','Maranhão'].map(l=>`<th>${l} · R$/km</th><th>${l} · R$/L <span class="small">(preço pago)</span></th><th>${l} · km/L</th><th>${l} · L/km</th>`).join('')+'</tr>';
+  box.querySelector('tbody').innerHTML=meses.map(m=>{
+    let tds='<td class="txt">'+m+'</td>';
+    ['Amazonas','Maranhão'].forEach(loc=>{ const c=consumoCalc(loc,m,cost); const sfx=(loc==='Amazonas'?'AM':'MA')+'_'+m.replace('/','-');
+      tds+=`<td>${c.rkm?BRL.format(c.rkm)+'<span class="small">/km</span>':'—'}</td>`+
+        `<td><input type="text" inputmode="decimal" value="${kmGet(loc,m,'rl')||''}" placeholder="R$/L" aria-label="Preço R$/L ${loc} ${m}" style="width:82px" oninput="setRL('${loc}','${m}',this.value)"></td>`+
+        `<td id="cs_kmL_${sfx}"><b>${c.kmL!=null?fmtKmL(c.kmL):'—'}</b></td>`+
+        `<td id="cs_Lkm_${sfx}">${c.Lkm!=null?fmtLkm(c.Lkm):'—'}</td>`; });
+    return '<tr>'+tds+'</tr>';
+  }).join('');
+  renderConsumoCharts();
+}
+function renderConsumoCharts(){
+  const meses=opsMeses(), cost=consumoCustoComb();
+  ['Amazonas','Maranhão'].forEach(loc=>{
+    const id='cons_'+(loc==='Amazonas'?'AM':'MA'); if(!document.getElementById(id)) return;
+    const kmL=meses.map(m=>consumoCalc(loc,m,cost).kmL);
+    const Lkm=meses.map(m=>consumoCalc(loc,m,cost).Lkm);
+    destroy(id);
+    charts[id]=new Chart(id,{type:'bar',data:{labels:meses.map(mesCurto),datasets:[
+      {label:'km/L',data:kmL,backgroundColor:'#00A0A8',datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,anchor:'end',align:'top',color:'#e2e8f0',font:{weight:'700',size:10},formatter:v=>v==null?'':v.toFixed(2).replace('.',',')}}
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const i=c.dataIndex; return kmL[i]==null?'sem R$/L ou sem KM':[fmtKmL(kmL[i]),fmtLkm(Lkm[i])];}}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>v.toFixed(1).replace('.',',')}}}}});
+  });
+}
 function renderKmTable(){
   const meses=opsMeses();
   const orcCell=(loc,m,cat)=>{ const a=kmOrcAuto(loc,m,cat);
