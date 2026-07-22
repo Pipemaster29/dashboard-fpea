@@ -166,8 +166,12 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   #flash{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-24px);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;box-shadow:0 12px 34px rgba(0,0,0,.45);z-index:2000;opacity:0;pointer-events:none;transition:opacity .24s var(--ease-out),transform .24s var(--ease-out);max-width:90vw;text-align:center}
   #flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  #drillModal{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;visibility:hidden;transition:opacity .2s var(--ease-out),background-color .2s var(--ease-out),visibility 0s linear .2s}
-  #drillModal.show{opacity:1;visibility:visible;background:rgba(0,0,0,.62);transition:opacity .2s var(--ease-out),background-color .2s var(--ease-out)}
+  #drillModal,#impModal{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;visibility:hidden;transition:opacity .2s var(--ease-out),background-color .2s var(--ease-out),visibility 0s linear .2s}
+  #drillModal.show,#impModal.show{opacity:1;visibility:visible;background:rgba(0,0,0,.62);transition:opacity .2s var(--ease-out),background-color .2s var(--ease-out)}
+  #impModal.show .drillbox{transform:scale(1)}
+  .imptab{width:100%;border-collapse:collapse}
+  .imptab td{padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
+  .imptab td.k{color:var(--muted);white-space:nowrap;width:150px;text-transform:uppercase;font-size:11px;letter-spacing:.4px}
   .drillbox{background:var(--panel);border:1px solid var(--accent2);border-radius:14px;padding:18px;width:min(1100px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.55);transform:scale(.96);transition:transform .22s var(--ease-out);overscroll-behavior:contain}
   .tablewrap{overscroll-behavior:contain}
   #drillModal.show .drillbox{transform:scale(1)}
@@ -556,7 +560,16 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v79 · Novo layout de BI: navegação em barra lateral (esquerda), colapsa em faixa no celular · 21/07</b> · Chart.js + SheetJS</footer>
+<!-- PREVIEW DE IMPORTAÇÃO (a base oficial só troca ao confirmar) -->
+<div id="impModal" onclick="if(event.target===this)cancelarImport()">
+  <div class="drillbox" style="width:min(620px,96vw)" role="dialog" aria-modal="true" aria-labelledby="impTit">
+    <div class="drillhead"><span id="impTit" style="font-weight:700"></span></div>
+    <div id="impBody" style="overflow:auto"></div>
+    <div class="drillhead" id="impFoot" style="justify-content:flex-end;margin:16px 0 0"></div>
+  </div>
+</div>
+
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v80 · Importação com pré-visualização + snapshot seguro + Check-up como trava de publicação · 21/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -710,56 +723,110 @@ drop.addEventListener('click',()=>comSenhaUpload(()=>document.getElementById('fi
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
 drop.addEventListener('drop',e=>{e.preventDefault();const fs2=[...e.dataTransfer.files];comSenhaUpload(()=>fs2.forEach(lerArquivo));});
 
-function lerArquivo(file){
+// ---------- IMPORTAÇÃO COM PREVIEW ----------
+// A base OFICIAL só é trocada quando você confirma. O arquivo é lido numa área temporária, mostro um
+// resumo (tipo, período, nº de linhas, total R$, diferença vs base atual, SHA-256), e só no Confirmar
+// a base é aplicada. Depois roda o Check-up: se uma conciliação FINANCEIRA não bater, o salvamento
+// automático é bloqueado (você decide publicar mesmo assim ou descartar e voltar à base anterior).
+let IMPORT_FILA=[], IMPORT_OCUPADO=false, IMPORT_PEND=null;
+function lerArquivo(file){ IMPORT_FILA.push(file); proxImport(); }
+function fimImport(){ IMPORT_OCUPADO=false; IMPORT_PEND=null; setTimeout(proxImport,0); }
+function proxImport(){
+  if(IMPORT_OCUPADO||!IMPORT_FILA.length) return;
+  IMPORT_OCUPADO=true; const file=IMPORT_FILA.shift();
   const r=new FileReader();
-  r.onload=ev=>{
+  r.onerror=()=>{ alert('Não consegui ler "'+file.name+'".'); fimImport(); };
+  r.onload=async ev=>{
     try{
-      const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+      const buf=ev.target.result;
+      const wb=XLSX.read(buf,{type:'array',cellDates:true});
       const ws=wb.Sheets[ escolherAba(wb) ];
       const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,cellDates:true,defval:''});
-      if(ehReceitaGNL(aoa)){
-        const novos=parseReceita(aoa);
-        if(!novos.length){ alert('Reconheci "'+file.name+'" como Receita, mas não achei valores.'); return; }
-        const antes=RECEITA_RAW.length; RECEITA_RAW=novos;
-        flash(antes?`🔄 Receita real atualizada (${INT.format(novos.length)} lançamentos).`:`➕ Receita real carregada (${INT.format(novos.length)} lançamentos).`);
-      }else if(ehSGA(aoa)){
-        const novos=parseSGA(aoa);
-        if(!novos.length){ alert('Reconheci "'+file.name+'" como SG&A realizado, mas não achei valores.'); return; }
-        const antes=SGA_RAW.length; SGA_RAW=novos;
-        flash(antes?`🔄 SG&A real atualizado (${INT.format(novos.length)} lançamentos).`:`➕ SG&A real carregado (${INT.format(novos.length)} lançamentos) — a DRE agora usa o realizado.`);
-      }else if(ehOrcReceita(aoa)){
-        const novos=parseOrcReceita(aoa);
-        if(!novos.length){ alert('Reconheci "'+file.name+'" como Orçamento de Receita, mas não achei valores.'); return; }
-        const antes=ORCREC.length; ORCREC=novos;
-        flash(antes?`🔄 Orçamento de Receita atualizado (${INT.format(novos.length)} linhas).`:`➕ Orçamento de Receita carregado (${INT.format(novos.length)} linhas).`);
-      }else if(ehOBZ(aoa)){
-        const obz=parseOBZ(aoa);
-        if(!Object.keys(obz).length){ alert('Reconheci "'+file.name+'" como Orçamento KPIs (OBZ), mas não consegui extrair o R$/km.'); return; }
-        const tinha=!!ORCKPI; ORCKPI=obz;
-        flash(`🔄 Orçado R$/km (OBZ) ${tinha?'atualizado (substituiu o anterior)':'carregado'}.`);
-      }else if(ehOrcamento(aoa)){
-        const novos=parseOrcamento(aoa);
-        if(!novos.length){ alert('Reconheci "'+file.name+'" como orçamento, mas não achei valores mensais.'); return; }
-        const antes=ORCAMENTO.length; ORCAMENTO=novos; // substitui a base de orçamento (não soma)
-        flash(antes?`🔄 Orçamento atualizado: ${INT.format(antes)} → ${INT.format(novos.length)} linhas (substituí a versão anterior).`
-                   :`➕ Orçamento carregado: ${INT.format(novos.length)} linhas.`);
-      }else{
-        const json=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
-        const novos=mapear(json,file.name);
-        if(!novos.length){ alert('Não consegui identificar as colunas de "'+file.name+'".'); return; }
-        const org=novos[0].origem;
-        const antes=DADOS_RAW.filter(d=>d.origem===org).length;
-        DADOS_RAW=DADOS_RAW.filter(d=>d.origem!==org).concat(novos); // substitui a base "org" (não soma)
-        ratearSeguro();   // seguros (4022*) → 50% Amazonas / 50% Maranhão
-        flash(antes?`🔄 "${org}" atualizado: ${INT.format(antes)} → ${INT.format(novos.length)} lançamentos (substituí a versão anterior).`
-                   :`➕ "${org}" carregado: ${INT.format(novos.length)} lançamentos.`);
-      }
-      aplicarPeriodo();
-      agendarSalvamento();   // salva na nuvem automaticamente após atualizar
-    }catch(err){ alert('Erro ao ler "'+file.name+'": '+err.message); }
+      const desc=analisarArquivo(aoa,ws,file.name);   // parseia numa área TEMPORÁRIA (não toca nas globais)
+      if(desc.erro){ alert(desc.erro); return fimImport(); }
+      let hash='—'; try{ hash=await sha256Hex(buf); }catch(e){}
+      abrirPreviewImport(desc,{nome:file.name,tam:file.size,hash,abas:wb.SheetNames});
+    }catch(err){ alert('Erro ao ler "'+file.name+'": '+err.message); fimImport(); }
   };
   r.readAsArrayBuffer(file);
 }
+async function sha256Hex(buf){ const h=await crypto.subtle.digest('SHA-256',buf); return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+function resumoBase(arr,valFn){ valFn=valFn||(d=>d.valor||0);
+  let tot=0,mn=null,mx=null; (arr||[]).forEach(d=>{ tot+=valFn(d)||0; const m=d.mes; if(m&&/^\d\d\/\d{4}$/.test(m)){ if(mn===null||mesOrd(m)<mesOrd(mn))mn=m; if(mx===null||mesOrd(m)>mesOrd(mx))mx=m; } });
+  return {n:(arr||[]).length,total:tot,mesMin:mn,mesMax:mx}; }
+// detecta o tipo e devolve um DESCRITOR com a função que aplica a base (sem executá-la ainda)
+function analisarArquivo(aoa,ws,nome){
+  if(ehReceitaGNL(aoa)){ const novos=parseReceita(aoa); if(!novos.length) return {erro:'Reconheci "'+nome+'" como Receita, mas não achei valores.'};
+    return {base:'Receita real',novos,aplicar:()=>{RECEITA_RAW=novos;},atual:RECEITA_RAW}; }
+  if(ehSGA(aoa)){ const novos=parseSGA(aoa); if(!novos.length) return {erro:'Reconheci "'+nome+'" como SG&A, mas não achei valores.'};
+    return {base:'SG&A realizado',novos,aplicar:()=>{SGA_RAW=novos;},atual:SGA_RAW}; }
+  if(ehOrcReceita(aoa)){ const novos=parseOrcReceita(aoa); if(!novos.length) return {erro:'Reconheci "'+nome+'" como Orçamento de Receita, mas não achei valores.'};
+    return {base:'Orçamento de Receita',novos,aplicar:()=>{ORCREC=novos;},atual:ORCREC}; }
+  if(ehOBZ(aoa)){ const obz=parseOBZ(aoa); if(!Object.keys(obz).length) return {erro:'Reconheci "'+nome+'" como OBZ (R$/km), mas não consegui extrair o R$/km.'};
+    return {base:'Orçado R$/km (OBZ)',novos:null,obz:true,aplicar:()=>{ORCKPI=obz;},atual:null}; }
+  if(ehOrcamento(aoa)){ const novos=parseOrcamento(aoa); if(!novos.length) return {erro:'Reconheci "'+nome+'" como orçamento, mas não achei valores mensais.'};
+    return {base:'Orçamento de custos',novos,valFn:o=>o.valor,aplicar:()=>{ORCAMENTO=novos;},atual:ORCAMENTO,valAtual:o=>o.valor}; }
+  const json=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
+  const novos=mapear(json,nome); if(!novos.length) return {erro:'Não consegui identificar as colunas de "'+nome+'".'};
+  const org=novos[0].origem;
+  return {base:'Realizado — '+org,novos,org,atual:DADOS_RAW.filter(d=>d.origem===org),
+    aplicar:()=>{ DADOS_RAW=DADOS_RAW.filter(d=>d.origem!==org).concat(novos); ratearSeguro(); }};
+}
+function abrirPreviewImport(desc,meta){
+  IMPORT_PEND={desc,meta};
+  const rn=desc.novos?resumoBase(desc.novos,desc.valFn):null;
+  const ra=desc.atual?resumoBase(desc.atual,desc.valAtual):null;
+  const dRow=(k,v)=>'<tr><td class="k">'+k+'</td><td>'+v+'</td></tr>';
+  const kb=(meta.tam/1024).toFixed(0)+' KB';
+  let rows=dRow('Arquivo','<b>'+String(meta.nome).replace(/</g,'&lt;')+'</b>')+dRow('Tamanho',kb)+
+    dRow('SHA-256','<span style="font-family:ui-monospace,monospace;font-size:11px">'+meta.hash.slice(0,40)+'…</span>')+
+    dRow('Abas do arquivo',meta.abas.map(a=>String(a).replace(/</g,'&lt;')).join(', '))+
+    dRow('Tipo detectado','<b style="color:var(--accent)">'+desc.base+'</b>');
+  const av=[];
+  if(desc.obz){ rows+=dRow('Conteúdo','Tabela de R$/km orçado — substitui o OBZ anterior'); }
+  else {
+    const dN=(rn.n-(ra?ra.n:0)), dT=(rn.total-(ra?ra.total:0));
+    rows+=dRow('Período', (rn.mesMin||'—')+' – '+(rn.mesMax||'—'));
+    rows+=dRow('Linhas lidas', INT.format(rn.n)+(ra?' <span class="small">· base atual '+INT.format(ra.n)+' · Δ '+(dN>=0?'+':'')+INT.format(dN)+'</span>':' <span class="small">· base nova</span>'));
+    rows+=dRow('Total R$', BRL.format(rn.total)+(ra?' <span class="small">· atual '+BRL.format(ra.total)+' · Δ '+(dT>=0?'+':'')+BRL.format(dT)+'</span>':''));
+    if(rn.n===0) av.push('Nenhuma linha com valor foi lida.');
+    if(!rn.mesMin) av.push('⚠️ Não identifiquei o período (mês/ano) nesta base — confira a coluna de data.');
+    if(ra&&ra.n>0&&rn.n<ra.n*0.5) av.push('⚠️ A base nova tem MENOS da metade das linhas da atual ('+INT.format(rn.n)+' × '+INT.format(ra.n)+') — confira se é o arquivo certo.');
+  }
+  document.getElementById('impTit').innerHTML='📥 Pré-visualização da importação';
+  document.getElementById('impBody').innerHTML='<table class="imptab">'+rows+'</table>'+
+    (av.length?'<div class="resumo" style="border-left-color:var(--warn);margin-top:12px">'+av.join('<br>')+'</div>':'')+
+    '<div class="note" style="margin-top:10px">A base oficial <b>só é trocada quando você clicar em Confirmar</b>. Nada vai pra nuvem antes disso, e o <b>Check-up roda automaticamente</b> logo depois.</div>';
+  resetImpFoot();
+  document.getElementById('impModal').classList.add('show');
+}
+function resetImpFoot(){ document.getElementById('impFoot').innerHTML='<button class="btn-ghost" onclick="cancelarImport()">Cancelar</button><button class="btn-primary" onclick="confirmarImport()">✓ Confirmar importação</button>'; }
+// cópia profunda das globais afetadas, para reverter com segurança se algo der errado
+function snapshotEstado(){ const c=x=>x==null?x:(typeof structuredClone==='function'?structuredClone(x):JSON.parse(JSON.stringify(x)));
+  return {DADOS_RAW:c(DADOS_RAW),ORCAMENTO:c(ORCAMENTO),ORCKPI:c(ORCKPI),ORCREC:c(ORCREC),RECEITA_RAW:c(RECEITA_RAW),SGA_RAW:c(SGA_RAW)}; }
+function restaurarEstado(s){ DADOS_RAW=s.DADOS_RAW; ORCAMENTO=s.ORCAMENTO; ORCKPI=s.ORCKPI; ORCREC=s.ORCREC; RECEITA_RAW=s.RECEITA_RAW; SGA_RAW=s.SGA_RAW; }
+function confirmarImport(){
+  if(!IMPORT_PEND) return; const desc=IMPORT_PEND.desc;
+  document.getElementById('impModal').classList.remove('show');
+  const snap=snapshotEstado();                 // ponto de retorno
+  try{ desc.aplicar(); aplicarPeriodo(); }
+  catch(err){ restaurarEstado(snap); aplicarPeriodo(); alert('Falha ao aplicar "'+desc.base+'" — a base anterior foi restaurada.\n'+err.message); return fimImport(); }
+  const falhas=checkupFalhas();                 // gate: roda o Check-up sobre a base nova
+  if(falhas>0){
+    IMPORT_PEND={desc,snap};
+    document.getElementById('impTit').innerHTML='⚠️ O Check-up encontrou inconsistências';
+    document.getElementById('impBody').innerHTML='<div class="resumo" style="border-left-color:var(--bad)">O Check-up apontou <b>'+falhas+' conciliação(ões) que NÃO batem</b> com esta base. Ela foi <b>carregada na tela</b> para você conferir, mas <b>NÃO foi salva na nuvem</b>.</div>'+
+      '<div class="note">Abra <b>DRE / EBITDA → 🩺 Check-up</b> para ver o que não fechou. Você pode publicar mesmo assim (se souber que é esperado) ou descartar e voltar à base anterior.</div>';
+    document.getElementById('impFoot').innerHTML='<button class="btn-ghost" onclick="descartarImport()">↩︎ Descartar (voltar à base anterior)</button><button class="btn-primary" style="background:var(--bad);border-color:var(--bad);color:#fff" onclick="publicarMesmoAssim()">Publicar mesmo assim</button>';
+    document.getElementById('impModal').classList.add('show');
+    return;
+  }
+  flash('✅ "'+desc.base+'" importado · Check-up OK · salvando na nuvem…');
+  agendarSalvamento(); resetImpFoot(); fimImport();
+}
+function cancelarImport(){ document.getElementById('impModal').classList.remove('show'); flash('Importação cancelada — base atual mantida.'); fimImport(); }
+function descartarImport(){ if(IMPORT_PEND&&IMPORT_PEND.snap){ restaurarEstado(IMPORT_PEND.snap); aplicarPeriodo(); } document.getElementById('impModal').classList.remove('show'); resetImpFoot(); flash('Importação descartada — base anterior restaurada.'); fimImport(); }
+function publicarMesmoAssim(){ document.getElementById('impModal').classList.remove('show'); resetImpFoot(); flash('Publicando na nuvem (com ressalva do Check-up)…'); salvarNaNuvem(); fimImport(); }
 // ----- SG&A realizado (razão contábil: Ano/Mês + Montante em moeda interna + Centro de lucro) -----
 function ehSGA(aoa){
   const h=(aoa[0]||[]).map(norm);
@@ -2797,8 +2864,10 @@ function renderCheckup(){
   const falhas=linhas.filter(l=>l[3]&&l[3].includes('✗')).length+okA.filter(b=>!b).length;
   document.getElementById('ckResumo').innerHTML=(falhas?'🚨 <b>'+falhas+' conciliação(ões) falharam</b> — veja abaixo.':'✅ <b>Todas as conciliações batem.</b>')+
     ' Os custos agora são o <b>valor cheio em TODAS as abas</b> (inclusive na DRE) — os lançamentos a mão neutralizam os NR dentro do custo. A linha (+/−) Não Recorrente devolve o efeito real e soma com o EBITDA Ajustado. '+(cruz.length||sobras.length?'⚠️ Se "a mão + NR" não zera (seção 3), a marcação da base tem sobra — o custo cheio continua certo, mas a linha NR pode carregar diferença.':'');
-  CK_LAST={linhas,cruz,sobras,totMao,nrMes,meses:dd.meses,eb};
+  CK_LAST={linhas,cruz,sobras,totMao,nrMes,meses:dd.meses,eb,falhas};
 }
+// resultado estruturado do Check-up para o gate de publicação (roda o cálculo/visual e lê o nº de falhas financeiras)
+function checkupFalhas(){ try{ renderCheckup(); return (CK_LAST&&typeof CK_LAST.falhas==='number')?CK_LAST.falhas:0; }catch(e){ console.error('check-up gate',e); return 0; } }
 function exportarCheckupXls(){
   if(!CK_LAST){ alert('Abra o check-up primeiro.'); return; }
   const {linhas,cruz,sobras,totMao,nrMes,meses,eb}=CK_LAST;
