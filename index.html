@@ -581,7 +581,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v82 · Nova subpágina ⛽ Consumo: informe R$/L e o app calcula km/L e L/km (a partir do R$/km) · 22/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v83 · Consumo: gráfico e tabela clicáveis — abre os lançamentos de combustível do mês (soma + Excel) · 22/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1517,6 +1517,7 @@ function consumoCalc(loc,mes,cost){
   const kmL=(rkm>0&&rl>0)?rl/rkm:null;        // km/L = (R$/L) ÷ (R$/km)
   const Lkm=(rkm>0&&rl>0)?rkm/rl:null;        // L/km = (R$/km) ÷ (R$/L)
   return {rkm,rl,kmL,Lkm,km}; }
+function drillConsumo(loc,mes){ drillReal('⛽ Combustível · '+loc+' · '+mes+' · base do R$/km', DADOS.filter(d=>catDeLinha(d)==='combustivel'&&d.loc===loc&&d.mes===mes)); }
 function setRL(loc,mes,val){ const k=loc+'|'+mes; kmGrid[k]=kmGrid[k]||{km:0,kmOrc:0}; kmGrid[k].rl=num(val); saveKm(); atualizaConsumoLinha(loc,mes); renderConsumoCharts(); }
 function atualizaConsumoLinha(loc,mes){ const c=consumoCalc(loc,mes,consumoCustoComb()); const sfx=(loc==='Amazonas'?'AM':'MA')+'_'+mes.replace('/','-');
   const a=document.getElementById('cs_kmL_'+sfx), b=document.getElementById('cs_Lkm_'+sfx);
@@ -1530,7 +1531,7 @@ function renderConsumo(){
   box.querySelector('tbody').innerHTML=meses.map(m=>{
     let tds='<td class="txt">'+m+'</td>';
     ['Amazonas','Maranhão'].forEach(loc=>{ const c=consumoCalc(loc,m,cost); const sfx=(loc==='Amazonas'?'AM':'MA')+'_'+m.replace('/','-');
-      tds+=`<td>${c.rkm?BRL.format(c.rkm)+'<span class="small">/km</span>':'—'}</td>`+
+      tds+=`<td class="txt" ${c.rkm?`style="cursor:pointer" onclick="drillConsumo('${loc}','${m}')" title="clique p/ ver os lançamentos e exportar"`:''}>${c.rkm?'🔍 '+BRL.format(c.rkm)+'<span class="small">/km</span>':'—'}</td>`+
         `<td><input type="text" inputmode="decimal" value="${kmGet(loc,m,'rl')||''}" placeholder="R$/L" aria-label="Preço R$/L ${loc} ${m}" style="width:82px" oninput="setRL('${loc}','${m}',this.value)"></td>`+
         `<td id="cs_kmL_${sfx}"><b>${c.kmL!=null?fmtKmL(c.kmL):'—'}</b></td>`+
         `<td id="cs_Lkm_${sfx}">${c.Lkm!=null?fmtLkm(c.Lkm):'—'}</td>`; });
@@ -1548,7 +1549,8 @@ function renderConsumoCharts(){
     charts[id]=new Chart(id,{type:'bar',data:{labels:meses.map(mesCurto),datasets:[
       {label:'km/L',data:kmL,backgroundColor:'#00A0A8',datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,anchor:'end',align:'top',color:'#e2e8f0',font:{weight:'700',size:10},formatter:v=>v==null?'':v.toFixed(2).replace('.',',')}}
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const i=c.dataIndex; return kmL[i]==null?'sem R$/L ou sem KM':[fmtKmL(kmL[i]),fmtLkm(Lkm[i])];}}}},
+      onClick:(e,els)=>{ if(!els.length) return; drillConsumo(loc,meses[els[0].index]); },
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const i=c.dataIndex; return kmL[i]==null?'sem R$/L ou sem KM':[fmtKmL(kmL[i]),fmtLkm(Lkm[i]),'clique p/ ver os lançamentos'];}}}},
       scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>v.toFixed(1).replace('.',',')}}}}});
   });
 }
