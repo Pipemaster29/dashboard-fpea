@@ -571,6 +571,12 @@
   <!-- FLUXO DE CAIXA -->
   <div id="caixa" class="ovrbox hidden">
     <div class="sectitle">💵 Fluxo de Caixa <span class="tag" id="caixaTag">FCO · Capex · Dívida · FCFE · Cash Position</span></div>
+    <div class="subnav">
+      <button class="active" data-sp="quadro" onclick="showSub('caixa','quadro')">📋 Quadro</button>
+      <button data-sp="forn" onclick="showSub('caixa','forn')">🏭 Fornecedores</button>
+      <button data-sp="capex" onclick="showSub('caixa','capex')">🏗️ Capex</button>
+    </div>
+    <div class="sp active" data-sp="quadro">
     <div class="scope">
       <label for="caixaIni">Caixa inicial (dez/25)</label>
       <input type="text" inputmode="decimal" id="caixaIni" style="width:150px" oninput="setCaixaIni(this.value)">
@@ -579,10 +585,32 @@
     <div class="resumo" id="caixaResumo"></div>
     <div class="kpis" id="caixaKpis"></div>
     <div class="card full" style="margin-bottom:20px"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chCaixa','Fluxo de Caixa')">🖼️ Imagem</button><button class="xls" onclick="exportarCaixaXls()">⬇ Excel</button></div>
-      <h3>FCO × FCFE × Cash Position por mês</h3><div class="wrap" style="height:320px"><canvas id="chCaixa"></canvas></div></div>
+      <h3>FCO × FCFE × Cash Position por mês <span class="small">— clique numa barra para ver o mês</span></h3><div class="wrap" style="height:320px"><canvas id="chCaixa"></canvas></div></div>
     <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quadro do Fluxo de Caixa <span class="small">— clique numa linha do mês para ver os lançamentos · células amarelas são digitadas</span></h3>
     <div class="tablewrap dreq"><table id="tabCaixa"><thead></thead><tbody></tbody></table></div>
     <div class="note" id="caixaNota"></div>
+    </div>
+
+    <div class="sp" data-sp="forn">
+    <div class="scope">
+      <label for="fornTipo">Tipo de pagamento</label>
+      <select id="fornTipo" onchange="renderCaixaForn()"><option value="">Todos (operacional)</option></select>
+      <span class="small">Maiores fornecedores nos pagamentos operacionais (Capex e dívida ficam fora). Clique na barra ou na linha para ver os lançamentos e exportar.</span>
+    </div>
+    <div class="kpis" id="fornKpis"></div>
+    <div class="card full" style="margin-bottom:16px"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chForn','Fornecedores')">🖼️ Imagem</button><button class="xls" onclick="exportarCaixaAnalise('forn')">⬇ Excel</button></div>
+      <h3 id="fornTit">Maiores fornecedores</h3><div class="wrap" style="height:400px"><canvas id="chForn"></canvas></div></div>
+    <div class="tablewrap" style="max-height:460px"><table id="tabForn"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="sp" data-sp="capex">
+    <div class="scope"><span class="small">Capex = linhas <b>FCI</b> (recebimentos e pagamentos). Abaixo, o que constitui o Capex do período por item. Clique para ver os lançamentos.</span></div>
+    <div class="kpis" id="capexKpis"></div>
+    <div class="card full" style="margin-bottom:16px"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chCapex','Capex')">🖼️ Imagem</button><button class="xls" onclick="exportarCaixaAnalise('capex')">⬇ Excel</button></div>
+      <h3>Composição do Capex (FCI) por mês</h3><div class="wrap" style="height:300px"><canvas id="chCapex"></canvas></div></div>
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">O que constitui o Capex <span class="small">— por item (subtipo/fornecedor)</span></h3>
+    <div class="tablewrap" style="max-height:460px"><table id="tabCapex"><thead></thead><tbody></tbody></table></div>
+    </div>
   </div>
   </main>
 </div>
@@ -603,7 +631,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v88 · Fluxo de Caixa: Despesa Financeira automática no bloco financeiro (plug = só a diferença pura) · 22/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v89 · Fluxo de Caixa: análises de Fornecedores (Pareto) e Capex (composição) + gráficos clicáveis · 22/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1735,10 +1763,13 @@ function renderCaixa(){
     {type:'bar',label:'FCFE',data:meses.map(m=>calc[m].fcfe),backgroundColor:'#FCB316',order:2,datalabels:{display:false}},
     {type:'line',label:'Cash Position',data:meses.map(m=>cashPos[m]),yAxisID:'y2',borderColor:'#e2e8f0',backgroundColor:'#e2e8f0',tension:.25,pointRadius:3,order:1,datalabels:{display:false}}
   ]},options:{responsive:true,maintainAspectRatio:false,
+    onClick:(e,els)=>{ if(!els.length) return; const m=meses[els[0].index]; const ds=charts.chCaixa.data.datasets[els[0].datasetIndex].label;
+      if(ds==='FCO'||ds==='Cash Position') drillCaixaRows('Pagamentos operacionais · '+m,cxPagOp(m)); else drillCaixaRows('Recebimentos operacionais · '+m,cxRecOp(m)); },
     plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
     scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},
       y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},
       y2:{position:'right',grid:{display:false},title:{display:true,text:'Cash Position',color:'#e2e8f0',font:{size:10}},ticks:{color:'#cbd5e1',callback:v=>kBRL(v)}}}}});
+  renderCaixaForn(); renderCaixaCapex();
 }
 function exportarCaixaXls(){
   if(!CAIXA_LAST){ alert('Carregue a base de Caixa primeiro.'); return; }
@@ -1767,6 +1798,90 @@ function exportarCaixaXls(){
   const base=[['Lado','Tipo','Mês','Nome','Nº doc','Texto','Valor (R$)']].concat(
     CAIXA_REC.concat(CAIXA_PAG).map(d=>[d.lado==='R'?'Recebimento':'Pagamento',d.tipo,d.mes,d.nome,d.doc,d.texto,d.valor]));
   baixarXlsx('Fluxo_de_Caixa',[{nome:'Fluxo',aoa},{nome:'Lançamentos (base)',aoa:base}]);
+}
+// drill genérico de uma lista de lançamentos de caixa
+function drillCaixaRows(nome,linhas){
+  linhas=linhas.slice().sort((a,b)=>Math.abs(b.valor)-Math.abs(a.valor));
+  if(!linhas.length){ flash('Sem lançamentos para '+nome+'.'); return; }
+  const tot=sumV(linhas);
+  DRILL_LAST={linhas:linhas.map(d=>({mes:d.mes,loc:d.lado==='R'?'Recebimento':'Pagamento',centro:'',ccod:d.tipo,classe:d.sub||'',forn:d.nome,material:d.texto,objeto:'',origem:'Caixa',valor:d.valor})),nome:'Caixa '+nome};
+  document.getElementById('drillTit').innerHTML='<b>'+nome+'</b> · '+INT.format(linhas.length)+' lançamentos · '+BRL.format(tot);
+  document.querySelector('#tabDrill thead').innerHTML='<tr><th class="txt">Mês</th><th class="txt">Tipo</th><th class="txt">Nome</th><th class="txt">Nº doc</th><th class="txt">Texto</th><th>Valor</th></tr>';
+  document.querySelector('#tabDrill tbody').innerHTML=linhas.slice(0,1000).map(d=>`<tr><td class="txt">${d.mes}</td><td class="txt">${d.tipo}</td><td class="txt" title="${String(d.nome||'').replace(/"/g,'')}">${(d.nome||'—').slice(0,30)}</td><td class="txt">${d.doc||'—'}</td><td class="txt" title="${String(d.texto||'').replace(/"/g,'')}">${(d.texto||'').slice(0,36)}</td><td class="${d.valor<0?'neg':''}">${BRL.format(d.valor)}</td></tr>`).join('')+(linhas.length>1000?'<tr><td colspan="6" class="small txt">… 1.000 de '+INT.format(linhas.length)+'</td></tr>':'');
+  document.getElementById('drillModal').classList.add('show');
+}
+// FORNECEDORES (Pareto dos pagamentos operacionais)
+let _FORN_LAST=[], _FORN_TF='';
+function cxFornAgg(tf){ const rows=CAIXA_PAG.filter(d=>d.tipo!==CX_CAP&&d.tipo!==CX_DIV&&d.tipo!==CX_DESPFIN&&(!tf||d.tipo===tf));
+  const agg={}; rows.forEach(d=>{ const k=((d.nome||d.texto||'(sem nome)').trim())||'(sem nome)'; agg[k]=(agg[k]||0)+d.valor; });
+  return Object.entries(agg).map(([nome,valor])=>({nome,valor})).filter(x=>Math.abs(x.valor)>=1).sort((a,b)=>a.valor-b.valor); }
+function drillFornIdx(i){ const x=_FORN_LAST[i]; if(!x) return;
+  drillCaixaRows('Fornecedor · '+x.nome, CAIXA_PAG.filter(d=>d.tipo!==CX_CAP&&d.tipo!==CX_DIV&&d.tipo!==CX_DESPFIN&&(!_FORN_TF||d.tipo===_FORN_TF)&&(((d.nome||d.texto||'(sem nome)').trim())||'(sem nome)')===x.nome)); }
+function renderCaixaForn(){
+  const tb=document.getElementById('tabForn'); if(!tb) return;
+  if(!CAIXA_PAG.length){ tb.querySelector('thead').innerHTML=''; tb.querySelector('tbody').innerHTML=''; return; }
+  const sel=document.getElementById('fornTipo'); const cur=sel.value;
+  const tipos=uniq(CAIXA_PAG.filter(d=>d.tipo!==CX_CAP&&d.tipo!==CX_DIV&&d.tipo!==CX_DESPFIN).map(d=>d.tipo)).sort();
+  sel.innerHTML='<option value="">Todos (operacional)</option>'+tipos.map(t=>`<option ${t===cur?'selected':''}>${t}</option>`).join('');
+  const tf=sel.value; _FORN_TF=tf;
+  const itens=cxFornAgg(tf); _FORN_LAST=itens;
+  const tot=sumV(itens), TOP=15, top=itens.slice(0,TOP), resto=itens.slice(TOP), restoV=sumV(resto);
+  document.getElementById('fornKpis').innerHTML=[
+    {lbl:'Total pago'+(tf?' · '+tf:''),val:BRL.format(tot)},
+    {lbl:'Nº de fornecedores',val:INT.format(itens.length)},
+    {lbl:'Maior fornecedor',val:top[0]?BRL.format(top[0].valor):'—',sub:top[0]?top[0].nome.slice(0,26):''}
+  ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
+  document.getElementById('fornTit').textContent='Maiores fornecedores'+(tf?' · '+tf:'')+' (top '+TOP+')';
+  const labels=top.map(x=>x.nome.slice(0,30)).concat(resto.length?['Outros ('+resto.length+')']:[]);
+  const vals=top.map(x=>Math.abs(x.valor)).concat(resto.length?[Math.abs(restoV)]:[]);
+  destroy('chForn');
+  charts.chForn=new Chart('chForn',{type:'bar',data:{labels,datasets:[{label:'Pago',data:vals,backgroundColor:'#E4562E',
+    datalabels:{anchor:'end',align:'right',color:'#e2e8f0',font:{size:10,weight:'700'},formatter:v=>kBRL(v)}}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:52}},
+      onClick:(e,els)=>{ if(!els.length)return; const i=els[0].index; if(i<top.length) drillFornIdx(i); },
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>BRL.format(-Math.abs(c.parsed.x))+' (clique p/ ver)'}}},
+      scales:{x:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},y:{grid:{display:false},ticks:{color:'#cbd5e1',font:{size:11}}}}}});
+  tb.querySelector('thead').innerHTML='<tr><th class="txt">Fornecedor</th><th>Pago (R$)</th><th>% do total</th><th>% acum.</th></tr>';
+  let ac=0; tb.querySelector('tbody').innerHTML=itens.slice(0,60).map((x,i)=>{ac+=x.valor; return `<tr style="cursor:pointer" onclick="drillFornIdx(${i})"><td class="txt" title="${x.nome.replace(/"/g,'')}">🔍 ${x.nome.slice(0,46)}</td><td>${BRL.format(x.valor)}</td><td>${(tot?x.valor/tot*100:0).toFixed(1).replace('.',',')}%</td><td>${(tot?ac/tot*100:0).toFixed(1).replace('.',',')}%</td></tr>`;}).join('');
+}
+// CAPEX (FCI) — o que constitui
+let _CAPEX_LAST=[];
+function cxCapexAgg(){ const agg={}; CAIXA_REC.concat(CAIXA_PAG).filter(d=>d.tipo===CX_CAP).forEach(d=>{ const k=((d.sub||d.nome||d.texto||'(sem detalhe)').trim())||'(sem detalhe)'; agg[k]=(agg[k]||0)+d.valor; });
+  return Object.entries(agg).map(([item,valor])=>({item,valor})).filter(x=>Math.abs(x.valor)>=1).sort((a,b)=>Math.abs(b.valor)-Math.abs(a.valor)); }
+function drillCapexIdx(i){ const x=_CAPEX_LAST[i]; if(!x) return;
+  drillCaixaRows('Capex · '+x.item, CAIXA_REC.concat(CAIXA_PAG).filter(d=>d.tipo===CX_CAP&&(((d.sub||d.nome||d.texto||'(sem detalhe)').trim())||'(sem detalhe)')===x.item)); }
+function renderCaixaCapex(){
+  const tb=document.getElementById('tabCapex'); if(!tb) return;
+  const fci=CAIXA_REC.concat(CAIXA_PAG).filter(d=>d.tipo===CX_CAP);
+  if(!fci.length){ tb.querySelector('thead').innerHTML=''; tb.querySelector('tbody').innerHTML=''; document.getElementById('capexKpis').innerHTML=''; return; }
+  const meses=caixaMeses();
+  const ent=fci.filter(d=>d.valor>0).reduce((s,d)=>s+d.valor,0), sai=fci.filter(d=>d.valor<0).reduce((s,d)=>s+d.valor,0), liq=ent+sai;
+  document.getElementById('capexKpis').innerHTML=[
+    {lbl:'Capex líquido',val:BRL.format(liq)},
+    {lbl:'Saídas (investimento)',val:BRL.format(sai),cls:'neg'},
+    {lbl:'Entradas (FCI +)',val:BRL.format(ent)}
+  ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div></div>`).join('');
+  destroy('chCapex');
+  charts.chCapex=new Chart('chCapex',{type:'bar',data:{labels:meses.map(m=>mesCurto(m)+'/'+m.slice(3)),datasets:[
+    {label:'Capex FCI (líquido)',data:meses.map(m=>sumV(cxCapex(m))),backgroundColor:meses.map(m=>sumV(cxCapex(m))<0?'#E4562E':'#00B050'),
+      datalabels:{anchor:'end',align:'top',color:'#e2e8f0',font:{size:10,weight:'700'},formatter:v=>fmtMil(v)}}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},
+      onClick:(e,els)=>{ if(!els.length)return; const m=meses[els[0].index]; drillCaixaRows('Capex (FCI) · '+m,cxCapex(m)); },
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>BRL.format(c.parsed.y)+' (clique p/ ver)'}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}}}}});
+  const itens=cxCapexAgg(); _CAPEX_LAST=itens; const tot=sumV(itens);
+  tb.querySelector('thead').innerHTML='<tr><th class="txt">Item (subtipo / fornecedor)</th><th>Valor (R$)</th><th>% do Capex</th></tr>';
+  tb.querySelector('tbody').innerHTML=itens.slice(0,60).map((x,i)=>`<tr style="cursor:pointer" onclick="drillCapexIdx(${i})"><td class="txt" title="${x.item.replace(/"/g,'')}">🔍 ${x.item.slice(0,50)}</td><td class="${x.valor<0?'neg':''}">${BRL.format(x.valor)}</td><td>${(tot?x.valor/tot*100:0).toFixed(1).replace('.',',')}%</td></tr>`).join('');
+}
+function exportarCaixaAnalise(qual){
+  if(qual==='forn'){ const itens=cxFornAgg(_FORN_TF); const tot=sumV(itens); let ac=0;
+    const aoa=[['Fornecedor','Pago (R$)','% do total','% acum.']].concat(itens.map(x=>{ac+=x.valor;return [x.nome,x.valor,tot?x.valor/tot:0,tot?ac/tot:0];}));
+    const base=[['Mês','Tipo','Nome','Nº doc','Texto','Valor (R$)']].concat(CAIXA_PAG.filter(d=>d.tipo!==CX_CAP&&d.tipo!==CX_DIV&&d.tipo!==CX_DESPFIN&&(!_FORN_TF||d.tipo===_FORN_TF)).map(d=>[d.mes,d.tipo,d.nome,d.doc,d.texto,d.valor]));
+    baixarXlsx('Fornecedores_caixa',[{nome:'Fornecedores',aoa},{nome:'Lançamentos (base)',aoa:base}]); }
+  else { const itens=cxCapexAgg(); const tot=sumV(itens);
+    const aoa=[['Item','Valor (R$)','% do Capex']].concat(itens.map(x=>[x.item,x.valor,tot?x.valor/tot:0]));
+    const base=[['Lado','Mês','Tipo','Subtipo','Nome','Texto','Valor (R$)']].concat(CAIXA_REC.concat(CAIXA_PAG).filter(d=>d.tipo===CX_CAP).map(d=>[d.lado==='R'?'Recebimento':'Pagamento',d.mes,d.tipo,d.sub,d.nome,d.texto,d.valor]));
+    baixarXlsx('Capex_caixa',[{nome:'Capex',aoa},{nome:'Lançamentos (base)',aoa:base}]); }
 }
 function renderKmTable(){
   const meses=opsMeses();
