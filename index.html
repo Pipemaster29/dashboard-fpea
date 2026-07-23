@@ -603,7 +603,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v85 · Nível 2 — Fluxo de Caixa: FCO · Capex · Dívida · FCFE · Cash Position (base da tesouraria) · 22/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v86 · Fluxo de Caixa reconciliado com a base real (Despesa Financeira fora do operacional) · 22/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1627,7 +1627,7 @@ function renderConsumoCharts(){
 // ========== FLUXO DE CAIXA (financeiro) ==========
 // FCO=Receb+Pag · FCF=Banco+ParentJuros+NewDebt+ParentNewDebt+plug · FCFE=FCO+Capex+FCF
 // Changes=Dividendos+Adiantamento+Reserva+Receita financeira · CashPos(m)=CashPos(m-1)+FCFE+Changes
-const CX_CAP='FCI', CX_DIV='DIVIDA', CX_ADI='ADIANTAMENTO';
+const CX_CAP='FCI', CX_DIV='DIVIDA', CX_ADI='ADIANTAMENTO', CX_DESPFIN='DESPESA FINANCEIRA';
 const CX_NOME={receb:'Recebimentos operacionais',pag:'Pagamentos operacionais',capex:'CAPEX (FCI)',bank:'Bank Principal/Juros (Dívida)',equity:'Equity — Adiantamento cliente'};
 let caixaGrid={},CAIXA_INI=12545931;
 try{caixaGrid=JSON.parse(localStorage.getItem('caixaGrid')||'{}');}catch(e){caixaGrid={};}
@@ -1638,7 +1638,7 @@ function setCaixaIni(v){CAIXA_INI=num(v);try{localStorage.setItem('caixaIni',Str
 function caixaMeses(){return uniq(CAIXA_REC.concat(CAIXA_PAG).map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));}
 const sumV=a=>a.reduce((s,d)=>s+d.valor,0);
 const cxRecOp=m=>CAIXA_REC.filter(d=>d.mes===m&&d.tipo!==CX_CAP&&d.tipo!==CX_ADI);
-const cxPagOp=m=>CAIXA_PAG.filter(d=>d.mes===m&&d.tipo!==CX_CAP&&d.tipo!==CX_DIV);
+const cxPagOp=m=>CAIXA_PAG.filter(d=>d.mes===m&&d.tipo!==CX_CAP&&d.tipo!==CX_DIV&&d.tipo!==CX_DESPFIN);   // despesa financeira fica fora do operacional (reconciliada no plug, igual à lógica do usuário)
 const cxCapex=m=>CAIXA_REC.concat(CAIXA_PAG).filter(d=>d.mes===m&&d.tipo===CX_CAP);
 const cxBank=m=>CAIXA_PAG.filter(d=>d.mes===m&&d.tipo===CX_DIV);
 const cxAdiant=m=>CAIXA_REC.filter(d=>d.mes===m&&d.tipo===CX_ADI);
@@ -1725,7 +1725,7 @@ function renderCaixa(){
     {lbl:'Caixa inicial',val:BRL.format(CAIXA_INI),sub:'dez/25'}
   ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
   const nota=document.getElementById('caixaNota');
-  if(nota){ const tes=temFin?somaMes(m=>cxSaldoTes(m)):0; nota.innerHTML='Células <b>amarelas</b> são digitadas (dívida, dividendos, reserva e o "plug"). Clique nas demais para ver os lançamentos e exportar. '+(temFin?'':'Sem tesouraria carregada. ')+'FCO = Receb + Pag · FCFE = FCO + CAPEX + FCF · Cash Position acumula o FCFE + Changes on cash.'; }
+  if(nota){ nota.innerHTML='Células <b>amarelas</b> são digitadas (New Debt, juros/dividendos, reserva e o "plug"). Clique nas demais para ver os lançamentos e exportar. '+(temFin?'':'⚠️ Sem tesouraria carregada. ')+'FCO = Receb + Pag · FCFE = FCO + CAPEX + FCF · Cash Position acumula FCFE + Changes on cash. A <b>Despesa Financeira</b> fica fora do Pagamentos operacional (reconciliada no plug, igual à sua planilha). Receita financeira = Rendimento das aplicações (sem BNB).'; }
   destroy('chCaixa');
   charts.chCaixa=new Chart('chCaixa',{data:{labels:meses.map(m=>mesCurto(m)+'/'+m.slice(3)),datasets:[
     {type:'bar',label:'FCO',data:meses.map(m=>calc[m].fco),backgroundColor:'#00A0A8',order:3,datalabels:{display:false}},
