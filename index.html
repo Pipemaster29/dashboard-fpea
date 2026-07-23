@@ -603,7 +603,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v87 · Receita financeira: corrige fevereiro (nome do mês na linha de dados) — jan/fev/mar batem ao centavo · 22/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v88 · Fluxo de Caixa: Despesa Financeira automática no bloco financeiro (plug = só a diferença pura) · 22/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -1629,7 +1629,7 @@ function renderConsumoCharts(){
 // FCO=Receb+Pag · FCF=Banco+ParentJuros+NewDebt+ParentNewDebt+plug · FCFE=FCO+Capex+FCF
 // Changes=Dividendos+Adiantamento+Reserva+Receita financeira · CashPos(m)=CashPos(m-1)+FCFE+Changes
 const CX_CAP='FCI', CX_DIV='DIVIDA', CX_ADI='ADIANTAMENTO', CX_DESPFIN='DESPESA FINANCEIRA';
-const CX_NOME={receb:'Recebimentos operacionais',pag:'Pagamentos operacionais',capex:'CAPEX (FCI)',bank:'Bank Principal/Juros (Dívida)',equity:'Equity — Adiantamento cliente'};
+const CX_NOME={receb:'Recebimentos operacionais',pag:'Pagamentos operacionais',capex:'CAPEX (FCI)',bank:'Bank Principal/Juros (Dívida)',equity:'Equity — Adiantamento cliente',despfin:'Despesa financeira'};
 let caixaGrid={},CAIXA_INI=12545931;
 try{caixaGrid=JSON.parse(localStorage.getItem('caixaGrid')||'{}');}catch(e){caixaGrid={};}
 try{const ci=localStorage.getItem('caixaIni'); if(ci!=null&&ci!=='') CAIXA_INI=num(ci);}catch(e){}
@@ -1643,19 +1643,20 @@ const cxPagOp=m=>CAIXA_PAG.filter(d=>d.mes===m&&d.tipo!==CX_CAP&&d.tipo!==CX_DIV
 const cxCapex=m=>CAIXA_REC.concat(CAIXA_PAG).filter(d=>d.mes===m&&d.tipo===CX_CAP);
 const cxBank=m=>CAIXA_PAG.filter(d=>d.mes===m&&d.tipo===CX_DIV);
 const cxAdiant=m=>CAIXA_REC.filter(d=>d.mes===m&&d.tipo===CX_ADI);
+const cxDespFin=m=>CAIXA_PAG.filter(d=>d.mes===m&&d.tipo===CX_DESPFIN);   // despesa financeira → entra no "other financial income" automaticamente
 const cxFin=m=>CAIXA_FIN.filter(d=>d.mes===m&&!d.bnb).reduce((s,d)=>s+d.rendimento,0);
 const cxSaldoTes=m=>CAIXA_FIN.filter(d=>d.mes===m&&!d.bnb).reduce((s,d)=>s+d.saldoFinal,0);
 function cxCalc(m){
   const receb=sumV(cxRecOp(m)), pag=sumV(cxPagOp(m)), fco=receb+pag;
   const capex=sumV(cxCapex(m)), bank=sumV(cxBank(m));
-  const plug=cxGet(m,'plug'),newDebt=cxGet(m,'newDebt'),parentInt=cxGet(m,'parentInt'),parentNew=cxGet(m,'parentNew');
-  const fcf=bank+parentInt+newDebt+parentNew+plug, fcfe=fco+capex+fcf;
+  const despfin=sumV(cxDespFin(m)), plug=cxGet(m,'plug'),newDebt=cxGet(m,'newDebt'),parentInt=cxGet(m,'parentInt'),parentNew=cxGet(m,'parentNew');
+  const fcf=bank+parentInt+newDebt+parentNew+despfin+plug, fcfe=fco+capex+fcf;   // despesa financeira automática + diferença manual (plug)
   const div=cxGet(m,'dividends'),adiant=sumV(cxAdiant(m)),reserva=cxGet(m,'reserva'),fin=cxFin(m);
   const changes=div+adiant+reserva+fin;
-  return {receb,pag,fco,capex,bank,plug,newDebt,parentInt,parentNew,fcf,fcfe,div,adiant,reserva,fin,changes};
+  return {receb,pag,fco,capex,bank,despfin,plug,newDebt,parentInt,parentNew,fcf,fcfe,div,adiant,reserva,fin,changes};
 }
 function drillCaixa(bucket,m){
-  const map={receb:cxRecOp,pag:cxPagOp,capex:cxCapex,bank:cxBank,equity:cxAdiant};
+  const map={receb:cxRecOp,pag:cxPagOp,capex:cxCapex,bank:cxBank,equity:cxAdiant,despfin:cxDespFin};
   const fn=map[bucket]; if(!fn) return;
   const linhas=fn(m).slice().sort((a,b)=>Math.abs(b.valor)-Math.abs(a.valor));
   if(!linhas.length){ flash('Sem lançamentos para '+(CX_NOME[bucket]||bucket)+' em '+m+'.'); return; }
@@ -1693,7 +1694,8 @@ function renderCaixa(){
   clineInput('(+) Bank New Debt','newDebt');
   clineInput('(–) Parent Company Juros','parentInt');
   clineInput('(+) Parent Company New Debt','parentNew');
-  clineInput('(–/+) Other fin. income (plug)','plug');
+  clineCalc('(–/+) Despesa financeira (auto)',m=>calc[m].despfin,'despfin');
+  clineInput('(–/+) Other fin. income — diferença (plug)','plug');
   clineCalc('(=) FCF',m=>calc[m].fcf,null,'sub');
   clineCalc('(=) FCFE',m=>calc[m].fcfe,null,'ebit');
   clineInput('(–) Dividendos','dividends');
@@ -1726,7 +1728,7 @@ function renderCaixa(){
     {lbl:'Caixa inicial',val:BRL.format(CAIXA_INI),sub:'dez/25'}
   ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
   const nota=document.getElementById('caixaNota');
-  if(nota){ nota.innerHTML='Células <b>amarelas</b> são digitadas (New Debt, juros/dividendos, reserva e o "plug"). Clique nas demais para ver os lançamentos e exportar. '+(temFin?'':'⚠️ Sem tesouraria carregada. ')+'FCO = Receb + Pag · FCFE = FCO + CAPEX + FCF · Cash Position acumula FCFE + Changes on cash. A <b>Despesa Financeira</b> fica fora do Pagamentos operacional (reconciliada no plug, igual à sua planilha). Receita financeira = Rendimento das aplicações (sem BNB).'; }
+  if(nota){ nota.innerHTML='Células <b>amarelas</b> são digitadas (New Debt, juros/dividendos, reserva e o "plug"). Clique nas demais para ver os lançamentos e exportar. '+(temFin?'':'⚠️ Sem tesouraria carregada. ')+'FCO = Receb + Pag · FCFE = FCO + CAPEX + FCF · Cash Position acumula FCFE + Changes on cash. A <b>Despesa Financeira</b> entra <b>automática</b> (linha própria clicável) no bloco financeiro — o "plug" que você digita é só a <b>diferença pura</b>. Receita financeira = Rendimento das aplicações (sem BNB).'; }
   destroy('chCaixa');
   charts.chCaixa=new Chart('chCaixa',{data:{labels:meses.map(m=>mesCurto(m)+'/'+m.slice(3)),datasets:[
     {type:'bar',label:'FCO',data:meses.map(m=>calc[m].fco),backgroundColor:'#00A0A8',order:3,datalabels:{display:false}},
@@ -1751,7 +1753,8 @@ function exportarCaixaXls(){
   aoa.push(lin('(+) Bank New Debt',m=>cxGet(m,'newDebt')));
   aoa.push(lin('(-) Parent Juros',m=>cxGet(m,'parentInt')));
   aoa.push(lin('(+) Parent New Debt',m=>cxGet(m,'parentNew')));
-  aoa.push(lin('(-/+) Other fin income (plug)',m=>cxGet(m,'plug')));
+  aoa.push(lin('(-/+) Despesa financeira (auto)',m=>calc[m].despfin));
+  aoa.push(lin('(-/+) Other fin income - diferença (plug)',m=>cxGet(m,'plug')));
   aoa.push(lin('(=) FCF',m=>calc[m].fcf));
   aoa.push(lin('(=) FCFE',m=>calc[m].fcfe));
   aoa.push(lin('(-) Dividendos',m=>cxGet(m,'dividends')));
