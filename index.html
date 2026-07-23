@@ -172,6 +172,10 @@
   .imptab{width:100%;border-collapse:collapse}
   .imptab td{padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
   .imptab td.k{color:var(--muted);white-space:nowrap;width:150px;text-transform:uppercase;font-size:11px;letter-spacing:.4px}
+  #tabCaixa td:first-child{text-align:left}
+  #tabCaixa input{width:74px;background:rgba(252,179,22,.14);border:1px solid rgba(252,179,22,.5);border-radius:6px;color:#fff;padding:4px 6px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+  #tabCaixa td{cursor:default}
+  #tabCaixa tr.dre-forte td,#tabCaixa tr.dre-ebit td{cursor:default}
   .drillbox{background:var(--panel);border:1px solid var(--accent2);border-radius:14px;padding:18px;width:min(1100px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.55);transform:scale(.96);transition:transform .22s var(--ease-out);overscroll-behavior:contain}
   .tablewrap{overscroll-behavior:contain}
   #drillModal.show .drillbox{transform:scale(1)}
@@ -248,6 +252,7 @@
       <button class="tabbtn" data-t="ops" onclick="showTab('ops')"><span class="ti" aria-hidden="true">🚚</span><span class="tl">Operações & R$/KM</span></button>
       <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')"><span class="ti" aria-hidden="true">🔎</span><span class="tl">Pareto & Gargalos</span></button>
       <button class="tabbtn" data-t="dash" onclick="showTab('dash')"><span class="ti" aria-hidden="true">📈</span><span class="tl">Análise de Custos</span></button>
+      <button class="tabbtn" data-t="caixa" onclick="showTab('caixa')"><span class="ti" aria-hidden="true">💵</span><span class="tl">Fluxo de Caixa</span></button>
     </nav>
     <div class="side-period"><label for="ytdAte">Período</label><select id="ytdAte" onchange="aplicarPeriodo()" title="Acumulado (YTD) de janeiro até o mês escolhido, OU um mês isolado — vale para TODAS as análises, drills e exports. Na nuvem fica sempre a base completa."></select></div>
   </aside>
@@ -562,6 +567,23 @@
       <div class="tablewrap"><table id="tabela"><thead></thead><tbody></tbody></table></div>
     </div>
   </div>
+
+  <!-- FLUXO DE CAIXA -->
+  <div id="caixa" class="ovrbox hidden">
+    <div class="sectitle">💵 Fluxo de Caixa <span class="tag" id="caixaTag">FCO · Capex · Dívida · FCFE · Cash Position</span></div>
+    <div class="scope">
+      <label for="caixaIni">Caixa inicial (dez/25)</label>
+      <input type="text" inputmode="decimal" id="caixaIni" style="width:150px" oninput="setCaixaIni(this.value)">
+      <span class="small">Recebimentos/Pagamentos vêm da base de Caixa (por Tipo). FCI→Capex · DIVIDA→Banco · ADIANTAMENTO→Equity. Rendimento das aplicações vem da base de Receita Financeira. O "plug" e as linhas de dívida/dividendos são digitados por mês.</span>
+    </div>
+    <div class="resumo" id="caixaResumo"></div>
+    <div class="kpis" id="caixaKpis"></div>
+    <div class="card full" style="margin-bottom:20px"><div class="expbar"><button class="xls png" onclick="exportarGraficoPNG('chCaixa','Fluxo de Caixa')">🖼️ Imagem</button><button class="xls" onclick="exportarCaixaXls()">⬇ Excel</button></div>
+      <h3>FCO × FCFE × Cash Position por mês</h3><div class="wrap" style="height:320px"><canvas id="chCaixa"></canvas></div></div>
+    <h3 style="font-size:14px;font-weight:600;margin:4px 0 10px">Quadro do Fluxo de Caixa <span class="small">— clique numa linha do mês para ver os lançamentos · células amarelas são digitadas</span></h3>
+    <div class="tablewrap dreq"><table id="tabCaixa"><thead></thead><tbody></tbody></table></div>
+    <div class="note" id="caixaNota"></div>
+  </div>
   </main>
 </div>
 
@@ -581,7 +603,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v84 · Consumo: coluna de litros consumidos no mês (custo ÷ R$/L) · 22/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v85 · Nível 2 — Fluxo de Caixa: FCO · Capex · Dívida · FCFE · Cash Position (base da tesouraria) · 22/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -596,6 +618,7 @@ let ORCKPI=null;     // {localidade:{mes:{km, custo:{manut,pneu,lubrif,comb,tota
 let ORCREC=[];       // orçamento de RECEITA: {tipo(fixa|variavel|viagens|cte|km|tax), contrato, regiao, mes, valor}
 let RECEITA_RAW=[];  // receita REAL completa: {mes, conta, contrato, regiao, tipo(fixa|variavel), valor(+), viag, texto}
 let SGA_RAW=[],SGA=[];   // SG&A REALIZADO: {mes, conta, texto, forn, loc, valor, nr, mao}
+let CAIXA_REC=[],CAIXA_PAG=[],CAIXA_FIN=[];   // FLUXO DE CAIXA: recebimentos/pagamentos {lado,tipo,mes,valor,...} + receita financeira {mes,bnb,rendimento,saldoFinal}
 let RECEITA=[];      // receita real da visão (cortada pelo Período YTD)
 let charts={};
 let sortState={col:'valor',dir:1};
@@ -608,7 +631,7 @@ try{ Chart.defaults.onHover=(e,els)=>{ const t=e.native&&e.native.target; if(t) 
 // ---------- ABAS ----------
 // estado na URL (?tab=&sub=&p=): permite deep-link direto para uma aba/subpágina/período
 const _q=new URLSearchParams(location.search);
-const TAB_IDS=['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash'];
+const TAB_IDS=['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash','caixa'];
 const _urlTab=TAB_IDS.includes(_q.get('tab'))?_q.get('tab'):null;
 let _urlSub=_q.get('sub'), _urlPer=_q.get('p');
 let activeTab=_urlTab||localStorage.getItem('activeTab')||'ovr';
@@ -629,7 +652,7 @@ setTimeout(()=>{ try{                             // reaplica a última visão d
   if(l!=null&&document.getElementById('wfLoc')&&[...document.getElementById('wfLoc').options].some(o=>o.value===l)) document.getElementById('wfLoc').value=l;
 }catch(e){} },0);
 let _has={ovr:false};
-function tabHasContent(id){ if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; if(id==='fixo') return DADOS.some(d=>natDe(d)==='fixo'); if(id==='rec') return RECEITA.length>0; if(id==='dre') return RECEITA.length>0&&DADOS.length>0; if(id==='sga') return SGA.length>0||ORCAMENTO.some(o=>/sg/.test(norm(o.tipo))); return DADOS.length>0; }
+function tabHasContent(id){ if(id==='caixa') return CAIXA_REC.length>0||CAIXA_PAG.length>0; if(id==='ovr') return _has.ovr; if(id==='exec') return DADOS.length>0&&ORCAMENTO.length>0; if(id==='fixo') return DADOS.some(d=>natDe(d)==='fixo'); if(id==='rec') return RECEITA.length>0; if(id==='dre') return RECEITA.length>0&&DADOS.length>0; if(id==='sga') return SGA.length>0||ORCAMENTO.some(o=>/sg/.test(norm(o.tipo))); return DADOS.length>0; }
 function showTab(t){ activeTab=t; try{localStorage.setItem('activeTab',t);}catch(e){} applyTabs();
   renderTab(activeTab);   // render preguiçoso: a aba renderiza na primeira abertura após os dados mudarem
   syncUrl();
@@ -650,8 +673,8 @@ function restoreSubs(){
 }
 function applyTabs(){
   const nav=document.getElementById('tabs');
-  const temDados=DADOS.length||ORCAMENTO.length||ORCKPI||ORCREC.length||RECEITA.length;
-  const avail=['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash'].filter(tabHasContent);
+  const temDados=DADOS.length||ORCAMENTO.length||ORCKPI||ORCREC.length||RECEITA.length||CAIXA_REC.length||CAIXA_PAG.length;
+  const avail=['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash','caixa'].filter(tabHasContent);
   const esconder=!temDados || !avail.length;
   const sb=document.getElementById('sidebar'); if(sb) sb.classList.toggle('hidden', esconder);   // some a barra lateral inteira quando não há dados (só o #drop aparece)
   if(!avail.includes(activeTab)) activeTab=avail[0]||'ovr';
@@ -659,7 +682,7 @@ function applyTabs(){
     b.style.display=avail.includes(b.dataset.t)?'':'none';
     b.classList.toggle('active', b.dataset.t===activeTab);
   });
-  ['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash'].forEach(id=>{
+  ['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash','caixa'].forEach(id=>{
     document.getElementById(id).classList.toggle('hidden', !(id===activeTab && avail.includes(id)));
   });
 }
@@ -754,7 +777,7 @@ function proxImport(){
       const wb=XLSX.read(buf,{type:'array',cellDates:true});
       const ws=wb.Sheets[ escolherAba(wb) ];
       const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,cellDates:true,defval:''});
-      const desc=analisarArquivo(aoa,ws,file.name);   // parseia numa área TEMPORÁRIA (não toca nas globais)
+      const desc=analisarArquivo(aoa,ws,file.name,wb);   // parseia numa área TEMPORÁRIA (não toca nas globais)
       if(desc.erro){ alert(desc.erro); return fimImport(); }
       let hash='—'; try{ hash=await sha256Hex(buf); }catch(e){}
       abrirPreviewImport(desc,{nome:file.name,tam:file.size,hash,abas:wb.SheetNames});
@@ -767,7 +790,15 @@ function resumoBase(arr,valFn){ valFn=valFn||(d=>d.valor||0);
   let tot=0,mn=null,mx=null; (arr||[]).forEach(d=>{ tot+=valFn(d)||0; const m=d.mes; if(m&&/^\d\d\/\d{4}$/.test(m)){ if(mn===null||mesOrd(m)<mesOrd(mn))mn=m; if(mx===null||mesOrd(m)>mesOrd(mx))mx=m; } });
   return {n:(arr||[]).length,total:tot,mesMin:mn,mesMax:mx}; }
 // detecta o tipo e devolve um DESCRITOR com a função que aplica a base (sem executá-la ainda)
-function analisarArquivo(aoa,ws,nome){
+function analisarArquivo(aoa,ws,nome,wb){
+  // FLUXO DE CAIXA: workbook com abas "Recebimentos" E "Pagamentos" (base da tesouraria)
+  if(wb&&ehCaixa(wb)){ const cx=parseCaixa(wb); if(!cx.rec.length&&!cx.pag.length) return {erro:'Reconheci "'+nome+'" como base de Caixa, mas não achei valores.'};
+    return {base:'Fluxo de Caixa (Receb. + Pag.)',novos:cx.rec.concat(cx.pag),caixa:cx,
+      aplicar:()=>{ CAIXA_REC=cx.rec; CAIXA_PAG=cx.pag; }, atual:CAIXA_REC.concat(CAIXA_PAG) }; }
+  // RECEITA FINANCEIRA (tesouraria): aba com blocos mensais e coluna "Rendimento"
+  if(wb&&ehReceitaFin(wb)){ const fin=parseReceitaFin(wb); if(!fin.length) return {erro:'Reconheci "'+nome+'" como Receita Financeira, mas não achei rendimentos.'};
+    return {base:'Receita Financeira (tesouraria)',novos:fin,finceira:true,valFn:d=>d.rendimento,valAtual:d=>d.rendimento,
+      aplicar:()=>{ CAIXA_FIN=fin; }, atual:CAIXA_FIN }; }
   if(ehReceitaGNL(aoa)){ const novos=parseReceita(aoa); if(!novos.length) return {erro:'Reconheci "'+nome+'" como Receita, mas não achei valores.'};
     return {base:'Receita real',novos,aplicar:()=>{RECEITA_RAW=novos;},atual:RECEITA_RAW}; }
   if(ehSGA(aoa)){ const novos=parseSGA(aoa); if(!novos.length) return {erro:'Reconheci "'+nome+'" como SG&A, mas não achei valores.'};
@@ -783,6 +814,41 @@ function analisarArquivo(aoa,ws,nome){
   const org=novos[0].origem;
   return {base:'Realizado — '+org,novos,org,atual:DADOS_RAW.filter(d=>d.origem===org),
     aplicar:()=>{ DADOS_RAW=DADOS_RAW.filter(d=>d.origem!==org).concat(novos); ratearSeguro(); }};
+}
+// ---------- PARSERS DO FLUXO DE CAIXA ----------
+function ehCaixa(wb){ const s=wb.SheetNames.map(n=>norm(n)); return s.includes('recebimentos')&&s.includes('pagamentos'); }
+function mesAM(v){ const s=String(v||'').trim(); let m=s.match(/^(\d{4})[\/\-](\d{1,2})$/); if(m) return m[2].padStart(2,'0')+'/'+m[1];
+  m=s.match(/^(\d{1,2})[\/\-](\d{4})$/); if(m) return m[1].padStart(2,'0')+'/'+m[2]; return ''; }
+function parseCaixaAba(wb,nomeAba,lado){
+  const nm=wb.SheetNames.find(n=>norm(n)===nomeAba); if(!nm) return [];
+  const aoa=XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:true,cellDates:true,defval:''});
+  const h=aoa[0].map(x=>norm(x));
+  const cTipo=h.indexOf('tipo'), cAM2=h.findIndex(x=>x==='ano/mes-2'), cVal=h.findIndex(x=>x.includes('montante em moeda')),
+        cSub=h.indexOf('subtipo'), cNome=h.findIndex(x=>x.includes('nome')), cDoc=h.findIndex(x=>/^n.{0,2}\s*documento/.test(x)),
+        cTexto=h.indexOf('texto'), cMesAlt=h.indexOf('ano/mes');
+  const out=[];
+  for(let i=1;i<aoa.length;i++){ const r=aoa[i]||[]; const v=+r[cVal]; if(typeof v!=='number'||!isFinite(v)) continue;
+    let mes=mesAM(r[cAM2]); if(!mes&&cMesAlt>=0) mes=mesAM(r[cMesAlt]); if(!mes) continue;
+    out.push({lado, tipo:String(r[cTipo]||'').trim().toUpperCase(), sub:cSub>=0?String(r[cSub]||'').slice(0,30):'', mes,
+      nome:cNome>=0?String(r[cNome]||'').slice(0,40):'', doc:cDoc>=0?String(r[cDoc]||'').slice(0,20):'',
+      texto:cTexto>=0?String(r[cTexto]||'').slice(0,50):'', valor:v}); }
+  return out;
+}
+function parseCaixa(wb){ return {rec:parseCaixaAba(wb,'recebimentos','R'), pag:parseCaixaAba(wb,'pagamentos','P')}; }
+// Receita financeira (tesouraria): blocos mensais; Rendimento e Saldo Final (excluindo BNB) — ano fixo 2026 por ora
+function ehReceitaFin(wb){ return !ehCaixa(wb)&&wb.SheetNames.some(n=>{ const a=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});
+  return a.some(r=>r.some(x=>norm(x)==='rendimento')&&r.some(x=>norm(x).includes('saldo final'))); }); }
+function parseReceitaFin(wb,ano){ ano=ano||2026;
+  const MESN={janeiro:1,fevereiro:2,marco:3,'março':3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12};
+  const out=[];
+  wb.SheetNames.forEach(sn=>{ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,cellDates:true,defval:''});
+    let cur=null,iR=-1,iSF=-1,iBco=-1,iInd=-1;
+    aoa.forEach(r=>{ const c0=norm(r[0]); const mn=MESN[c0];
+      if(mn){ cur=mn; iR=r.findIndex(x=>norm(x)==='rendimento'); iSF=r.findIndex(x=>norm(x).includes('saldo final')); iBco=r.findIndex(x=>norm(x)==='banco'); iInd=r.findIndex(x=>norm(x)==='indexador'); return; }
+      if(cur&&iR>=0&&typeof r[iR]==='number'){ const banco=norm((iBco>=0?r[iBco]:'')+' '+(iInd>=0?r[iInd]:'')); const bnb=/bnb|nordeste/.test(banco);
+        out.push({mes:String(cur).padStart(2,'0')+'/'+ano, banco:(iBco>=0?String(r[iBco]):''), bnb, rendimento:+r[iR]||0, saldoFinal:iSF>=0?(+r[iSF]||0):0}); } });
+  });
+  return out;
 }
 function abrirPreviewImport(desc,meta){
   IMPORT_PEND={desc,meta};
@@ -815,8 +881,8 @@ function abrirPreviewImport(desc,meta){
 function resetImpFoot(){ document.getElementById('impFoot').innerHTML='<button class="btn-ghost" onclick="cancelarImport()">Cancelar</button><button class="btn-primary" onclick="confirmarImport()">✓ Confirmar importação</button>'; }
 // cópia profunda das globais afetadas, para reverter com segurança se algo der errado
 function snapshotEstado(){ const c=x=>x==null?x:(typeof structuredClone==='function'?structuredClone(x):JSON.parse(JSON.stringify(x)));
-  return {DADOS_RAW:c(DADOS_RAW),ORCAMENTO:c(ORCAMENTO),ORCKPI:c(ORCKPI),ORCREC:c(ORCREC),RECEITA_RAW:c(RECEITA_RAW),SGA_RAW:c(SGA_RAW)}; }
-function restaurarEstado(s){ DADOS_RAW=s.DADOS_RAW; ORCAMENTO=s.ORCAMENTO; ORCKPI=s.ORCKPI; ORCREC=s.ORCREC; RECEITA_RAW=s.RECEITA_RAW; SGA_RAW=s.SGA_RAW; }
+  return {DADOS_RAW:c(DADOS_RAW),ORCAMENTO:c(ORCAMENTO),ORCKPI:c(ORCKPI),ORCREC:c(ORCREC),RECEITA_RAW:c(RECEITA_RAW),SGA_RAW:c(SGA_RAW),CAIXA_REC:c(CAIXA_REC),CAIXA_PAG:c(CAIXA_PAG),CAIXA_FIN:c(CAIXA_FIN)}; }
+function restaurarEstado(s){ DADOS_RAW=s.DADOS_RAW; ORCAMENTO=s.ORCAMENTO; ORCKPI=s.ORCKPI; ORCREC=s.ORCREC; RECEITA_RAW=s.RECEITA_RAW; SGA_RAW=s.SGA_RAW; CAIXA_REC=s.CAIXA_REC||[]; CAIXA_PAG=s.CAIXA_PAG||[]; CAIXA_FIN=s.CAIXA_FIN||[]; }
 function confirmarImport(){
   if(!IMPORT_PEND) return; const desc=IMPORT_PEND.desc;
   document.getElementById('impModal').classList.remove('show');
@@ -1197,7 +1263,7 @@ function areaDe(d){
 
 function atualizarUI(){
   montarYtd();
-  const temDados=DADOS.length||ORCAMENTO.length||ORCKPI||ORCREC.length||RECEITA.length;
+  const temDados=DADOS.length||ORCAMENTO.length||ORCKPI||ORCREC.length||RECEITA.length||CAIXA_REC.length||CAIXA_PAG.length;
   document.getElementById('drop').classList.toggle('hidden', !!temDados);
   const origens=[...new Set(DADOS.map(d=>d.origem))];
   let badge=[];
@@ -1218,7 +1284,7 @@ function atualizarUI(){
 }
 // ---------- RENDER PREGUIÇOSO: só a aba visível renderiza; as outras ao serem abertas ----------
 const _dirty={};
-const RENDER_TAB={ ovr:()=>renderOVR(), rec:()=>renderReceita(), dre:()=>renderDre(), exec:()=>renderExec(),
+const RENDER_TAB={ caixa:()=>renderCaixa(), ovr:()=>renderOVR(), rec:()=>renderReceita(), dre:()=>renderDre(), exec:()=>renderExec(),
   fixo:()=>renderFixo(), sga:()=>renderSga(), ops:()=>renderOps(), pareto:()=>renderParetoTab(), dash:()=>{ if(DADOS.length) render(); } };
 function marcarTudoSujo(){ Object.keys(RENDER_TAB).forEach(t=>_dirty[t]=true); }
 function renderTab(t){ if(RENDER_TAB[t]&&_dirty[t]){ _dirty[t]=false; RENDER_TAB[t](); } }
@@ -1557,6 +1623,146 @@ function renderConsumoCharts(){
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const i=c.dataIndex; return kmL[i]==null?'sem R$/L ou sem KM':[fmtKmL(kmL[i]),fmtLkm(Lkm[i]),'clique p/ ver os lançamentos'];}}}},
       scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>v.toFixed(1).replace('.',',')}}}}});
   });
+}
+// ========== FLUXO DE CAIXA (financeiro) ==========
+// FCO=Receb+Pag · FCF=Banco+ParentJuros+NewDebt+ParentNewDebt+plug · FCFE=FCO+Capex+FCF
+// Changes=Dividendos+Adiantamento+Reserva+Receita financeira · CashPos(m)=CashPos(m-1)+FCFE+Changes
+const CX_CAP='FCI', CX_DIV='DIVIDA', CX_ADI='ADIANTAMENTO';
+const CX_NOME={receb:'Recebimentos operacionais',pag:'Pagamentos operacionais',capex:'CAPEX (FCI)',bank:'Bank Principal/Juros (Dívida)',equity:'Equity — Adiantamento cliente'};
+let caixaGrid={},CAIXA_INI=12545931;
+try{caixaGrid=JSON.parse(localStorage.getItem('caixaGrid')||'{}');}catch(e){caixaGrid={};}
+try{const ci=localStorage.getItem('caixaIni'); if(ci!=null&&ci!=='') CAIXA_INI=num(ci);}catch(e){}
+const cxGet=(m,f)=>caixaGrid[m]?(+caixaGrid[m][f]||0):0;
+function setCaixaCel(m,f,v){caixaGrid[m]=caixaGrid[m]||{};caixaGrid[m][f]=num(v);try{localStorage.setItem('caixaGrid',JSON.stringify(caixaGrid));}catch(e){} renderCaixa(); }
+function setCaixaIni(v){CAIXA_INI=num(v);try{localStorage.setItem('caixaIni',String(CAIXA_INI));}catch(e){} renderCaixa(); }
+function caixaMeses(){return uniq(CAIXA_REC.concat(CAIXA_PAG).map(d=>d.mes)).sort((a,b)=>mesOrd(a)-mesOrd(b));}
+const sumV=a=>a.reduce((s,d)=>s+d.valor,0);
+const cxRecOp=m=>CAIXA_REC.filter(d=>d.mes===m&&d.tipo!==CX_CAP&&d.tipo!==CX_ADI);
+const cxPagOp=m=>CAIXA_PAG.filter(d=>d.mes===m&&d.tipo!==CX_CAP&&d.tipo!==CX_DIV);
+const cxCapex=m=>CAIXA_REC.concat(CAIXA_PAG).filter(d=>d.mes===m&&d.tipo===CX_CAP);
+const cxBank=m=>CAIXA_PAG.filter(d=>d.mes===m&&d.tipo===CX_DIV);
+const cxAdiant=m=>CAIXA_REC.filter(d=>d.mes===m&&d.tipo===CX_ADI);
+const cxFin=m=>CAIXA_FIN.filter(d=>d.mes===m&&!d.bnb).reduce((s,d)=>s+d.rendimento,0);
+const cxSaldoTes=m=>CAIXA_FIN.filter(d=>d.mes===m&&!d.bnb).reduce((s,d)=>s+d.saldoFinal,0);
+function cxCalc(m){
+  const receb=sumV(cxRecOp(m)), pag=sumV(cxPagOp(m)), fco=receb+pag;
+  const capex=sumV(cxCapex(m)), bank=sumV(cxBank(m));
+  const plug=cxGet(m,'plug'),newDebt=cxGet(m,'newDebt'),parentInt=cxGet(m,'parentInt'),parentNew=cxGet(m,'parentNew');
+  const fcf=bank+parentInt+newDebt+parentNew+plug, fcfe=fco+capex+fcf;
+  const div=cxGet(m,'dividends'),adiant=sumV(cxAdiant(m)),reserva=cxGet(m,'reserva'),fin=cxFin(m);
+  const changes=div+adiant+reserva+fin;
+  return {receb,pag,fco,capex,bank,plug,newDebt,parentInt,parentNew,fcf,fcfe,div,adiant,reserva,fin,changes};
+}
+function drillCaixa(bucket,m){
+  const map={receb:cxRecOp,pag:cxPagOp,capex:cxCapex,bank:cxBank,equity:cxAdiant};
+  const fn=map[bucket]; if(!fn) return;
+  const linhas=fn(m).slice().sort((a,b)=>Math.abs(b.valor)-Math.abs(a.valor));
+  if(!linhas.length){ flash('Sem lançamentos para '+(CX_NOME[bucket]||bucket)+' em '+m+'.'); return; }
+  const tot=sumV(linhas);
+  DRILL_LAST={linhas:linhas.map(d=>({mes:d.mes,loc:d.lado==='R'?'Recebimento':'Pagamento',centro:'',ccod:d.tipo,classe:d.sub||'',forn:d.nome,material:d.texto,objeto:'',origem:'Caixa',valor:d.valor})),nome:'Caixa '+(CX_NOME[bucket]||bucket)+' '+m};
+  document.getElementById('drillTit').innerHTML='<b>'+(CX_NOME[bucket]||bucket)+' · '+m+'</b> · '+INT.format(linhas.length)+' lançamentos · '+BRL.format(tot);
+  document.querySelector('#tabDrill thead').innerHTML='<tr><th class="txt">Tipo</th><th class="txt">Nome</th><th class="txt">Nº doc</th><th class="txt">Texto</th><th>Valor</th></tr>';
+  document.querySelector('#tabDrill tbody').innerHTML=linhas.slice(0,1000).map(d=>`<tr><td class="txt">${d.tipo}</td><td class="txt" title="${String(d.nome||'').replace(/"/g,'')}">${(d.nome||'—').slice(0,34)}</td><td class="txt">${d.doc||'—'}</td><td class="txt" title="${String(d.texto||'').replace(/"/g,'')}">${(d.texto||'').slice(0,40)}</td><td class="${d.valor<0?'neg':''}">${BRL.format(d.valor)}</td></tr>`).join('')+(linhas.length>1000?'<tr><td colspan="5" class="small txt">… 1.000 de '+INT.format(linhas.length)+'</td></tr>':'');
+  document.getElementById('drillModal').classList.add('show');
+}
+let CAIXA_LAST=null;
+function renderCaixa(){
+  const tb=document.getElementById('tabCaixa'); if(!tb) return;
+  if(!CAIXA_REC.length&&!CAIXA_PAG.length){ tb.querySelector('thead').innerHTML=''; tb.querySelector('tbody').innerHTML=''; return; }
+  const ini=document.getElementById('caixaIni'); if(ini&&document.activeElement!==ini) ini.value=INT.format(Math.round(CAIXA_INI));
+  const meses=caixaMeses();
+  const calc={}; meses.forEach(m=>calc[m]=cxCalc(m));
+  // cash position acumulado
+  let cash=CAIXA_INI; const cashPos={}; meses.forEach(m=>{ cash+=calc[m].fcfe+calc[m].changes; cashPos[m]=cash; });
+  CAIXA_LAST={meses,calc,cashPos,ini:CAIXA_INI};
+  const temFin=CAIXA_FIN.length>0;
+  const kmil=v=>{const x=Math.round(v/1000);const s=INT.format(Math.abs(x));return x<0?'('+s+')':s;};
+  // cabeçalho
+  tb.querySelector('thead').innerHTML='<tr><th class="txt">Linha (R$ mil)</th>'+meses.map(m=>'<th>'+mesCurto(m)+'/'+m.slice(3)+'</th>').join('')+'<th>Total</th></tr>';
+  // linhas: [nome, tipo, fn(m)->valor OU key p/ input, bucket p/ drill, classe css]
+  const R=[];
+  const somaMes=fn=>meses.reduce((s,m)=>s+fn(m),0);
+  const clineCalc=(nome,fn,bucket,cls)=>R.push({nome,fn,bucket,cls});
+  const clineInput=(nome,f)=>R.push({nome,input:f});
+  clineCalc('(+) Recebimentos',m=>calc[m].receb,'receb');
+  clineCalc('(–) Pagamentos',m=>calc[m].pag,'pag');
+  clineCalc('(=) FCO',m=>calc[m].fco,null,'forte');
+  clineCalc('(–) CAPEX (FCI)',m=>calc[m].capex,'capex');
+  clineCalc('(–) Bank Principal/Juros',m=>calc[m].bank,'bank');
+  clineInput('(+) Bank New Debt','newDebt');
+  clineInput('(–) Parent Company Juros','parentInt');
+  clineInput('(+) Parent Company New Debt','parentNew');
+  clineInput('(–/+) Other fin. income (plug)','plug');
+  clineCalc('(=) FCF',m=>calc[m].fcf,null,'sub');
+  clineCalc('(=) FCFE',m=>calc[m].fcfe,null,'ebit');
+  clineInput('(–) Dividendos','dividends');
+  clineCalc('(+) Equity — Adiantamento',m=>calc[m].adiant,'equity');
+  clineInput('(–/+) Variação Conta Reserva','reserva');
+  clineCalc('(+/–) Receita financeira'+(temFin?'':' (sem base)'),m=>calc[m].fin,null);
+  clineCalc('(+/–) Changes on cash',m=>calc[m].changes,null,'sub');
+  clineCalc('(=) Cash Position',m=>cashPos[m],null,'forte');
+  const cell=(v,extra)=>`<td ${extra||''}>${kmil(v)}</td>`;
+  tb.querySelector('tbody').innerHTML=R.map(l=>{
+    let tds='<td class="txt">'+l.nome+'</td>';
+    meses.forEach(m=>{
+      if(l.input){ tds+=`<td><input type="text" inputmode="decimal" value="${cxGet(m,l.input)||''}" style="width:74px" onchange="setCaixaCel('${m}','${l.input}',this.value)" title="digite o valor (R$)"></td>`; }
+      else { const v=l.fn(m); const clk=l.bucket?`style="cursor:pointer" onclick="drillCaixa('${l.bucket}','${m}')" title="clique p/ ver os lançamentos"`:''; tds+=cell(v,clk); }
+    });
+    // total
+    if(l.input) tds+=cell(somaMes(m=>cxGet(m,l.input)));
+    else if(l.nome.includes('Cash Position')) tds+='<td>'+kmil(cashPos[meses[meses.length-1]])+'</td>';
+    else tds+=cell(somaMes(l.fn));
+    return `<tr class="dre-${l.cls||'norm'}">${tds}</tr>`;
+  }).join('');
+  // KPIs + resumo + gráfico
+  const fim=meses[meses.length-1], cashFim=cashPos[fim];
+  const fcoAc=somaMes(m=>calc[m].fco), fcfeAc=somaMes(m=>calc[m].fcfe);
+  document.getElementById('caixaResumo').innerHTML=`📌 Caixa inicial <b>${BRL.format(CAIXA_INI)}</b> → Cash Position em ${mesCurto(fim)}/${fim.slice(3)} <b>${BRL.format(cashFim)}</b>. FCO acumulado <b>${BRL.format(fcoAc)}</b> · FCFE acumulado <b>${BRL.format(fcfeAc)}</b>.`+(temFin?'':' <span class="small">⚠️ Sem a base de Receita Financeira (tesouraria) — a linha de rendimento está zerada; carregue o Excel da tesouraria para fechar o Cash Position.</span>');
+  document.getElementById('caixaKpis').innerHTML=[
+    {lbl:'Cash Position ('+mesCurto(fim)+')',val:BRL.format(cashFim)},
+    {lbl:'FCO acumulado',val:BRL.format(fcoAc)},
+    {lbl:'FCFE acumulado',val:BRL.format(fcfeAc),cls:fcfeAc<0?'neg':''},
+    {lbl:'Caixa inicial',val:BRL.format(CAIXA_INI),sub:'dez/25'}
+  ].map(c=>`<div class="kpi glass"><div class="lbl">${c.lbl}</div><div class="val ${c.cls||''}">${c.val}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div>`).join('');
+  const nota=document.getElementById('caixaNota');
+  if(nota){ const tes=temFin?somaMes(m=>cxSaldoTes(m)):0; nota.innerHTML='Células <b>amarelas</b> são digitadas (dívida, dividendos, reserva e o "plug"). Clique nas demais para ver os lançamentos e exportar. '+(temFin?'':'Sem tesouraria carregada. ')+'FCO = Receb + Pag · FCFE = FCO + CAPEX + FCF · Cash Position acumula o FCFE + Changes on cash.'; }
+  destroy('chCaixa');
+  charts.chCaixa=new Chart('chCaixa',{data:{labels:meses.map(m=>mesCurto(m)+'/'+m.slice(3)),datasets:[
+    {type:'bar',label:'FCO',data:meses.map(m=>calc[m].fco),backgroundColor:'#00A0A8',order:3,datalabels:{display:false}},
+    {type:'bar',label:'FCFE',data:meses.map(m=>calc[m].fcfe),backgroundColor:'#FCB316',order:2,datalabels:{display:false}},
+    {type:'line',label:'Cash Position',data:meses.map(m=>cashPos[m]),yAxisID:'y2',borderColor:'#e2e8f0',backgroundColor:'#e2e8f0',tension:.25,pointRadius:3,order:1,datalabels:{display:false}}
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#e2e8f0'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+BRL.format(c.parsed.y)}}},
+    scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},
+      y:{grid:{color:'#334155'},ticks:{color:'#94a3b8',callback:v=>kBRL(v)}},
+      y2:{position:'right',grid:{display:false},title:{display:true,text:'Cash Position',color:'#e2e8f0',font:{size:10}},ticks:{color:'#cbd5e1',callback:v=>kBRL(v)}}}}});
+}
+function exportarCaixaXls(){
+  if(!CAIXA_LAST){ alert('Carregue a base de Caixa primeiro.'); return; }
+  const {meses,calc,cashPos}=CAIXA_LAST;
+  const lin=(nome,fn)=>[nome,...meses.map(fn),meses.reduce((s,m)=>s+fn(m),0)];
+  const aoa=[['Fluxo de Caixa — R$',...meses,'Total']];
+  aoa.push(lin('(+) Recebimentos',m=>calc[m].receb));
+  aoa.push(lin('(-) Pagamentos',m=>calc[m].pag));
+  aoa.push(lin('(=) FCO',m=>calc[m].fco));
+  aoa.push(lin('(-) CAPEX',m=>calc[m].capex));
+  aoa.push(lin('(-) Bank Principal/Juros',m=>calc[m].bank));
+  aoa.push(lin('(+) Bank New Debt',m=>cxGet(m,'newDebt')));
+  aoa.push(lin('(-) Parent Juros',m=>cxGet(m,'parentInt')));
+  aoa.push(lin('(+) Parent New Debt',m=>cxGet(m,'parentNew')));
+  aoa.push(lin('(-/+) Other fin income (plug)',m=>cxGet(m,'plug')));
+  aoa.push(lin('(=) FCF',m=>calc[m].fcf));
+  aoa.push(lin('(=) FCFE',m=>calc[m].fcfe));
+  aoa.push(lin('(-) Dividendos',m=>cxGet(m,'dividends')));
+  aoa.push(lin('(+) Equity - Adiantamento',m=>calc[m].adiant));
+  aoa.push(lin('(-/+) Variação Reserva',m=>cxGet(m,'reserva')));
+  aoa.push(lin('(+/-) Receita financeira',m=>calc[m].fin));
+  aoa.push(lin('(+/-) Changes on cash',m=>calc[m].changes));
+  aoa.push(['(=) Cash Position',...meses.map(m=>cashPos[m]),cashPos[meses[meses.length-1]]]);
+  // aba de lançamentos base
+  const base=[['Lado','Tipo','Mês','Nome','Nº doc','Texto','Valor (R$)']].concat(
+    CAIXA_REC.concat(CAIXA_PAG).map(d=>[d.lado==='R'?'Recebimento':'Pagamento',d.tipo,d.mes,d.nome,d.doc,d.texto,d.valor]));
+  baixarXlsx('Fluxo_de_Caixa',[{nome:'Fluxo',aoa},{nome:'Lançamentos (base)',aoa:base}]);
 }
 function renderKmTable(){
   const meses=opsMeses();
@@ -3305,6 +3511,7 @@ async function carregarDaNuvem(){
       DATASET_VERSION=(typeof data.version==='number')?data.version:0;
       const obj=descomprimir(data.payload);
       DADOS_RAW=obj.DADOS||[]; ORCAMENTO=obj.ORCAMENTO||[]; ORCKPI=obj.ORCKPI||null; ORCREC=obj.ORCREC||[]; RECEITA_RAW=obj.RECEITA||[]; SGA_RAW=obj.SGA||[];
+      CAIXA_REC=obj.CAIXA_REC||[]; CAIXA_PAG=obj.CAIXA_PAG||[]; CAIXA_FIN=obj.CAIXA_FIN||[];
       migrarDados();   // bases salvas antes dos blocos do fixo ganham bloco/categoria corretos
       aplicarPeriodo(); marcarAtualizado(data.updated_at);
     }else{
@@ -3322,7 +3529,7 @@ async function salvarNaNuvem(auto){
   if(!senha){ (auto?flash('🔒 Base NÃO salva na nuvem — precisa da senha de atualização.'):alert('Salvamento cancelado — precisa da senha de atualização.')); return; }
   info.innerHTML='<span class="spin"></span> salvando…';
   try{
-    const payload=comprimir({DADOS:DADOS_RAW,ORCAMENTO,ORCKPI,ORCREC,RECEITA:RECEITA_RAW,SGA:SGA_RAW});   // sempre a base COMPLETA (o seletor de período é só visão)
+    const payload=comprimir({DADOS:DADOS_RAW,ORCAMENTO,ORCKPI,ORCREC,RECEITA:RECEITA_RAW,SGA:SGA_RAW,CAIXA_REC,CAIXA_PAG,CAIXA_FIN});   // sempre a base COMPLETA (o seletor de período é só visão)
     const meta={by:(localStorage.getItem('dsUser')||'').slice(0,60),rows:String(DADOS_RAW.length+RECEITA_RAW.length+SGA_RAW.length),
       checkup:(CK_LAST&&typeof CK_LAST.falhas==='number')?(CK_LAST.falhas?('com_falhas('+CK_LAST.falhas+')'):'verde'):''};
     // controle OTIMISTA: só grava se a versão que carreguei ainda for a atual na nuvem
