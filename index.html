@@ -59,7 +59,18 @@
   .ovrbox{background:transparent;border:none;border-radius:0;padding:0;margin-bottom:30px}
   .resumo{background:rgba(0,160,168,.10);border-left:3px solid var(--accent);border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:13.5px;line-height:1.6}
   .resumo b{color:#fff}
-  .tabs{display:flex;flex-direction:column;gap:5px;align-items:stretch}
+  .tabs{display:flex;flex-direction:column;gap:9px;align-items:stretch}
+  .navgroup{display:flex;flex-direction:column;gap:5px}
+  .grouphdr{background:transparent;color:var(--txt);border:1px solid transparent;border-radius:10px;padding:9px 10px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;transition:background-color .16s var(--ease-out)}
+  .grouphdr .ti{font-size:15px;width:20px;text-align:center;flex:none}
+  .grouphdr .tl{flex:1}
+  .grouphdr .chev{font-size:10px;color:var(--muted);flex:none;transition:transform .18s var(--ease-out)}
+  .grouphdr[aria-expanded="true"] .chev{transform:rotate(90deg)}
+  @media(hover:hover){.grouphdr:hover{background:var(--panel2)}}
+  .grouphdr:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .groupitems{display:flex;flex-direction:column;gap:5px;margin-left:9px;padding-left:9px;border-left:1px solid var(--line)}
+  .navgroup[data-open="false"] .groupitems{display:none}
   .tabbtn{background:transparent;color:var(--muted);border:1px solid transparent;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;
     display:flex;align-items:center;gap:10px;text-align:left;width:100%;transition:background-color .16s var(--ease-out),color .16s var(--ease-out),border-color .16s var(--ease-out)}
   .tabbtn .ti{font-size:15px;width:20px;text-align:center;flex:none}
@@ -211,8 +222,11 @@
     .layout{display:block}
     .sidebar{position:static;flex:none;width:100%;min-width:0;max-width:100%;box-sizing:border-box;height:auto;overflow:visible;border-right:none;
       border-bottom:1px solid var(--line);padding:8px 12px;flex-direction:column;gap:8px}
-    .tabs{flex-direction:row;overflow-x:auto;flex-wrap:nowrap;gap:6px;min-width:0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-    .tabs::-webkit-scrollbar{display:none}
+    .tabs{flex-direction:column;gap:8px;min-width:0}
+    .navgroup{gap:6px}
+    .groupitems{flex-direction:row;overflow-x:auto;flex-wrap:nowrap;gap:6px;margin-left:0;padding-left:0;border-left:none;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .groupitems::-webkit-scrollbar{display:none}
+    .grouphdr{padding:6px 8px}
     .tabbtn{width:auto;flex:none;padding:8px 12px;font-size:12.5px;border:1px solid var(--line);border-radius:20px}
     .tabbtn .tl{max-width:none}
     .side-period{margin-top:0;border-top:none;padding-top:0;flex-direction:row;align-items:center;gap:8px}
@@ -243,16 +257,28 @@
   <!-- BARRA LATERAL DE NAVEGAÇÃO (estilo BI) -->
   <aside class="sidebar hidden" id="sidebar">
     <nav id="tabs" class="tabs" aria-label="Seções do dashboard">
-      <button class="tabbtn" data-t="ovr" onclick="showTab('ovr')"><span class="ti" aria-hidden="true">🎯</span><span class="tl">Orçado vs Real</span></button>
-      <button class="tabbtn" data-t="rec" onclick="showTab('rec')"><span class="ti" aria-hidden="true">💰</span><span class="tl">Receita & Viagens</span></button>
-      <button class="tabbtn" data-t="dre" onclick="showTab('dre')"><span class="ti" aria-hidden="true">🏦</span><span class="tl">DRE / EBITDA</span></button>
-      <button class="tabbtn" data-t="exec" onclick="showTab('exec')"><span class="ti" aria-hidden="true">📋</span><span class="tl">Execução por Área</span></button>
-      <button class="tabbtn" data-t="fixo" onclick="showTab('fixo')"><span class="ti" aria-hidden="true">🏢</span><span class="tl">Custos Fixos</span></button>
-      <button class="tabbtn" data-t="sga" onclick="showTab('sga')"><span class="ti" aria-hidden="true">💼</span><span class="tl">SG&amp;A</span></button>
-      <button class="tabbtn" data-t="ops" onclick="showTab('ops')"><span class="ti" aria-hidden="true">🚚</span><span class="tl">Operações & R$/KM</span></button>
-      <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')"><span class="ti" aria-hidden="true">🔎</span><span class="tl">Pareto & Gargalos</span></button>
-      <button class="tabbtn" data-t="dash" onclick="showTab('dash')"><span class="ti" aria-hidden="true">📈</span><span class="tl">Análise de Custos</span></button>
-      <button class="tabbtn" data-t="caixa" onclick="showTab('caixa')"><span class="ti" aria-hidden="true">💵</span><span class="tl">Fluxo de Caixa</span></button>
+      <div class="navgroup" data-g="contabil" data-open="true">
+        <button class="grouphdr" aria-expanded="true" aria-controls="grp-contabil" onclick="toggleGroup('contabil')"><span class="ti" aria-hidden="true">📒</span><span class="tl">Contábil</span><span class="chev" aria-hidden="true">▸</span></button>
+        <div class="groupitems" id="grp-contabil" role="group" aria-label="Contábil">
+          <button class="tabbtn" data-t="ovr" onclick="showTab('ovr')"><span class="ti" aria-hidden="true">🎯</span><span class="tl">Orçado vs Real</span></button>
+          <button class="tabbtn" data-t="rec" onclick="showTab('rec')"><span class="ti" aria-hidden="true">💰</span><span class="tl">Receita & Viagens</span></button>
+          <button class="tabbtn" data-t="dre" onclick="showTab('dre')"><span class="ti" aria-hidden="true">🏦</span><span class="tl">DRE / EBITDA</span></button>
+          <button class="tabbtn" data-t="exec" onclick="showTab('exec')"><span class="ti" aria-hidden="true">📋</span><span class="tl">Execução por Área</span></button>
+          <button class="tabbtn" data-t="fixo" onclick="showTab('fixo')"><span class="ti" aria-hidden="true">🏢</span><span class="tl">Custos Fixos</span></button>
+          <button class="tabbtn" data-t="sga" onclick="showTab('sga')"><span class="ti" aria-hidden="true">💼</span><span class="tl">SG&amp;A</span></button>
+          <button class="tabbtn" data-t="ops" onclick="showTab('ops')"><span class="ti" aria-hidden="true">🚚</span><span class="tl">Operações & R$/KM</span></button>
+          <button class="tabbtn" data-t="pareto" onclick="showTab('pareto')"><span class="ti" aria-hidden="true">🔎</span><span class="tl">Pareto & Gargalos</span></button>
+          <button class="tabbtn" data-t="dash" onclick="showTab('dash')"><span class="ti" aria-hidden="true">📈</span><span class="tl">Análise de Custos</span></button>
+        </div>
+      </div>
+      <div class="navgroup" data-g="financeiro" data-open="false">
+        <button class="grouphdr" aria-expanded="false" aria-controls="grp-financeiro" onclick="toggleGroup('financeiro')"><span class="ti" aria-hidden="true">💵</span><span class="tl">Financeiro</span><span class="chev" aria-hidden="true">▸</span></button>
+        <div class="groupitems" id="grp-financeiro" role="group" aria-label="Financeiro">
+          <button class="tabbtn" data-t="caixa" data-sp="quadro" onclick="goFin('quadro')"><span class="ti" aria-hidden="true">📋</span><span class="tl">Fluxo de Caixa</span></button>
+          <button class="tabbtn" data-t="caixa" data-sp="forn" onclick="goFin('forn')"><span class="ti" aria-hidden="true">🏭</span><span class="tl">Fornecedores</span></button>
+          <button class="tabbtn" data-t="caixa" data-sp="capex" onclick="goFin('capex')"><span class="ti" aria-hidden="true">🏗️</span><span class="tl">Capex</span></button>
+        </div>
+      </div>
     </nav>
     <div class="side-period"><label for="ytdAte">Período</label><select id="ytdAte" onchange="aplicarPeriodo()" title="Acumulado (YTD) de janeiro até o mês escolhido, OU um mês isolado — vale para TODAS as análises, drills e exports. Na nuvem fica sempre a base completa."></select></div>
   </aside>
@@ -571,7 +597,7 @@
   <!-- FLUXO DE CAIXA -->
   <div id="caixa" class="ovrbox hidden">
     <div class="sectitle">💵 Fluxo de Caixa <span class="tag" id="caixaTag">FCO · Capex · Dívida · FCFE · Cash Position</span></div>
-    <div class="subnav">
+    <div class="subnav" style="display:none">
       <button class="active" data-sp="quadro" onclick="showSub('caixa','quadro')">📋 Quadro</button>
       <button data-sp="forn" onclick="showSub('caixa','forn')">🏭 Fornecedores</button>
       <button data-sp="capex" onclick="showSub('caixa','capex')">🏗️ Capex</button>
@@ -631,7 +657,7 @@
   </div>
 </div>
 
-<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v89 · Fluxo de Caixa: análises de Fornecedores (Pareto) e Capex (composição) + gráficos clicáveis · 22/07</b> · Chart.js + SheetJS</footer>
+<footer>Dashboard FP&amp;A · Orçado vs Real + análise de custos (SAP KSB1) · <b style="color:var(--accent)">UI v90 · Menu em duas seções: Contábil e Financeiro (accordion). Fluxo de Caixa, Fornecedores e Capex viram itens próprios do menu · 24/07</b> · Chart.js + SheetJS</footer>
 
 <script>
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -690,7 +716,39 @@ function showSub(tab,key){
   try{localStorage.setItem('sub:'+tab,key);}catch(e){}
   document.querySelectorAll('#'+tab+' .sp').forEach(d=>d.classList.toggle('active',d.dataset.sp===key));
   document.querySelectorAll('#'+tab+' .subnav button').forEach(b=>b.classList.toggle('active',b.dataset.sp===key));
+  refreshNav();
   if(tab===activeTab) syncUrl();
+}
+// grupos da barra lateral (Contábil / Financeiro) — acordeão, um aberto por vez
+const GRUPO_DE={ovr:'contabil',rec:'contabil',dre:'contabil',exec:'contabil',fixo:'contabil',sga:'contabil',ops:'contabil',pareto:'contabil',dash:'contabil',caixa:'financeiro'};
+function toggleGroup(g){
+  const grp=document.querySelector('.navgroup[data-g="'+g+'"]'); if(!grp) return;
+  const abrir=grp.getAttribute('data-open')!=='true';
+  document.querySelectorAll('.navgroup').forEach(x=>{
+    const on=(x===grp)?abrir:false;
+    x.setAttribute('data-open',on?'true':'false');
+    x.querySelector('.grouphdr')?.setAttribute('aria-expanded',on?'true':'false');
+  });
+  try{localStorage.setItem('navGroup',abrir?g:'');}catch(e){}
+}
+function abrirGrupoDe(tab){                                    // garante que o grupo da aba ativa esteja aberto
+  const g=GRUPO_DE[tab]||'contabil';
+  document.querySelectorAll('.navgroup').forEach(x=>{
+    const on=x.getAttribute('data-g')===g;
+    x.setAttribute('data-open',on?'true':'false');
+    x.querySelector('.grouphdr')?.setAttribute('aria-expanded',on?'true':'false');
+  });
+}
+// item "Fluxo de Caixa / Fornecedores / Capex" do menu = aba caixa + subpágina
+function goFin(sub){ showTab('caixa'); showSub('caixa',sub); }
+function subAtualDe(tab){ try{ return localStorage.getItem('sub:'+tab); }catch(e){ return null; } }
+function refreshNav(){                                          // marca o item certo como ativo (leva a subpágina em conta)
+  const subCx=subAtualDe('caixa')||'quadro';
+  document.querySelectorAll('#tabs .tabbtn').forEach(b=>{
+    const mesmaAba=b.dataset.t===activeTab;
+    const ok=mesmaAba && (!b.dataset.sp || b.dataset.sp===(activeTab==='caixa'?subCx:b.dataset.sp));
+    b.classList.toggle('active', ok);
+  });
 }
 function restoreSubs(){
   document.querySelectorAll('.subnav').forEach(nav=>{
@@ -708,8 +766,13 @@ function applyTabs(){
   if(!avail.includes(activeTab)) activeTab=avail[0]||'ovr';
   document.querySelectorAll('#tabs .tabbtn').forEach(b=>{
     b.style.display=avail.includes(b.dataset.t)?'':'none';
-    b.classList.toggle('active', b.dataset.t===activeTab);
   });
+  document.querySelectorAll('.navgroup').forEach(grp=>{                 // esconde a seção inteira se nenhum item dela tem dados
+    const temItem=[...grp.querySelectorAll('.tabbtn')].some(b=>b.style.display!=='none');
+    grp.style.display=temItem?'':'none';
+  });
+  abrirGrupoDe(activeTab);                                              // abre a seção da aba ativa
+  refreshNav();
   ['ovr','rec','dre','exec','fixo','sga','ops','pareto','dash','caixa'].forEach(id=>{
     document.getElementById(id).classList.toggle('hidden', !(id===activeTab && avail.includes(id)));
   });
